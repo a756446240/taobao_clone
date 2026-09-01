@@ -279,6 +279,13 @@ class MaterialPoolProvider extends ChangeNotifier {
   /// 推荐区商品流：优先用素材池（图+名严格对应，按名称去重），不足时用内置 mock 补齐
   List<SearchResultItem> recommendGoods(int count, {Random? rand}) {
     final r = rand ?? Random();
+    // 推荐流顺手渐进触发未命名素材的 AI 起名（每次最多 3 条，识别中/失败过的自动跳过；
+    // 不 await，识别完成后 setTitle → notifyListeners 会自动刷新界面）
+    for (final e
+        in _entries.where((e) => e.title.isEmpty).take(3)) {
+      // ignore: unawaited_futures
+      aiNameEntry(e);
+    }
     final pool = _entries.where((e) => e.title.isNotEmpty).toList()
       ..shuffle(r);
     // 同名素材只保留一条（内置与用户导入可能重复）
