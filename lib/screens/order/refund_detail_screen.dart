@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,8 +11,11 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
+import 'refund_reason_picker.dart';
 
-/// 退款详情页（照 3.4 APK：大标题 + 副标题/倒计时 + 三步进度 + 金额卡 + 协商历史）
+/// 退款详情页 v3.5 整改版
+/// 新增：未发货秒退横幅、运费保障、可折叠协商历史、寄件详情、
+/// "您是否遇到以下问题？"反馈区、AI 随机商品推荐、4 开头 17 位退款编号、可选退款原因
 class RefundDetailScreen extends StatefulWidget {
   final ShoppingCartShop shop;
   final OrderItem item;
@@ -38,7 +42,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     _shop = widget.shop;
     _ensureDefaults();
     _startTimerIfPending();
-    // 默认值补齐后落盘一次，保证退款详情页与售后列表卡片数据一致
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<CartProvider>().updateOrderItem(_item);
@@ -51,9 +54,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     super.dispose();
   }
 
-  /// 补齐退款字段默认值（initState 后统一落盘，与售后列表保持同步）
+  /// 补齐退款字段默认值
   void _ensureDefaults() {
-    // 状态：优先读持久化字段；根据订单状态标题推导
     if (_item.refundStatus.isEmpty) {
       _item.refundStatus =
           _item.statusTitle.contains('待商家退款') ? '待商家退款' : '退款成功';
@@ -64,9 +66,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           _item.paymentMethod.contains('微信') ? '微信支付' : '支付宝';
     }
     if (_item.refundAmount <= 0) {
-      // 退款金额默认 = 实付价（录入多少就是多少，不乘规格数量）
-      _item.refundAmount =
-          double.parse(_item.price.toStringAsFixed(2));
+      _item.refundAmount = double.parse(_item.price.toStringAsFixed(2));
     }
     if (_item.refundApplyTime.isEmpty) {
       _item.refundApplyTime =
@@ -76,6 +76,24 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       _item.refundDoneTime =
           _item.shipTime.isNotEmpty ? _item.shipTime : _item.createTime;
     }
+    // 退款编号：4 开头 17 位随机生成
+    if (_item.refundNumber.isEmpty) {
+      _item.refundNumber = _genRefundNumber();
+    }
+    // 未发货秒退：状态是退款成功 && 没有发货时间 && 申请时间跟完成时间接近
+    if (_item.shipTime.isEmpty && !_isPending) {
+      _item.isInstantRefund = true;
+    }
+  }
+
+  /// 生成 4 开头 17 位退款编号
+  String _genRefundNumber() {
+    final rand = Random();
+    final sb = StringBuffer('4');
+    for (var i = 0; i < 16; i++) {
+      sb.write(rand.nextInt(10));
+    }
+    return sb.toString();
   }
 
   bool get _isPending =>
@@ -91,7 +109,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     }
   }
 
-  /// 商家处理倒计时（申请时间 + 3 天）
   (int, int, int) _merchantCountdown() {
     try {
       final t = DateTime.parse(_item.refundApplyTime.replaceFirst(' ', 'T'));
@@ -129,13 +146,20 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 child: Column(
                   children: [
                     _buildStatusHeader(),
+                    // 未发货秒退横幅（可关）
+                    if (_item.isInstantRefund &&
+                        _item.showInstantRefundBanner &&
+                        _isDone)
+                      _buildInstantRefundBanner(),
                     _buildAmountCard(),
                     if (_isPending && _item.refundLogistics.isNotEmpty)
                       _buildLogisticsCard(),
                     _buildShopRow(),
                     _buildProductCard(),
-                    _buildHistoryCard(),
+                    _buildRefundInfoCard(),
                     _buildRecommendCard(),
+                    // "您是否遇到以下问题？"反馈区（可关）
+                    if (_item.showHelpSection) _buildHelpSection(),
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -168,7 +192,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                     fontWeight: FontWeight.bold,
                     color: Colors.black87)),
           ),
-          // 编辑入口：双击打开编辑菜单
           GestureDetector(
             onDoubleTap: () => _showEditMenu(),
             child:
@@ -212,7 +235,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  /// 三步进度条：申请退款 → 商家处理 → 退款结束
   Widget _stepRow() {
     Widget node(String label, bool done, bool current) {
       final color = (done || current)
@@ -250,7 +272,53 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 退款金额卡 ============
+  // ============ 未发货秒退横幅 ============
+  Widget _buildInstantRefundBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF4E8), Color(0xFFFFE8D1)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5000),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('未发货秒退',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('未发货订单享受秒退款',
+                style: TextStyle(fontSize: 12, color: Color(0xFF8B4513))),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _item.showInstantRefundBanner = false;
+              });
+              context.read<CartProvider>().updateOrderItem(_item);
+            },
+            child: const Icon(Icons.close, size: 16, color: Color(0xFF999999)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 退款金额卡（含运费保障） ============
   Widget _buildAmountCard() {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
@@ -280,34 +348,84 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           ),
           if (_isDone) ...[
             const SizedBox(height: 10),
-            GestureDetector(
+            // 退款明细列表（参考图 6：退回花呗/返还优惠/退回淘金币/运费保障）
+            _buildRefundDetailRow(
+              icon: Icons.account_balance,
+              label: '退回${_item.refundMethod}',
+              value: '¥${_item.refundAmount.toStringAsFixed(2)}',
+              iconColor: const Color(0xFF1890FF),
               onDoubleTap: _editRefundMethod,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                    color: const Color(0xFFF7F7F7),
-                    borderRadius: BorderRadius.circular(4)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.arrow_downward,
-                        color: Color(0xFF2A9655), size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '退回至${_item.refundMethod}  ¥${_item.refundAmount.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF333333)),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right,
-                        size: 14, color: Colors.grey),
-                  ],
-                ),
-              ),
             ),
+            if (_item.refundDiscount > 0 && _item.showRefundDiscount)
+              _buildRefundDetailRow(
+                icon: Icons.card_giftcard,
+                label: '返还优惠',
+                value: '¥${_item.refundDiscount.toStringAsFixed(2)}',
+                iconColor: const Color(0xFFFF8C00),
+              ),
+            if (_item.returnedCoins > 0)
+              _buildRefundDetailRow(
+                icon: Icons.monetization_on,
+                label: '退回淘金币',
+                value: '${_item.returnedCoins}个',
+                iconColor: const Color(0xFFFFB300),
+              ),
+            // 运费保障（参考图 6 红框）
+            if (_item.hasFreightInsurance)
+              _buildRefundDetailRow(
+                icon: Icons.shield_outlined,
+                label: '运费保障',
+                value: '',
+                iconColor: const Color(0xFFFF5000),
+                sublabel: '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+              ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildRefundDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color iconColor,
+    String? sublabel,
+    VoidCallback? onDoubleTap,
+  }) {
+    return GestureDetector(
+      onDoubleTap: onDoubleTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF333333))),
+                  if (sublabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(sublabel,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF999999))),
+                  ],
+                ],
+              ),
+            ),
+            if (value.isNotEmpty)
+              Text(value,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF1A1A1A),
+                      fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }
@@ -442,8 +560,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 协商历史 ============
-  Widget _buildHistoryCard() {
+  // ============ 协商历史 + 退款信息（可折叠） ============
+  Widget _buildRefundInfoCard() {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
@@ -452,98 +570,178 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('协商历史',
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1A1A1A))),
-          const SizedBox(height: 10),
-          _historyItem(
-            '申请退款',
-            '退款金额 ¥${_item.refundAmount.toStringAsFixed(2)} · 已提交申请',
-            _item.refundApplyTime,
-            true,
-            onTap: () => _editTime('修改申请时间', _item.refundApplyTime, (v) {
-              context
-                  .read<CartProvider>()
-                  .updateOrderItem(_item, refundApplyTime: v);
-              setState(() {});
-            }),
+          // 标题行
+          Row(
+            children: [
+              const Text('协商历史',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A1A1A))),
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  // 查看完整协商历史弹窗（略，可扩展）
+                  _toast('查看完整协商历史');
+                },
+                child: const Text('查看',
+                    style:
+                        TextStyle(fontSize: 12, color: Color(0xFF999999))),
+              ),
+            ],
           ),
-          _historyLine(),
-          if (_isPending)
-            _historyItem('商家处理', '等待商家处理中', '', false, pending: true)
-          else
-            _historyItem(
-              '退款成功',
-              '退款已原路退回至${_item.refundMethod}',
-              _item.refundDoneTime,
-              true,
-              onTap: () => _editTime('修改完成时间', _item.refundDoneTime, (v) {
-                context
-                    .read<CartProvider>()
-                    .updateOrderItem(_item, refundDoneTime: v);
-                setState(() {});
-              }),
+          const SizedBox(height: 10),
+          // 退款完结行
+          _historyItem(
+            _isPending ? '商家处理' : '退款完结',
+            _isPending ? '等待商家处理中' : '退款已原路退回至${_item.refundMethod}',
+            _isPending ? '' : _item.refundDoneTime,
+            _isDone,
+            pending: _isPending,
+          ),
+          const SizedBox(height: 12),
+          // 可折叠的"查看全部售后信息"
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _item.refundInfoCollapsed = !_item.refundInfoCollapsed;
+              });
+              context.read<CartProvider>().updateOrderItem(_item);
+            },
+            child: Row(
+              children: [
+                Text(
+                  _item.refundInfoCollapsed ? '查看全部售后信息' : '收起售后信息',
+                  style: const TextStyle(
+                      fontSize: 13, color: Color(0xFF666666)),
+                ),
+                Icon(
+                  _item.refundInfoCollapsed
+                      ? Icons.keyboard_arrow_down
+                      : Icons.keyboard_arrow_up,
+                  size: 16,
+                  color: const Color(0xFF999999),
+                ),
+              ],
             ),
+          ),
+          // 展开的售后信息（参考图 8）
+          if (!_item.refundInfoCollapsed) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: Color(0xFFF0F0F0)),
+            const SizedBox(height: 10),
+            _infoRow('退款原因',
+                _item.refundReason.isEmpty ? '点击选择' : _item.refundReason,
+                onTap: _pickRefundReason, isLink: _item.refundReason.isEmpty),
+            _infoRow('申请金额',
+                '共${_item.refundAmount.toStringAsFixed(2)}元'),
+            _infoRow('退款完结', _item.refundDoneTime),
+            _infoRow('申请时间', _item.refundApplyTime),
+            _infoRowWithCopy('退款编号', _item.refundNumber),
+          ],
         ],
       ),
-    );
-  }
-
-  Widget _historyLine() {
-    return Container(
-      margin: const EdgeInsets.only(left: 5),
-      width: 1,
-      height: 16,
-      color: const Color(0xFFE5E5E5),
     );
   }
 
   Widget _historyItem(String title, String desc, String time, bool done,
-      {bool pending = false, VoidCallback? onTap}) {
-    // 双击触发编辑
+      {bool pending = false}) {
     final color = done
         ? const Color(0xFF2A9655)
         : (pending ? const Color(0xFFFF5000) : const Color(0xFF666666));
-    return GestureDetector(
-      onDoubleTap: onTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(pending ? Icons.schedule : (done ? Icons.check_circle : Icons.circle),
-              size: 12, color: color),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        fontSize: 13, color: color, fontWeight: FontWeight.w500)),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+            pending
+                ? Icons.schedule
+                : (done ? Icons.check_circle : Icons.circle),
+            size: 14,
+            color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 13, color: color, fontWeight: FontWeight.w500)),
+              if (desc.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(desc,
-                    style:
-                        const TextStyle(fontSize: 12, color: Color(0xFF666666))),
-                if (time.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(time,
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF999999))),
-                ],
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF666666))),
               ],
+              if (time.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(time,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF999999))),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(String label, String value,
+      {VoidCallback? onTap, bool isLink = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 13, color: Color(0xFF999999))),
+          const Spacer(),
+          GestureDetector(
+            onTap: onTap,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                color: isLink ? const Color(0xFFFF5000) : const Color(0xFF1A1A1A),
+                decoration: isLink ? TextDecoration.underline : null,
+              ),
             ),
           ),
-          if (onTap != null)
-            const Icon(Icons.chevron_right, size: 14, color: Colors.grey),
         ],
       ),
     );
   }
 
-  // ============ 推荐商品 ============
+  Widget _infoRowWithCopy(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 13, color: Color(0xFF999999))),
+          const Spacer(),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFF1A1A1A))),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () {
+              _toast('已复制：$value');
+            },
+            child: const Text('复制',
+                style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 推荐商品（AI 随机） ============
   Widget _buildRecommendCard() {
-    final goods = MockData.guessLikeGoods.take(6).toList();
+    // AI 随机：每次 build 都从 MockData 随机抽 6 个（实际产品可加缓存避免每次滚动都换）
+    final allGoods = MockData.guessLikeGoods.toList();
+    allGoods.shuffle(Random());
+    final goods = allGoods.take(6).toList();
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -552,16 +750,28 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.local_fire_department,
+              const Icon(Icons.local_fire_department,
                   color: Color(0xFFFF5000), size: 16),
-              SizedBox(width: 4),
-              Text('推荐商品',
+              const SizedBox(width: 4),
+              const Text('推荐商品',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => setState(() {}), // 换一换
+                child: const Row(
+                  children: [
+                    Text('换一换',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF999999))),
+                    Icon(Icons.refresh, size: 14, color: Color(0xFF999999)),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -614,6 +824,72 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
+  // ============ "您是否遇到以下问题？"反馈区 ============
+  Widget _buildHelpSection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.help_outline,
+                  size: 16, color: Color(0xFF999999)),
+              const SizedBox(width: 4),
+              const Text('您是否遇到以下问题？',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A1A1A))),
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _item.showHelpSection = false;
+                  });
+                  context.read<CartProvider>().updateOrderItem(_item);
+                },
+                child: const Icon(Icons.close,
+                    size: 16, color: Color(0xFF999999)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _helpChip('没有退款入口'),
+              _helpChip('商品有问题'),
+              _helpChip('运费谁承担'),
+              _helpChip('催促商家处理'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _helpChip(String label) {
+    return GestureDetector(
+      onTap: () => _toast('已记录：$label'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE5E5E5)),
+        ),
+        child: Text(label,
+            style:
+                const TextStyle(fontSize: 12, color: Color(0xFF333333))),
+      ),
+    );
+  }
+
   // ============ 底部栏 ============
   Widget _buildBottomBar() {
     return Container(
@@ -637,9 +913,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 const SizedBox(width: 8),
                 _bigBtn('催处理'),
               ] else ...[
+                // 寄件详情（参考图 9 红框）
+                if (_item.showShipDetailBtn) ...[
+                  _smallBtn('寄件详情', onTap: () => _toast('查看寄件详情')),
+                  const SizedBox(width: 8),
+                ],
                 _smallBtn('删除记录', onTap: _confirmDelete),
                 const SizedBox(width: 8),
-                _bigBtn('再次购买'),
+                _bigBtn('钱款去向'),
               ],
             ],
           ),
@@ -694,7 +975,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   // ============ 编辑入口 ============
-  /// 修改完成后的统一反馈
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -746,7 +1026,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showOptionPicker(
       context,
       title: '选择退款方式',
-      options: const ['支付宝', '银行卡', '微信支付'],
+      options: const ['支付宝', '银行卡', '微信支付', '花呗'],
       currentValue: _item.refundMethod,
     ).then((v) {
       if (v != null) {
@@ -771,12 +1051,16 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     });
   }
 
-  void _editTime(String title, String initial, ValueChanged<String> onSave) {
-    DialogHelpers.showDateTimePicker(context, title: title, initial: initial)
+  /// 选择退款原因（完整版弹窗：Tab 切换 + 12 个原因）
+  void _pickRefundReason() {
+    showRefundReasonPicker(context, currentReason: _item.refundReason)
         .then((v) {
-      if (v != null && v.isNotEmpty) {
-        onSave(v);
-        _toast('$title成功：$v');
+      if (v != null) {
+        setState(() {
+          _item.refundReason = v;
+        });
+        context.read<CartProvider>().updateOrderItem(_item);
+        _toast('退款原因已选择：$v');
       }
     });
   }
@@ -804,7 +1088,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 右上角编辑菜单（限高可滚动，底部按钮不再超出屏幕） ============
+  // ============ 右上角编辑菜单 ============
   void _showEditMenu() {
     showModalBottomSheet(
       context: context,
@@ -854,22 +1138,46 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         ctx, Icons.payments, '修改退款金额', _editRefundAmount),
                     _menuTile(ctx, Icons.local_shipping, '修改退款物流',
                         _editRefundLogistics),
-                    _menuTile(ctx, Icons.schedule, '修改申请时间（滚动选择）', () {
-                      _editTime('修改申请时间', _item.refundApplyTime, (v) {
-                        context
-                            .read<CartProvider>()
-                            .updateOrderItem(_item, refundApplyTime: v);
-                        setState(() {});
+                    _menuTile(ctx, Icons.format_list_bulleted, '选择退款原因',
+                        _pickRefundReason),
+                    _menuTile(ctx, Icons.confirmation_number, '修改退款编号',
+                        _editRefundNumber),
+                    _menuTile(ctx, Icons.flash_on, '切换"未发货秒退"横幅', () {
+                      setState(() {
+                        _item.showInstantRefundBanner =
+                            !_item.showInstantRefundBanner;
                       });
+                      context.read<CartProvider>().updateOrderItem(_item);
+                      _toast(_item.showInstantRefundBanner
+                          ? '秒退横幅已显示'
+                          : '秒退横幅已隐藏');
                     }),
-                    _menuTile(ctx, Icons.event_available, '修改完成时间（滚动选择）',
-                        () {
-                      _editTime('修改完成时间', _item.refundDoneTime, (v) {
-                        context
-                            .read<CartProvider>()
-                            .updateOrderItem(_item, refundDoneTime: v);
-                        setState(() {});
+                    _menuTile(ctx, Icons.shield, '切换"运费保障"', () {
+                      setState(() {
+                        _item.hasFreightInsurance = !_item.hasFreightInsurance;
                       });
+                      context.read<CartProvider>().updateOrderItem(_item);
+                      _toast(_item.hasFreightInsurance
+                          ? '运费保障已显示'
+                          : '运费保障已隐藏');
+                    }),
+                    _menuTile(ctx, Icons.help, '切换"您是否遇到问题"区', () {
+                      setState(() {
+                        _item.showHelpSection = !_item.showHelpSection;
+                      });
+                      context.read<CartProvider>().updateOrderItem(_item);
+                      _toast(_item.showHelpSection
+                          ? '帮助区已显示'
+                          : '帮助区已隐藏');
+                    }),
+                    _menuTile(ctx, Icons.local_post_office, '切换"寄件详情"按钮', () {
+                      setState(() {
+                        _item.showShipDetailBtn = !_item.showShipDetailBtn;
+                      });
+                      context.read<CartProvider>().updateOrderItem(_item);
+                      _toast(_item.showShipDetailBtn
+                          ? '寄件详情已显示'
+                          : '寄件详情已隐藏');
                     }),
                     ListTile(
                       leading: const Icon(Icons.delete_outline,
@@ -891,9 +1199,20 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  /// 修改退款状态：双向可逆。
-  /// 可选三个退款状态（待商家退款/退款成功/退款结束），也可直接改回
-  /// 待发货/已发货/交易成功等普通状态，订单自动归入对应栏目。
+  void _editRefundNumber() {
+    DialogHelpers.showTextInput(context,
+            title: '修改退款编号（留空=重新生成）', initial: _item.refundNumber)
+        .then((v) {
+      if (v != null) {
+        setState(() {
+          _item.refundNumber = v.isEmpty ? _genRefundNumber() : v;
+        });
+        context.read<CartProvider>().updateOrderItem(_item);
+        _toast('退款编号已修改：${_item.refundNumber}');
+      }
+    });
+  }
+
   void _pickRefundStatus() {
     DialogHelpers.showOptionPicker(
       context,
@@ -905,7 +1224,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     ).then((v) {
       if (v == null) return;
       final provider = context.read<CartProvider>();
-      // 统一走 updateOrderStatus：同步退款字段 + 订单栏目归类（双向可逆）
       provider.updateOrderStatus(_shop, _item, v);
       final isRefund = CartProvider.statusCategory(v) == '退款/售后';
       if (!mounted) return;
@@ -914,7 +1232,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         _startTimerIfPending();
         _toast('退款状态已修改为「$v」');
       } else {
-        // 改回普通状态：退出退款详情页，订单已归入对应栏目
         _toast('已改回「$v」，可在订单列表对应栏目查看');
         Navigator.of(context).pop();
       }
@@ -923,7 +1240,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   Widget _menuTile(
       BuildContext sheetCtx, IconData icon, String label, VoidCallback onTap) {
-    // 编辑菜单内的按钮：单击直接修改（入口双击、菜单内单击规则）
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF666666)),
       title: Text(label),
