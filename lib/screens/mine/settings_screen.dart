@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'account_pay_screens.dart';
 import 'address_screen.dart';
 import 'settings_detail_screens.dart';
 
@@ -56,8 +57,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           _group([
-            _arrowRow('账号与安全', onTap: () => _toast('账号与安全（演示）')),
-            _arrowRow('支付设置', onTap: () => _toast('支付设置（演示）')),
+            _arrowRow('账号与安全',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            const AccountSecurityScreen()))),
+            _arrowRow('支付设置',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const PaySettingsScreen()))),
             _arrowRow('收货地址管理',
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
