@@ -56,39 +56,49 @@ class _MainShellState extends State<MainShell> {
           return const SizedBox.shrink();
         }),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() {
-          _currentIndex = index;
-          _visited.add(index);
-        }),
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(AppIcons.home),
-            activeIcon: const Icon(AppIcons.homeActive),
-            label: '首页',
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Color(0xFFF2F2F2), width: 0.5),
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(AppIcons.weTao),
-            activeIcon: Icon(AppIcons.weTaoFill),
-            label: '视频',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(AppIcons.message),
-            activeIcon: Icon(AppIcons.messageFill),
-            label: '消息',
-          ),
-          BottomNavigationBarItem(
-            icon: _CartIcon(count: cartCount, icon: AppIcons.cart),
-            activeIcon: _CartIcon(count: cartCount, icon: AppIcons.cartFill),
-            label: '购物车',
-          ),
-          const BottomNavigationBarItem(
-            icon: Icon(AppIcons.my),
-            activeIcon: Icon(AppIcons.myFill),
-            label: '我的淘宝',
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() {
+            _currentIndex = index;
+            _visited.add(index);
+          }),
+          elevation: 0,
+          backgroundColor: Colors.white,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(AppIcons.home),
+              activeIcon: const Icon(AppIcons.homeActive),
+              label: '首页',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(AppIcons.weTao),
+              activeIcon: Icon(AppIcons.weTaoFill),
+              label: '视频',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(AppIcons.message),
+              activeIcon: Icon(AppIcons.messageFill),
+              label: '消息',
+            ),
+            BottomNavigationBarItem(
+              icon: _CartIcon(count: cartCount, icon: AppIcons.cart),
+              activeIcon: _CartIcon(count: cartCount, icon: AppIcons.cartFill),
+              label: '购物车',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(AppIcons.my),
+              activeIcon: Icon(AppIcons.myFill),
+              label: '我的淘宝',
+            ),
+          ],
+        ),
       ),
     );
   }
