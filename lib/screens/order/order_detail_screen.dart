@@ -74,9 +74,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     _greyBar(),
                     _buildShopCard(),
                     _greyBar(),
+                    // 商品与价格明细合并在同一栏目（中间无空白分隔框）
                     _buildProductCard(),
-                    _greyBar(),
-                    _buildPriceCard(),
                     _greyBar(),
                     _buildOrderInfoCard(),
                     _greyBar(),
@@ -618,6 +617,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               _orangeOutlineBtn('申请售后'),
             ],
           ),
+          // 价格明细与上方商品处于同一栏目（无空白虚框分隔）
+          const Divider(height: 24, color: Color(0xFFf0f0f0)),
+          ..._priceSectionChildren(),
         ],
       ),
     );
@@ -664,8 +666,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 价格明细 ============
-  Widget _buildPriceCard() {
+  // ============ 价格明细（与商品卡同一栏目） ============
+  List<Widget> _priceSectionChildren() {
     final productTotal = _item.productTotal > 0
         ? _item.productTotal
         : _item.price + _item.shopDiscount + _item.platformCoupon;
@@ -675,70 +677,68 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ? _item.coDiscount
         : (_item.showShopDiscount ? _item.shopDiscount : 0) +
             (_item.showPlatformCoupon ? _item.platformCoupon : 0);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      color: Colors.white,
-      child: Column(
+    return [
+      _priceRow('商品总价', '共${_item.quantity}件',
+          '¥${productTotal.toStringAsFixed(2)}'),
+      // 运费行：可在编辑菜单开启/修改，默认不显示（金额为 0 也不显示）
+      if (_item.showShippingFee)
+        _priceRow('运费', '', '¥${_item.shippingFee.toStringAsFixed(2)}',
+            valueColor: const Color(0xFF1A1A1A)),
+      // 分割线：商品总价/运费下方、进口税上方
+      const Divider(height: 16, color: Color(0xFFf0f0f0)),
+      if (_item.showTax) _taxRow(),
+      if (_item.showShopDiscount)
+        _priceRow('店铺优惠', '', '-¥${_item.shopDiscount.toStringAsFixed(2)}',
+            valueColor: const Color(0xFFff5000),
+            icon: Icons.storefront),
+      if (_item.showPlatformCoupon)
+        _priceRow('平台优惠券', _item.platformCouponLabel,
+            '-¥${_item.platformCoupon.toStringAsFixed(2)}',
+            valueColor: const Color(0xFFff5000),
+            icon: Icons.confirmation_number),
+      Row(
         children: [
-          _priceRow('商品总价', '共${_item.quantity}件',
-              '¥${productTotal.toStringAsFixed(2)}'),
-          // 分割线：商品总价下方、进口税上方
-          const Divider(height: 16, color: Color(0xFFf0f0f0)),
-          if (_item.showTax) _taxRow(),
-          if (_item.showShopDiscount)
-            _priceRow('店铺优惠', '', '-¥${_item.shopDiscount.toStringAsFixed(2)}',
-                valueColor: const Color(0xFFff5000),
-                icon: Icons.storefront),
-          if (_item.showPlatformCoupon)
-            _priceRow('平台优惠券', _item.platformCouponLabel,
-                '-¥${_item.platformCoupon.toStringAsFixed(2)}',
-                valueColor: const Color(0xFFff5000),
-                icon: Icons.confirmation_number),
-          Row(
-            children: [
-              const Text('实付款',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87)),
-              if (co > 0) ...[
-                const SizedBox(width: 6),
-                Text('共减¥${co.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFff5000))),
-                const SizedBox(width: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF1EC),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('优惠解析',
-                          style: TextStyle(
-                              fontSize: 10, color: Color(0xFFff5000))),
-                      Icon(Icons.chevron_right,
-                          size: 12, color: Color(0xFFff5000)),
-                    ],
-                  ),
-                ),
-              ],
-              const Spacer(),
-              Text('¥',
-                  style: AppTextStyles.price.copyWith(fontSize: 12)),
-              Text(total.toStringAsFixed(2),
-                  style: AppTextStyles.price.copyWith(fontSize: 20)),
-            ],
-          ),
+          const Text('实付款',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87)),
+          if (co > 0) ...[
+            const SizedBox(width: 6),
+            Text('共减¥${co.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFff5000))),
+            const SizedBox(width: 4),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1EC),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('优惠解析',
+                      style: TextStyle(
+                          fontSize: 10, color: Color(0xFFff5000))),
+                  Icon(Icons.chevron_right,
+                      size: 12, color: Color(0xFFff5000)),
+                ],
+              ),
+            ),
+          ],
+          const Spacer(),
+          Text('¥',
+              style: AppTextStyles.price.copyWith(fontSize: 12)),
+          // 实付款：录入多少显示多少（不乘规格数量）
+          Text(total.toStringAsFixed(2),
+              style: AppTextStyles.price.copyWith(fontSize: 20)),
         ],
       ),
-    );
+    ];
   }
 
   Widget _taxRow() {
@@ -1572,6 +1572,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _editTile(Icons.monetization_on, '修改商品总价', () {
                         _editNumber('修改商品总价', _item.productTotal, (v) {
                           provider.updateOrderItem(_item, productTotal: v);
+                        });
+                      }),
+                      _editTile(Icons.price_check, '修改实付款', () {
+                        _editNumber('修改实付款', _item.price, (v) {
+                          // 直接写入实付价，provider 不会再用组成项重算覆盖
+                          provider.updateOrderItem(_item, price: v);
+                        });
+                      }),
+                      _switchTile(Icons.local_shipping_outlined, '显示运费行',
+                          value: _item.showShippingFee, onChanged: (v) {
+                        provider.updateOrderItem(_item, showShippingFee: v);
+                        setSheetState(() {});
+                      }),
+                      _editTile(Icons.local_shipping, '修改运费', () {
+                        _editNumber('修改运费', _item.shippingFee, (v) {
+                          provider.updateOrderItem(_item, shippingFee: v);
                         });
                       }),
                       _switchTile(Icons.visibility_off, '隐藏店铺优惠',
