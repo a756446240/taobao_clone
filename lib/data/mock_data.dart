@@ -6,21 +6,6 @@ class MockData {
 
   // ============================= 首页 =============================
 
-
-  /// 顶部黑字热搜轮播（2-3秒自动切换，与搜索框占位同步）
-  static const List<String> hotSearchProducts = [
-    '摩可多黑条固体饮料',
-    'OPPO Find X7 新品上市',
-    '戴森吹风机 HD15',
-    '兰蔻小黑瓶精华 50ml',
-    '蒙牛纯牛奶 250ml*16盒',
-    'Swisse 护肝片 100片',
-    '立白大师香氛洗衣液 1kg',
-    '华为 Mate 60 Pro',
-    '小米空气净化器 4',
-    '索尼 WH-1000XM5',
-  ];
-
   /// 热搜词
   static const List<String> searchHints = [
     '显示器4k',
@@ -35,27 +20,6 @@ class MockData {
     'lg4k显示器',
   ];
 
-  /// 搜索历史（默认）
-  static const List<String> searchRecords = [
-    'aoc4k显示器',
-    'lg4k显示器',
-    '菠萝',
-    'iphone xs',
-    '华为 p30',
-    '三星 手机',
-    'macbook pro 2018',
-    'dell xps15 9570',
-  ];
-
-  /// 头条滚动
-  static const List<String> headlines = [
-    'MT大白洗碗机测评：用了就再也回不去了',
-    '我与MT大白洗碗机的蜗居生活',
-    '太平洋电脑网每日早报，10月25日份，请查收',
-    '新版手机淘宝上线！逛街时可以摇出红包！赶紧更新吧',
-    '天猫双11手机&配件预售会场满减大促',
-  ];
-
   /// 首页图标区 第 1 页（单行 5 个 + 第 6 个半露"红包签到"）
   static const List<HomeIconEntry> homeIconPage1 = [
     HomeIconEntry('天猫超市', '超市', 0xFF22c55e, 'assets/images/icons/chaoshi.png'),
@@ -66,23 +30,23 @@ class MockData {
     HomeIconEntry('红包签到', '¥', 0xFFff3b30, 'assets/images/icons/redpacket.png'),
   ];
 
-  /// 首页图标区 第 2 页（3 行 × 5 = 15 个）
+  /// 首页图标区 第 2 页（3 行 × 5 = 15 个，全部唯一不重复）
   static const List<HomeIconEntry> homeIconPage2 = [
-    HomeIconEntry('红包签到', '¥', 0xFFff3b30, 'assets/images/icons/redpacket.png'),
-    HomeIconEntry('天猫新品', '新品', 0xFFa98548, 'assets/images/icons/tianmao_new.png'),
-    HomeIconEntry('淘工厂', '厂', 0xFFff6a00, 'assets/images/icons/taogongchang.png'),
-    HomeIconEntry('活动日历', '历', 0xFFf43f5e, 'assets/images/icons/calendar.png'),
-    HomeIconEntry('淘宝礼物', '礼', 0xFFef4444, 'assets/images/icons/gift.png'),
-    HomeIconEntry('淘鲜达', '鲜', 0xFF22c55e, 'assets/images/icons/fresh.png'),
-    HomeIconEntry('淘宝闪购', '购', 0xFFff7d00, 'assets/images/icons/flashbuy.png'),
-    HomeIconEntry('淘票票', '票', 0xFFff4d4f, 'assets/images/icons/piaowu.png'),
     HomeIconEntry('聚划算', '聚', 0xFFe11d74, 'assets/images/icons/jubuy.png'),
-    HomeIconEntry('充值中心', '充', 0xFFff8c00, 'assets/images/icons/recharge.png'),
-    HomeIconEntry('飞猪旅行', '猪', 0xFFfbbf24, 'assets/images/icons/feizhu.png'),
+    HomeIconEntry('天猫新品', '新品', 0xFFa98548, 'assets/images/icons/tianmao_new.png'),
     HomeIconEntry('分类', '三', 0xFF8b5cf6, 'assets/images/icons/category.png'),
-    HomeIconEntry('天猫国际', '际', 0xFF7c3aed, 'assets/images/icons/global.png'),
-    HomeIconEntry('资质规则', '✓', 0xFF3b82f6, 'assets/images/icons/qualification.png'),
+    HomeIconEntry('活动日历', '历', 0xFFf43f5e, 'assets/images/icons/calendar.png'),
+    HomeIconEntry('试用领取', 'U', 0xFFef4444, 'assets/images/icons/tryout.png'),
+    HomeIconEntry('淘工厂', '厂', 0xFFff6a00, 'assets/images/icons/taogongchang.png'),
+    HomeIconEntry('游戏中心', '游', 0xFFf97316, 'assets/images/icons/game.png'),
+    HomeIconEntry('飞猪旅行', '猪', 0xFFfbbf24, 'assets/images/icons/feizhu.png'),
+    HomeIconEntry('连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png'),
+    HomeIconEntry('充值中心', '充', 0xFFff8c00, 'assets/images/icons/recharge.png'),
+    HomeIconEntry('淘宝闪购', '购', 0xFFff7d00, 'assets/images/icons/flashbuy.png'),
+    HomeIconEntry('淘鲜达', '鲜', 0xFF22c55e, 'assets/images/icons/fresh.png'),
+    HomeIconEntry('淘宝礼物', '礼', 0xFFef4444, 'assets/images/icons/gift.png'),
     HomeIconEntry('全部频道', '●', 0xFFf59e0b, 'assets/images/icons/all_channels.png'),
+    HomeIconEntry('淘票票', '票', 0xFFff4d4f, 'assets/images/icons/piaowu.png'),
   ];
 
   /// 首页"淘宝直播/直播有好价/百亿补贴/国家补贴"四卡（固定不随图标滑动）
@@ -123,49 +87,126 @@ class MockData {
 
   // ============================= 商品 =============================
 
-  /// 猜你喜欢商品流（mock，保健品/食品，使用本地真实商品图）
+  /// 猜你喜欢商品流（图+名一一对应，使用素材库真实商品图）
   static const List<SearchResultItem> guessLikeGoods = [
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0046.jpg',
-        title: '立白大师香氛洗衣液 1kg 官方正品 持久留香',
-        shopName: '立白官方旗舰店',
-        price: '3.01',
-        commentCount: '已售1万+',
+        imageUrl: 'assets/materials/mat01.jpg',
+        title: '泰国进口WANGPROM汪逢姜黄膏50g 原装正品',
+        shopName: '如意母婴正品',
+        price: '39.9',
+        commentCount: '已售8000+',
         goodRate: '98%好评'),
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0039.jpg',
-        title: 'SAH Swiss Alp Health 瑞士胶原蛋白粉 1000mg 高含量 抗衰',
-        shopName: 'SAH 海外旗舰店',
-        price: '990.7',
-        commentCount: '全网热销100+',
+        imageUrl: 'assets/materials/mat02.jpg',
+        title: 'SINE SHAPE六联活菌即食型益生菌25g 肠道调理',
+        shopName: 'SINE海外旗舰店',
+        price: '89',
+        commentCount: '已售3000+',
         goodRate: '97%好评'),
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0045.jpg',
-        title: '蒙牛纯牛奶 250ml*16盒 整箱装 早餐奶',
-        shopName: '蒙牛官方旗舰店',
-        price: '45',
-        commentCount: '20万人付款',
+        imageUrl: 'assets/materials/mat03.jpg',
+        title: 'Aodeocare儿童保湿面霜50g 6-18岁学生专研',
+        shopName: 'AODEOCARE旗舰店',
+        price: '69',
+        commentCount: '已售1万+',
         goodRate: '99%好评'),
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0044.jpg',
-        title: 'Swisse 护肝片 100片 澳洲进口 应酬必备',
-        shopName: 'Swisse 海外旗舰店',
-        price: '178',
-        commentCount: '5万人付款',
+        imageUrl: 'assets/materials/mat04.jpg',
+        title: '美国进口SOLGAR甲钴胺维生素B12 5000mcg*60粒',
+        shopName: 'SOLGAR海外旗舰店',
+        price: '129',
+        commentCount: '已售5000+',
         goodRate: '98%好评'),
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0051.jpg',
-        title: '太太乐鸡精 100g*10袋 家用调味 火锅炒菜',
-        shopName: '太太乐官方旗舰店',
-        price: '12.5',
-        commentCount: '8万人付款',
+        imageUrl: 'assets/materials/mat05.jpg',
+        title: 'bionique Root Revive毛毛饮 养发口服液18支装',
+        shopName: 'bionique海外旗舰店',
+        price: '199',
+        commentCount: '已售2000+',
+        goodRate: '96%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat06.jpg',
+        title: '澳洲Healthy Care橄榄叶精华胶囊3000mg*100粒',
+        shopName: 'HealthyCare海外旗舰店',
+        price: '109',
+        commentCount: '已售9000+',
+        goodRate: '98%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat07.jpg',
+        title: '韩国直邮EXTREME男士综合维生素All in One 30日量',
+        shopName: 'EXTREME海外旗舰店',
+        price: '159',
+        commentCount: '已售4000+',
+        goodRate: '97%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat08.jpg',
+        title: '美国拜耳MiraLAX聚乙二醇3350通便粉578g',
+        shopName: '拜耳海外旗舰店',
+        price: '145',
+        commentCount: '已售2万+',
         goodRate: '99%好评'),
     SearchResultItem(
-        imageUrl: 'assets/images/remote/r0040.jpg',
-        title: '江中健胃消食片 50片 儿童成人 健脾',
-        shopName: '江中药业官方旗舰店',
-        price: '18.5',
-        commentCount: '3万人付款',
+        imageUrl: 'assets/materials/mat09.jpg',
+        title: 'Aodeocare舒缓保湿喷雾100ml*2瓶 法国活泉水',
+        shopName: 'AODEOCARE旗舰店',
+        price: '79',
+        commentCount: '已售6000+',
+        goodRate: '98%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat10.jpg',
+        title: '法国ZzzQuil褪黑素睡眠片30粒 森林水果味',
+        shopName: 'ZzzQuil海外旗舰店',
+        price: '99',
+        commentCount: '已售1万+',
+        goodRate: '97%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat11.jpg',
+        title: 'Aodeocare儿童舒缓保湿面膜25ml*5片 晒后修护',
+        shopName: 'AODEOCARE旗舰店',
+        price: '59',
+        commentCount: '已售7000+',
+        goodRate: '98%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat12.jpg',
+        title: '日本资生堂IHADA防花粉喷雾 阻隔PM2.5隐形口罩',
+        shopName: '资生堂海外旗舰店',
+        price: '88',
+        commentCount: '已售3000+',
+        goodRate: '96%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat13.jpg',
+        title: '美国Refresh OPTIVE MEGA-3人工泪液滴眼液70支',
+        shopName: 'Refresh海外旗舰店',
+        price: '115',
+        commentCount: '已售5000+',
+        goodRate: '98%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat14.jpg',
+        title: '韩国直邮SOLAR-C维生素C咀嚼片220mg*80粒',
+        shopName: 'SOLAR-C海外旗舰店',
+        price: '69',
+        commentCount: '已售1万+',
+        goodRate: '97%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat15.jpg',
+        title: '日本KB AIR MASK挂脖便携负离子空气净化器',
+        shopName: 'KBAIRMASK海外旗舰店',
+        price: '268',
+        commentCount: '已售1000+',
+        goodRate: '95%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat16.jpg',
+        title: '日本Eisai Chocola BB Plus维生素B2 180锭',
+        shopName: 'Eisai海外旗舰店',
+        price: '135',
+        commentCount: '已售8000+',
+        goodRate: '98%好评'),
+    SearchResultItem(
+        imageUrl: 'assets/materials/mat17.jpg',
+        title: 'bn HEALTHY维生素D3+K2+镁软胶囊3000IU*180粒',
+        shopName: 'bnHEALTHY海外旗舰店',
+        price: '149',
+        commentCount: '已售4000+',
         goodRate: '97%好评'),
   ];
 
@@ -271,113 +312,4 @@ class MockData {
         ),
       ];
 
-  // ============================= 消息 =============================
-
-  static const List<Conversation> conversations = [
-    Conversation(
-      type: '官方',
-      avatar: 'assets/images/cainiaoyizhan.png',
-      title: '菜鸟驿站',
-      titleColor: 0xFF7f3410,
-      createAt: '09:28',
-      description: '手慢无！抢最高2019元大包',
-      unReadCount: 2,
-    ),
-    Conversation(
-      type: '官方',
-      avatar: 'assets/images/taobaotoutiao.png',
-      title: '淘宝头条',
-      titleColor: 0xFF7f3410,
-      createAt: '12:30',
-      description: '这栋老宅被加价5000多万，还说买家赚钱了？',
-      unReadCount: 8,
-    ),
-    Conversation(
-      type: '官方',
-      avatar: 'assets/images/88members.png',
-      title: '淘气值',
-      titleColor: 0xFF7f3410,
-      createAt: '14:01',
-      description: '88VIP 独家包场免费看《复仇4》',
-      unReadCount: 10,
-    ),
-    Conversation(
-      type: '品牌',
-      avatar: 'assets/images/apple_home.png',
-      title: '苹果家园',
-      titleColor: 0xFF7f3410,
-      createAt: '昨天',
-      description: '亲，您看中的咨询的产品还没下单，请及时下单付款哟',
-      unReadCount: 5,
-    ),
-  ];
-
-  /// 聊天消息 mock
-  static const List<ChatMessage> chatMessages = [
-    ChatMessage(
-        content: '在吗？亲，请问有什么可以帮您的吗？',
-        isMe: false,
-        time: '09:30'),
-    ChatMessage(
-        content: '我想问下这款手机现在有货吗？',
-        isMe: true,
-        time: '09:31'),
-    ChatMessage(
-        content: '亲，这款手机现货充足，拍下后 48 小时内发货哦～',
-        isMe: false,
-        time: '09:32'),
-    ChatMessage(
-        content: '好的，那我拍一台，能优惠点吗？',
-        isMe: true,
-        time: '09:33'),
-    ChatMessage(
-        content: '亲，现在活动价已经是最低价了呢，拍下送原装壳和钢化膜哦～',
-        isMe: false,
-        time: '09:34'),
-  ];
-
-  // ============================= 微淘 =============================
-
-  static const List<PostModel> posts = [
-    PostModel(
-      name: '小米官方旗舰店',
-      avatar: 'assets/images/apple_home.png',
-      address: '广东 深圳',
-      message: '小米9 骁龙855 全面屏 4800万三摄，现货开抢！',
-      photos: [
-        'https://img.alicdn.com/bao/uploaded/i5/TB1d4D5HQzoK1RjSZFlDP9i4VXa_121840.jpg',
-        'https://img.alicdn.com/bao/uploaded/i5/TB1trAMNQPoK1RjSZKb.LB1IXXa_101123.jpg',
-      ],
-      readCount: 12890,
-      likesCount: 345,
-      commentsCount: 89,
-      postTime: '10分钟前',
-    ),
-    PostModel(
-      name: '华为官方旗舰店',
-      avatar: 'assets/images/taobaotoutiao.png',
-      address: '广东 东莞',
-      message: '华为 P30 Pro 徕卡四摄，记录美好生活，限时直降 500！',
-      photos: [
-        'https://img.alicdn.com/bao/uploaded/i8/TB1uiAYNMHqK1RjSZFkXfd.WFXa_112352.jpg',
-      ],
-      readCount: 23500,
-      likesCount: 1024,
-      commentsCount: 230,
-      postTime: '1小时前',
-    ),
-    PostModel(
-      name: 'LG 官方旗舰店',
-      avatar: 'assets/images/88members.png',
-      address: '上海',
-      message: '4K IPS 显示器，设计师的选择，色彩还原真实。',
-      photos: [
-        'https://img.alicdn.com/bao/uploaded/i1/2074230498/O1CN01lZnjxG1FY7lsf191X_!!0-item_pic.jpg',
-      ],
-      readCount: 8900,
-      likesCount: 156,
-      commentsCount: 45,
-      postTime: '3小时前',
-    ),
-  ];
 }
