@@ -29,11 +29,11 @@ class _MessageScreenState extends State<MessageScreen> {
   late final List<_HistoryMsg> _history;
   final _rand = Random();
 
-  /// 4 个圆圈入口（固定）
+  /// 4 个圆圈入口（固定，badge 为未读角标，0 表示不显示）
   static const _quickEntries = <_QuickEntry>[
-    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350)),
-    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5)),
-    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a)),
+    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350), badge: 3),
+    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5), badge: 12),
+    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a), badge: 1),
     _QuickEntry('直播消息', Icons.videocam, Color(0xFFab47bc)),
   ];
 
@@ -193,6 +193,50 @@ class _MessageScreenState extends State<MessageScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.add_circle_outline,
+                color: Color(0xFF333333)),
+            offset: const Offset(0, 44),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+            onSelected: (v) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text('$v 功能即将上线'),
+                  duration: const Duration(milliseconds: 1200),
+                ));
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: '添加淘友',
+                child: Row(children: [
+                  Icon(Icons.person_add_alt, size: 20),
+                  SizedBox(width: 10),
+                  Text('添加淘友'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: '发起群聊',
+                child: Row(children: [
+                  Icon(Icons.group_add_outlined, size: 20),
+                  SizedBox(width: 10),
+                  Text('发起群聊'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: '扫一扫',
+                child: Row(children: [
+                  Icon(Icons.qr_code_scanner, size: 20),
+                  SizedBox(width: 10),
+                  Text('扫一扫'),
+                ]),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
+        ],
         // 编辑入口已隐藏到列表项右滑
       ),
       body: Column(
@@ -231,20 +275,50 @@ class _MessageScreenState extends State<MessageScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: _quickEntries.map((e) {
-          return Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: e.color,
-                  shape: BoxShape.circle,
+          return GestureDetector(
+            onTap: () => _openChat(
+                title: e.title, lastMessage: '暂无新消息', color: e.color),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: e.color,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(e.icon, color: Colors.white, size: 24),
+                    ),
+                    if (e.badge > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(9),
+                            border:
+                                Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 18),
+                          child: Text('${e.badge}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10)),
+                        ),
+                      ),
+                  ],
                 ),
-                child: Icon(e.icon, color: Colors.white, size: 24),
-              ),
-              const SizedBox(height: 6),
-              Text(e.title, style: AppTextStyles.min),
-            ],
+                const SizedBox(height: 6),
+                Text(e.title, style: AppTextStyles.min),
+              ],
+            ),
           );
         }).toList(),
       ),
@@ -472,7 +546,8 @@ class _QuickEntry {
   final String title;
   final IconData icon;
   final Color color;
-  const _QuickEntry(this.title, this.icon, this.color);
+  final int badge;
+  const _QuickEntry(this.title, this.icon, this.color, {this.badge = 0});
 }
 
 class _ShopTpl {
