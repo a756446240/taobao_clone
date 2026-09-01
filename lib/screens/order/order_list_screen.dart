@@ -16,6 +16,7 @@ import '../../widgets/dialog_helpers.dart';
 import '../../widgets/shop_type_badge.dart';
 import 'logistics_screen.dart';
 import 'order_detail_screen.dart';
+import 'rate_order_screen.dart';
 import 'order_manager_screen.dart';
 import 'refund_detail_screen.dart';
 
@@ -40,8 +41,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   /// 各频道的子 Tab（对齐真实淘宝）
   static const _subTabs = [
-    ['全部', '待付款', '待发货', '待收货', '退款·售后'], // 全部订单
-    ['全部', '待付款', '待发货', '待收货', '退款·售后'], // 购物
+    ['全部', '待付款', '待发货', '待收货', '待评价', '退款·售后'], // 全部订单
+    ['全部', '待付款', '待发货', '待收货', '待评价', '退款·售后'], // 购物
     ['全部', '待付款', '待收货', '退款·售后'], // 闪购
     ['全部', '待付款', '待出行', '待评价', '已关闭'], // 飞猪
   ];
@@ -74,6 +75,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
         return '提醒发货';
       case '已发货':
         return '确认收货';
+      case '待评价':
+        return '评价';
       case '售后':
         return '申请售后';
       default:
@@ -96,9 +99,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
       idx = tabs.indexOf('待发货');
     } else if (type.contains('已发货') || type.contains('待收货')) {
       idx = tabs.indexOf('待收货');
-    } else if (type.contains('售后') ||
-        type.contains('退款') ||
-        type.contains('评价')) {
+    } else if (type.contains('评价')) {
+      idx = tabs.indexOf('待评价');
+    } else if (type.contains('售后') || type.contains('退款')) {
       idx = tabs.indexOf('退款·售后');
     } else {
       idx = 0;
@@ -303,8 +306,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
       case '售后':
         return category == '退款/售后' ||
             shop.orderSubStatus.contains('退款') ||
-            shop.orderSubStatus.contains('售后') ||
-            shop.orderSubStatus.contains('评价');
+            shop.orderSubStatus.contains('售后');
+      case '待评价':
+        return shop.orderSubStatus.contains('评价') &&
+            !shop.orderSubStatus.contains('退款') &&
+            !shop.orderSubStatus.contains('售后');
       case '全部订单':
       default:
         // 购物车状态的条目不进订单列表（对齐真实淘宝：购物车 ≠ 订单）
@@ -529,6 +535,19 @@ class _OrderCard extends StatelessWidget {
     required this.onDetail,
   });
 
+  /// 主按钮动作：评价 → 发表评价页；其他 → 订单详情
+  void _onPrimaryTap(BuildContext context) {
+    if (actionText == '评价') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => RateOrderScreen(shop: shop, item: items.first),
+        ),
+      );
+    } else {
+      onDetail(items.first);
+    }
+  }
+
   /// 点击店铺类型徽章：切换 天猫/淘宝/国际
   void _pickShopType(BuildContext context) {
     DialogHelpers.showOptionPicker(
@@ -647,7 +666,8 @@ class _OrderCard extends StatelessWidget {
                       _outlineBtn('查看物流',
                           onTap: () => _gotoLogistics(context, items.first)),
                       const SizedBox(width: 8),
-                      _primaryBtn(actionText, onTap: () => onDetail(items.first)),
+                      _primaryBtn(actionText,
+                          onTap: () => _onPrimaryTap(context)),
                     ],
                   ),
           ),
