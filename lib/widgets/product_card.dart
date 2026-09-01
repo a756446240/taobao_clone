@@ -5,8 +5,15 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
 import '../models/models.dart';
 import '../providers/product_image_provider.dart';
+import '../screens/product/product_detail_screen.dart';
 import 'app_image.dart';
 import 'image_picker_helper.dart';
+
+void _openProductDetail(BuildContext context, SearchResultItem item) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => ProductDetailScreen(item: item)),
+  );
+}
 
 /// 商品卡片（双列网格，用于猜你喜欢 / 搜索结果）
 /// 点击商品图可从相册选择图片替换，替换结果持久化保存。
@@ -22,17 +29,21 @@ class ProductCard extends StatelessWidget {
         context.watch<ProductImageProvider>().imageFor(item.title);
     final imageUrl = overrideUrl ?? item.imageUrl;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onDoubleTap: () => pickProductImageFromGallery(context, item.title),
+    return GestureDetector(
+      onTap: () => _openProductDetail(context, item),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => _openProductDetail(context, item),
+              onDoubleTap: () =>
+                  pickProductImageFromGallery(context, item.title),
             child: AspectRatio(
               aspectRatio: 1,
               child: Container(
@@ -85,6 +96,7 @@ class ProductCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -141,14 +153,18 @@ class ProductRow extends StatelessWidget {
     final overrideUrl =
         context.watch<ProductImageProvider>().imageFor(item.title);
     final imageUrl = overrideUrl ?? item.imageUrl;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onDoubleTap: () => pickProductImageFromGallery(context, item.title),
+    return GestureDetector(
+      onTap: () => _openProductDetail(context, item),
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => _openProductDetail(context, item),
+              onDoubleTap: () =>
+                  pickProductImageFromGallery(context, item.title),
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(
@@ -189,6 +205,7 @@ class ProductRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
