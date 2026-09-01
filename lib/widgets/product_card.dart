@@ -149,7 +149,13 @@ class ProductRow extends StatelessWidget {
         children: [
           GestureDetector(
             onDoubleTap: () => pickProductImageFromGallery(context, item.title),
-            child: AppImage(url: imageUrl, width: 100, height: 100),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: const Color(0xFFF0F0F0), width: 1),
+              ),
+              child: AppImage(url: imageUrl, width: 100, height: 100),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
