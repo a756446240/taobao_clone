@@ -102,6 +102,64 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 商品详情页加入购物车 / 立即购买：
+  /// - asPendingOrder=false → 状态"购物车"（只在购物车 Tab 显示，不进订单列表）
+  /// - asPendingOrder=true  → 状态"待付款"（模拟下单，出现在待付款 Tab）
+  void addToCart({
+    required String shopName,
+    required String title,
+    required double price,
+    required String imageUrl,
+    required String spec,
+    required int quantity,
+    bool asPendingOrder = false,
+  }) {
+    final now = DateTime.now();
+    String fmt(DateTime t) =>
+        '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+    final status = asPendingOrder ? '待付款' : '购物车';
+    final item = OrderItem(
+      imageUrl: imageUrl,
+      title: title,
+      configuration: spec,
+      stock: 99,
+      price: price,
+      quantity: quantity,
+      createTime: fmt(now),
+      payTime: '',
+      orderNo: '5127${List.generate(15, (_) => Random().nextInt(10)).join()}',
+      productTotal: price * quantity,
+      statusTitle: status,
+    );
+    // 尝试塞进已有同名店铺，否则新建店铺
+    ShoppingCartShop? target;
+    for (final s in _shops) {
+      if (s.shopName == shopName &&
+          s.orderSubStatus == status) {
+        target = s;
+        break;
+      }
+    }
+    if (target != null) {
+      target.items.insert(0, item);
+    } else {
+      _shops.insert(
+        0,
+        ShoppingCartShop(
+          shopName: shopName,
+          shopType: ShopType.taoBao,
+          items: [item],
+          orderStatus: status,
+          orderSubStatus: status,
+          orderTotalTip: '共$quantity件商品 合计：',
+        ),
+      );
+    }
+    _persist();
+    notifyListeners();
+  }
+
   /// 读取本地持久化的订单；有则覆盖默认生成
   Future<void> _restoreFromDisk() async {
     try {
