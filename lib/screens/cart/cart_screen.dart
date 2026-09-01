@@ -18,12 +18,20 @@ import '../../widgets/shop_type_badge.dart';
 /// 购物车页（1:1 复刻 3.4 新版）
 /// 商品项右滑显示“换图 / 编辑 / 删除”，不再直接显示编辑入口。
 /// 商品图与名称参与素材库随机分配（图名对应），未命名素材自动 AI 匹配名称。
-class CartScreen extends StatelessWidget {
+class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   /// 购物车商品的分配 key：优先订单编号（稳定唯一），兜底用标题
   static String cartItemKey(OrderItem item) =>
       item.orderNo.isNotEmpty ? item.orderNo : item.title;
+
+  @override
+  State<CartScreen> createState() => _CartScreenState();
+}
+
+/// 购物车页状态：管理模式下底部切换为批量操作栏（全选 / 移入收藏 / 删除）
+class _CartScreenState extends State<CartScreen> {
+  bool _managing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +42,7 @@ class CartScreen extends StatelessWidget {
     if (!pool.loading && !pool.isEmpty) {
       final keys = <String>[
         for (final s in shops)
-          for (final it in s.items) cartItemKey(it),
+          for (final it in s.items) CartScreen.cartItemKey(it),
       ];
       pool.assignCartMaterials(keys);
     }
@@ -126,9 +134,12 @@ class CartScreen extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               GestureDetector(
-                onTap: () => _showManageSheet(context),
-                child: const Text('管理',
-                    style: TextStyle(fontSize: 13, color: Colors.black87)),
+                // 单击：进入/退出批量管理模式；双击：店铺编辑菜单
+                onTap: () => setState(() => _managing = !_managing),
+                onDoubleTap: () => _showManageSheet(context),
+                child: Text(_managing ? '完成' : '管理',
+                    style: const TextStyle(
+                        fontSize: 13, color: Colors.black87)),
               ),
             ],
           ),
@@ -229,7 +240,7 @@ class CartScreen extends StatelessWidget {
           // 商品列表（带右滑操作，展示素材库随机分配的图+名）
           ...shop.items.map((item) => _SlidableCartItem(
                 item: item,
-                material: pool.cartMaterialFor(cartItemKey(item)),
+                material: pool.cartMaterialFor(CartScreen.cartItemKey(item)),
               )),
         ],
       ),
@@ -741,8 +752,9 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // ============ 底部结算栏 ============
+  // ============ 底部栏（结算 / 管理两种模式） ============
   Widget _buildBottomBar(BuildContext context, CartProvider cart) {
+    if (_managing) return _buildManageBar(context, cart);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -807,6 +819,114 @@ class CartScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // ============ 管理模式底部栏（全选 / 移入收藏 / 删除） ============
+  Widget _buildManageBar(BuildContext context, CartProvider cart) {
+    final hasSelection = cart.selectedItemCount > 0;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => cart.toggleAllSelection(),
+            child: Row(
+              children: [
+                _selectIcon(cart.isAllSelected,
+                    onTap: () => cart.toggleAllSelection()),
+                const SizedBox(width: 4),
+                const Text('全选', style: AppTextStyles.small),
+              ],
+            ),
+          ),
+          const Spacer(),
+          // 移入收藏（无选中时置灰）
+          GestureDetector(
+            onTap: hasSelection
+                ? () => _moveSelectedToFavorites(context, cart)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: hasSelection
+                        ? AppColors.primary
+                        : const Color(0xFFc4c4c4)),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('移入收藏',
+                  style: TextStyle(
+                      color: hasSelection
+                          ? AppColors.primary
+                          : const Color(0xFFc4c4c4),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // 删除（无选中时置灰）
+          GestureDetector(
+            onTap: hasSelection ? () => _deleteSelected(context, cart) : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 24, vertical: 10),
+              decoration: BoxDecoration(
+                color: hasSelection
+                    ? AppColors.primary
+                    : const Color(0xFFc4c4c4),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('删除(${cart.selectedItemCount})',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _moveSelectedToFavorites(BuildContext context, CartProvider cart) {
+    final count = cart.selectedItemCount;
+    cart.removeSelected();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('已将 $count 件商品移入收藏夹'),
+          duration: const Duration(seconds: 1)),
+    );
+  }
+
+  Future<void> _deleteSelected(
+      BuildContext context, CartProvider cart) async {
+    final count = cart.selectedItemCount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除商品'),
+        content: Text('确定要删除选中的 $count 件商品吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child:
+                  const Text('删除', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    cart.removeSelected();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('已删除 $count 件商品'),
+          duration: const Duration(seconds: 1)),
     );
   }
 }
