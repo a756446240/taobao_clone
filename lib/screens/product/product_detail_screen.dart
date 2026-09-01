@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'reviews_screen.dart';
 import 'shop_home_screen.dart';
 
 /// 商品详情页（1:1 对齐淘宝详情页结构）
@@ -342,20 +343,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text('宝贝评价（2000+）', style: AppTextStyles.smallBold),
-              const Spacer(),
-              Text(
-                widget.item.goodRate.isNotEmpty
-                    ? widget.item.goodRate
-                    : '98%好评',
-                style: const TextStyle(
-                    color: AppColors.primary, fontSize: 12),
-              ),
-              const Icon(Icons.chevron_right,
-                  color: Color(0xFFC4C4C4), size: 16),
-            ],
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            // 单击进入全部评价页
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => ReviewsScreen(item: widget.item)),
+            ),
+            child: Row(
+              children: [
+                Text('宝贝评价（2000+）', style: AppTextStyles.smallBold),
+                const Spacer(),
+                Text(
+                  widget.item.goodRate.isNotEmpty
+                      ? widget.item.goodRate
+                      : '98%好评',
+                  style: const TextStyle(
+                      color: AppColors.primary, fontSize: 12),
+                ),
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFFC4C4C4), size: 16),
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           ...reviews.map((r) => Padding(
