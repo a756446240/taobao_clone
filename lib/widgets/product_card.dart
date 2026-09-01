@@ -35,9 +35,15 @@ class ProductCard extends StatelessWidget {
             onDoubleTap: () => pickProductImageFromGallery(context, item.title),
             child: AspectRatio(
               aspectRatio: 1,
-              child: imageUrl.isEmpty
-                  ? _buildPlaceholder(item.shopName)
-                  : AppImage(url: imageUrl, fit: BoxFit.cover),
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: const Color(0xFFF0F0F0), width: 1),
+                ),
+                child: imageUrl.isEmpty
+                    ? _buildPlaceholder(item.shopName)
+                    : AppImage(url: imageUrl, fit: BoxFit.cover),
+              ),
             ),
           ),
           Padding(
