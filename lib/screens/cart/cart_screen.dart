@@ -33,10 +33,27 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   bool _managing = false;
 
+  /// 商品降价幅度（按标题+规格哈希稳定，约 30% 商品降价）；null 表示未降价
+  static double? priceDropOf(OrderItem item) {
+    var h = 0;
+    for (final c in (item.title + item.configuration).codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    if (h % 10 >= 3) return null;
+    final pct = 5 + (h ~/ 10) % 20; // 降幅 5%~24%
+    return (item.price * pct).round() / 100;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final shops = cart.shops;
+    // 降价商品（用于顶部降价提醒条）
+    final dropped = <OrderItem>[
+      for (final s in shops)
+        for (final it in s.items)
+          if (priceDropOf(it) != null) it,
+    ];
     // 素材池：为购物车商品随机分配"图+名对应"的素材（每次启动重抽，会话内稳定）
     final pool = context.watch<MaterialPoolProvider>();
     if (!pool.loading && !pool.isEmpty) {
@@ -55,6 +72,7 @@ class _CartScreenState extends State<CartScreen> {
           children: [
             _buildTopBar(context),
             _buildCouponBar(context),
+            if (dropped.isNotEmpty) _buildPriceDropBar(context, dropped),
             Expanded(
               child: shops.isEmpty
                   ? const Center(
@@ -179,6 +197,136 @@ class _CartScreenState extends State<CartScreen> {
                     fontWeight: FontWeight.bold)),
           ),
         ],
+      ),
+    );
+  }
+
+  // ============ 降价提醒条（点击展开降价商品清单）============
+  Widget _buildPriceDropBar(BuildContext context, List<OrderItem> dropped) {
+    final saved = dropped.fold<double>(
+        0, (sum, it) => sum + priceDropOf(it)! * it.quantity);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showPriceDropSheet(context, dropped),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF6E5),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.trending_down,
+                color: Color(0xFFe6432e), size: 16),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${dropped.length}件商品比加入时降价，共省 ¥${saved.toStringAsFixed(2)}',
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFFe6432e)),
+              ),
+            ),
+            const Text('查看',
+                style: TextStyle(fontSize: 12, color: Color(0xFFe6432e))),
+            const Icon(Icons.chevron_right,
+                color: Color(0xFFe6432e), size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPriceDropSheet(BuildContext context, List<OrderItem> dropped) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Text('降价商品',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: dropped.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: AppColors.divider),
+                  itemBuilder: (ctx, i) {
+                    final it = dropped[i];
+                    final drop = priceDropOf(it)!;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: AppImage(
+                                url: it.imageUrl, width: 52, height: 52),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(it.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.small),
+                                const SizedBox(height: 4),
+                                Text(it.configuration,
+                                    style: AppTextStyles.minSub),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '¥${it.price.toStringAsFixed(it.price % 1 == 0 ? 0 : 2)}',
+                                style: AppTextStyles.price
+                                    .copyWith(fontSize: 15),
+                              ),
+                              const SizedBox(height: 3),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFe6432e)
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  '降¥${drop.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFFe6432e)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -692,6 +840,22 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                   ],
                 ),
+                // 比加入时降价 标签
+                if (_CartScreenState.priceDropOf(item) != null) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.trending_down,
+                          size: 12, color: Color(0xFFe6432e)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '比加入时降¥${_CartScreenState.priceDropOf(item)!.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFFe6432e)),
+                      ),
+                    ],
+                  ),
+                ],
                 if (item.taxInfo.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(item.taxInfo,
