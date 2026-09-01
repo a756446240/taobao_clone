@@ -1412,3 +1412,216 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
     });
   }
 }
+
+// ============ 订单 AI 助手底部面板（本地关键词应答） ============
+class _AiAssistantSheet extends StatefulWidget {
+  const _AiAssistantSheet();
+
+  @override
+  State<_AiAssistantSheet> createState() => _AiAssistantSheetState();
+}
+
+class _AiAssistantSheetState extends State<_AiAssistantSheet> {
+  final List<Map<String, String>> _messages = [
+    {
+      'role': 'ai',
+      'text': '你好，我是订单 AI 助手。可以问我物流进度、退款售后、修改地址、催发货等问题～',
+    },
+  ];
+  final TextEditingController _input = TextEditingController();
+  final ScrollController _scroll = ScrollController();
+
+  static const List<String> _quickQuestions = [
+    '我的快递到哪了',
+    '怎么申请退款',
+    '可以改地址吗',
+    '怎么催发货',
+  ];
+
+  String _answer(String q) {
+    if (q.contains('物流') || q.contains('快递') || q.contains('到哪')) {
+      return '在订单卡片上点击「查看物流」，可以看到完整的物流跟踪时间线和运单号；显示"运输中"的订单一般 1-3 天内送达。';
+    }
+    if (q.contains('退款') || q.contains('售后') || q.contains('退钱')) {
+      return '未发货订单支持"秒退"：进入订单详情 → 申请退款，选择原因后提交即可；已收到货可在「退款/售后」Tab 发起退货退款。';
+    }
+    if (q.contains('地址') || q.contains('收件人')) {
+      return '待发货订单可以改地址：双击订单卡片左侧「更多」→ 编辑菜单 → 修改地址/修改收件人，保存后立即生效。';
+    }
+    if (q.contains('催') || q.contains('发货')) {
+      return '商家承诺 48 小时内发货。你可以点击订单卡片上的「催物流」按钮提醒商家，超时未发货可申请赔付。';
+    }
+    if (q.contains('优惠') || q.contains('券')) {
+      return '领券中心在「我的」页面中部，消费券和品类券每天限量发放，下单时满足门槛会自动抵扣。';
+    }
+    return '这个问题我还在学习中。你可以试试问物流、退款、改地址、催发货相关问题，我会尽力解答～';
+  }
+
+  void _send([String? preset]) {
+    final q = (preset ?? _input.text).trim();
+    if (q.isEmpty) return;
+    setState(() {
+      _messages.add({'role': 'me', 'text': q});
+      _messages.add({'role': 'ai', 'text': _answer(q)});
+    });
+    _input.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _input.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.72,
+      padding: EdgeInsets.only(bottom: bottom),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      child: Column(
+        children: [
+          // 标题栏
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.smart_toy_outlined,
+                    color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('订单 AI 助手',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          // 消息列表
+          Expanded(
+            child: ListView.builder(
+              controller: _scroll,
+              padding: const EdgeInsets.all(12),
+              itemCount: _messages.length,
+              itemBuilder: (_, i) {
+                final m = _messages[i];
+                final isMe = m['role'] == 'me';
+                return Align(
+                  alignment:
+                      isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    constraints: BoxConstraints(
+                        maxWidth:
+                            MediaQuery.of(context).size.width * 0.75),
+                    decoration: BoxDecoration(
+                      color: isMe ? AppColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      m['text']!,
+                      style: TextStyle(
+                          color: isMe ? Colors.white : Colors.black87,
+                          fontSize: 13,
+                          height: 1.4),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // 快捷提问
+          SizedBox(
+            height: 34,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _quickQuestions.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => GestureDetector(
+                onTap: () => _send(_quickQuestions[i]),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                  child: Text(_quickQuestions[i],
+                      style: const TextStyle(fontSize: 12)),
+                ),
+              ),
+            ),
+          ),
+          // 输入框
+          Container(
+            color: Colors.white,
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    onSubmitted: _send,
+                    decoration: InputDecoration(
+                      hintText: '输入你的问题…',
+                      hintStyle: const TextStyle(
+                          color: Color(0xFFBBBBBB), fontSize: 13),
+                      filled: true,
+                      fillColor: const Color(0xFFF5F5F5),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => _send(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('发送',
+                        style:
+                            TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
