@@ -23,6 +23,7 @@ import 'ai_order_import_screen.dart';
 import 'benefits_screen.dart';
 import 'coupon_center_screen.dart';
 import 'favorites_screen.dart';
+import 'followed_shops_screen.dart';
 import 'footprints_screen.dart';
 import 'settings_screen.dart';
 import 'material_pool_screen.dart';
@@ -589,7 +590,7 @@ class _MineScreenState extends State<MineScreen> {
           _toolIcon(Icons.star_border, '收藏的宝贝', '逛逛多宝贝',
               onTap: _openFavorites),
           _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
-              onDoubleTap: _openAiAudit),
+              onTap: _openFollowedShops, onDoubleTap: _openAiAudit),
           _toolIcon(Icons.access_time, '足迹', '看过的内容',
               onTap: _openFootprints, onDoubleTap: _openAiImport),
         ],
@@ -608,6 +609,13 @@ class _MineScreenState extends State<MineScreen> {
   void _openAiAudit() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const AiOrderAuditScreen()),
+    );
+  }
+
+  /// 单击"关注店铺" → 关注店铺列表
+  void _openFollowedShops() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FollowedShopsScreen()),
     );
   }
 
