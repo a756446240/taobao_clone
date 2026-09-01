@@ -16,9 +16,11 @@ import '../../providers/profile_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
+import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
+import 'favorites_screen.dart';
 import 'material_pool_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -564,8 +566,10 @@ class _MineScreenState extends State<MineScreen> {
       ),
       child: Row(
         children: [
-          _toolIcon(Icons.local_shipping_outlined, '快递', '暂无在途包裹'),
-          _toolIcon(Icons.star_border, '收藏的宝贝', '逛逛多宝贝'),
+          _toolIcon(Icons.local_shipping_outlined, '快递', '暂无在途包裹',
+              onTap: _openLogistics),
+          _toolIcon(Icons.star_border, '收藏的宝贝', '逛逛多宝贝',
+              onTap: _openFavorites),
           _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
               onDoubleTap: _openAiAudit),
           _toolIcon(Icons.access_time, '足迹', '看过的内容',
@@ -589,10 +593,25 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
+  /// 单击"快递" → 物流详情
+  void _openLogistics() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LogisticsScreen()),
+    );
+  }
+
+  /// 单击"收藏的宝贝" → 收藏夹
+  void _openFavorites() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+    );
+  }
+
   Widget _toolIcon(IconData icon, String title, String subtitle,
-      {VoidCallback? onDoubleTap}) {
+      {VoidCallback? onTap, VoidCallback? onDoubleTap}) {
     return Expanded(
       child: GestureDetector(
+        onTap: onTap,
         onDoubleTap: onDoubleTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
@@ -686,14 +705,14 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  // ============ App 圆圈入口（对齐 image#12） ============
+  // ============ App 圆圈入口（真实淘宝图标，素材库 icons/） ============
   Widget _buildAppGrid() {
     final apps = [
-      {'label': '芭芭农场', 'asset': 'assets/images/mine_icons/farm.png'},
-      {'label': '领淘金币', 'asset': 'assets/images/mine_icons/coin.png'},
-      {'label': '红包签到', 'asset': 'assets/images/mine_icons/redpacket.png'},
-      {'label': '游戏中心', 'asset': 'assets/images/mine_icons/game.png'},
-      {'label': '连连消', 'asset': 'assets/images/mine_icons/monster.png'},
+      {'label': '芭芭农场', 'asset': 'assets/images/icons/farm.png'},
+      {'label': '领淘金币', 'asset': 'assets/images/icons/coin.png'},
+      {'label': '红包签到', 'asset': 'assets/images/icons/redpacket.png'},
+      {'label': '游戏中心', 'asset': 'assets/images/icons/game.png'},
+      {'label': '连连消', 'asset': 'assets/images/icons/lianlian.png'},
     ];
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
