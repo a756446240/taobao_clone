@@ -15,22 +15,27 @@ class CartProvider extends ChangeNotifier {
     _restoreFromDisk();
   }
 
-  // ============ 订单状态固定 9 选项 ============
+  // ============ 订单状态固定选项（双向可逆，任意互切） ============
   static const List<String> orderStatusOptions = [
+    '待发货',
     '已发货',
     '已经签收',
     '待确认收货',
     '仓库已发货',
-    '交易关闭',
     '交易成功',
-    '退款成功',
+    '交易关闭',
     '待商家退款',
-    '待发货',
+    '退款成功',
+    '退款结束',
   ];
 
   /// 状态 → 栏目归类（待发货 / 待收货 / 退款/售后 / 已完成）
   static String statusCategory(String status) {
-    if (status.contains('待发货') || status.contains('等待发货')) return '待发货';
+    if (status.contains('待发货') ||
+        status.contains('等待发货') ||
+        status.contains('商家处理')) {
+      return '待发货';
+    }
     if (status.contains('发货') ||
         status.contains('签收') ||
         status.contains('收货') ||
@@ -272,6 +277,8 @@ class CartProvider extends ChangeNotifier {
     String? platformCouponLabel,
     bool? showPlatformCoupon,
     double? coDiscount,
+    double? shippingFee,
+    bool? showShippingFee,
     String? taxContent,
     bool? showTax,
     List<String>? detailTags,
@@ -343,6 +350,8 @@ class CartProvider extends ChangeNotifier {
     if (platformCouponLabel != null) item.platformCouponLabel = platformCouponLabel;
     if (showPlatformCoupon != null) item.showPlatformCoupon = showPlatformCoupon;
     if (coDiscount != null) item.coDiscount = coDiscount;
+    if (shippingFee != null) item.shippingFee = shippingFee;
+    if (showShippingFee != null) item.showShippingFee = showShippingFee;
     if (taxContent != null) item.taxContent = taxContent;
     if (showTax != null) item.showTax = showTax;
     if (detailTags != null) item.detailTags = detailTags;
@@ -364,31 +373,50 @@ class CartProvider extends ChangeNotifier {
     if (showRefundDiscount != null) {
       item.showRefundDiscount = showRefundDiscount;
     }
-    // 价格相关字段变动后，自动重算实付款并同步到所有展示位置
-    _recalcPaidAmount(item);
+    // 实付款规则：
+    // 1) 直接修改实付价（price）时，以录入值为准，绝不再用其它字段重算覆盖
+    // 2) 修改商品总价/运费/优惠等组成项时，才自动重算实付款
+    final priceComposingChanged = productTotal != null ||
+        shopDiscount != null ||
+        showShopDiscount != null ||
+        platformCoupon != null ||
+        showPlatformCoupon != null ||
+        shippingFee != null ||
+        showShippingFee != null;
+    if (price == null && priceComposingChanged) {
+      _recalcPaidAmount(item);
+    }
     _persist();
     notifyListeners();
   }
 
-  /// 实付款 = 商品总价 - 所有（显示中的）优惠，自动同步
+  /// 实付款 = 商品总价 + 运费（显示中） - 所有（显示中的）优惠
   void _recalcPaidAmount(OrderItem item) {
     if (item.productTotal <= 0) return;
     var paid = item.productTotal;
+    if (item.showShippingFee) paid += item.shippingFee;
     if (item.showShopDiscount) paid -= item.shopDiscount;
     if (item.showPlatformCoupon) paid -= item.platformCoupon;
     if (paid < 0) paid = 0;
     item.price = double.parse(paid.toStringAsFixed(2));
   }
 
-  /// 修改订单状态（9 个固定选项），并自动归类到对应栏目
+  /// 修改订单状态，并自动归类到对应栏目。
+  /// 状态双向可逆：退款类 ⇄ 普通类（待发货/已发货/交易成功…）可任意互切。
   void updateOrderStatus(ShoppingCartShop shop, OrderItem item, String status) {
     item.statusTitle = status;
     shop.orderSubStatus = status;
     final category = statusCategory(status);
     shop.orderStatus = category == '退款/售后' ? '退款/售后' : category;
-    // 退款类状态同步退款详情页字段
+    // 退款类状态同步退款详情页字段（三个退款状态互斥且都可逆）
     if (category == '退款/售后') {
-      item.refundStatus = status.contains('成功') ? '退款成功' : '待商家退款';
+      if (status.contains('成功')) {
+        item.refundStatus = '退款成功';
+      } else if (status.contains('结束')) {
+        item.refundStatus = '退款结束';
+      } else {
+        item.refundStatus = '待商家退款';
+      }
       item.refundTitle = item.refundStatus;
     }
     _persist();
@@ -468,7 +496,7 @@ class CartProvider extends ChangeNotifier {
       for (final item in shop.items) {
         if (item.refundBarStyle < 0) {
           item.refundBarStyle = rand.nextInt(4);
-          final base = item.price * item.quantity;
+          final base = item.price;
           item.refundDiscount = double.parse(
               ((base * 0.04) + rand.nextDouble() * base * 0.12)
                   .toStringAsFixed(2));
