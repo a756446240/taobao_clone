@@ -130,27 +130,26 @@ class _SearchScreenState extends State<SearchScreen> {
             const SizedBox(height: 16),
           ],
 
-          // 热搜推荐
-          Text('热搜推荐', style: AppTextStyles.middleBold),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: MockData.searchHints.map((e) {
-              return GestureDetector(
-                onTap: () => _search(e),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(e, style: AppTextStyles.small),
+          // 热搜榜（淘宝式双列排行：1-3 名橙序号 + 热/新/爆角标）
+          Row(
+            children: [
+              Text('热搜榜', style: AppTextStyles.middleBold),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1EC),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-              );
-            }).toList(),
+                child: const Text('实时热点，每分钟更新',
+                    style:
+                        TextStyle(color: AppColors.primary, fontSize: 10)),
+              ),
+            ],
           ),
+          const SizedBox(height: 8),
+          _buildHotRank(),
 
           // 实时建议
           if (suggestions.isNotEmpty) ...[
@@ -165,6 +164,77 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// 双列热搜排行：左列 1/3/5/7…，右列 2/4/6/8…
+  Widget _buildHotRank() {
+    final hints = MockData.searchHints;
+    const tags = ['热', '新', '爆', '', '热', '', '新', '', '热', ''];
+    final half = (hints.length + 1) ~/ 2;
+    Widget rankItem(int i) {
+      if (i >= hints.length) return const SizedBox.shrink();
+      final top3 = i < 3;
+      final tag = i < tags.length ? tags[i] : '';
+      return GestureDetector(
+        onTap: () => _search(hints[i]),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 18,
+                child: Text('${i + 1}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: top3
+                            ? AppColors.primary
+                            : const Color(0xFF999999))),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(hints[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.small),
+              ),
+              if (tag.isNotEmpty)
+                Text(tag,
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: tag == '热'
+                            ? const Color(0xFFFF2E4D)
+                            : tag == '爆'
+                                ? AppColors.primary
+                                : const Color(0xFF2B6DEF))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            children: [
+              for (var i = 0; i < half; i++) rankItem(i),
+            ],
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Column(
+            children: [
+              for (var i = half; i < hints.length; i++) rankItem(i),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
