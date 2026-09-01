@@ -832,13 +832,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           provider.updateOrderItem(_item, payTime: v);
         }),
       ),
-      _infoRow(
-        label: '发货时间',
-        value: _displayTime(_item.shipTime),
-        onTap: () => _editDateTime('修改发货时间', _item.shipTime, (v) {
-          provider.updateOrderItem(_item, shipTime: v);
-        }),
-      ),
+      // 发货时间：可显示/隐藏（眼睛开关，持久化）
+      _shipTimeRow(provider),
     ];
 
     return Container(
@@ -878,6 +873,68 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           const SizedBox(height: 12),
           ...entries,
+        ],
+      ),
+    );
+  }
+
+  /// 发货时间行：点击眼睛图标切换显示/隐藏（持久化到订单数据）
+  Widget _shipTimeRow(CartProvider provider) {
+    final visible = _item.showShipTime;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: visible
+                ? () => _editDateTime('修改发货时间', _item.shipTime, (v) {
+                      provider.updateOrderItem(_item, shipTime: v);
+                    })
+                : null,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('发货时间', style: AppTextStyles.small),
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFFcccccc), size: 16),
+              ],
+            ),
+          ),
+          const Spacer(),
+          Text(
+            visible ? _displayTime(_item.shipTime) : '已隐藏',
+            style: TextStyle(
+              fontSize: 13,
+              color: visible
+                  ? const Color(0xFF666666)
+                  : const Color(0xFFbbbbbb),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              provider.updateOrderItem(_item, showShipTime: !visible);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text(visible ? '发货时间已隐藏' : '发货时间已显示'),
+                  duration: const Duration(milliseconds: 900),
+                ));
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Icon(
+                visible
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 17,
+                color: const Color(0xFF999999),
+              ),
+            ),
+          ),
         ],
       ),
     );
