@@ -20,6 +20,7 @@ import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
+import 'coupon_center_screen.dart';
 import 'favorites_screen.dart';
 import 'footprints_screen.dart';
 import 'material_pool_screen.dart';
@@ -635,15 +636,18 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  // ============ 领券中心 ============
+  // ============ 领券中心（单击整卡 → 领券中心完整页） ============
   Widget _buildCouponCards() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
+    return GestureDetector(
+      onTap: _openCouponCenter,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
       child: Column(
         children: [
           Row(
@@ -675,6 +679,14 @@ class _MineScreenState extends State<MineScreen> {
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  /// 单击领券中心卡片 → 领券中心完整页
+  void _openCouponCenter() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CouponCenterScreen()),
     );
   }
 
