@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
@@ -211,7 +212,7 @@ class _OrderListScreenState extends State<OrderListScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search,
+                  const Icon(AppIcons.search,
                       color: Color(0xFF999999), size: 18),
                   const SizedBox(width: 6),
                   Expanded(
@@ -254,7 +255,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                 ),
               );
             },
-            child: _topAction(Icons.filter_list, '筛选'),
+            child: _topAction(AppIcons.filter, '筛选'),
           ),
           const SizedBox(width: 12),
           // 管理 → 订单管理页（编辑入口，双击进入）
@@ -262,7 +263,7 @@ class _OrderListScreenState extends State<OrderListScreen>
             onDoubleTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const OrderManagerScreen()),
             ),
-            child: _topAction(Icons.grid_view, '管理'),
+            child: _topAction(AppIcons.list, '管理'),
           ),
           const SizedBox(width: 12),
           // 消息 → 订单管理入口（编辑入口，双击进入）
@@ -273,7 +274,7 @@ class _OrderListScreenState extends State<OrderListScreen>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(Icons.message_outlined,
+                const Icon(AppIcons.message,
                     color: Colors.black87, size: 26),
                 Positioned(
                   right: -8,
