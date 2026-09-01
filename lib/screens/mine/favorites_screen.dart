@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/app_image.dart';
+import '../product/shop_home_screen.dart';
 
 /// 收藏店铺条目
 class _FavShop {
@@ -249,14 +250,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ],
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFDDDDDD)),
-                  borderRadius: BorderRadius.circular(14),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ShopHomeScreen(
+                        shopName: s.name,
+                        shopType: s.tag.contains('天猫')
+                            ? ShopType.tianMao
+                            : ShopType.taoBao),
+                  ),
                 ),
-                child: const Text('进店逛逛', style: TextStyle(fontSize: 12)),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFDDDDDD)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child:
+                      const Text('进店逛逛', style: TextStyle(fontSize: 12)),
+                ),
               ),
             ],
           ),
