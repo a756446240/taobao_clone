@@ -11,6 +11,7 @@ import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'category_screen.dart';
 import 'channel_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
@@ -308,9 +309,12 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildIconEntry(HomeIconEntry e) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      // 单击进入对应频道页
+      // 单击进入对应页面：分类走专属分类页，其余走频道页
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChannelScreen(entry: e)),
+        MaterialPageRoute(
+            builder: (_) => e.title == '分类'
+                ? const CategoryScreen()
+                : ChannelScreen(entry: e)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
