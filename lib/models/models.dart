@@ -135,6 +135,7 @@ class OrderItem {
   String createTime; // 创建时间
   String payTime; // 付款时间
   String shipTime; // 发货时间
+  bool showShipTime; // 是否显示发货时间行（眼睛开关可隐藏）
   String address; // 地址
   String receiver; // 收件人
   bool isSigned; // 是否已签收
@@ -215,6 +216,7 @@ class OrderItem {
     this.createTime = '',
     this.payTime = '',
     this.shipTime = '',
+    this.showShipTime = true,
     this.address = '',
     this.receiver = '',
     this.isSigned = false,
