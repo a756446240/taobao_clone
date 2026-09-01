@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -6,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
-import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
@@ -15,7 +13,7 @@ import '../../widgets/product_card.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
 
-/// 首页（搜索栏 + 热搜 + 轮播 + 金刚区 + 新品推荐 + 头条 + 猜你喜欢）
+/// 首页（搜索栏 + 图标两页滑动 + 直播四卡 + 超级立减横幅 + 吸顶 Tab + 猜你喜欢）
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -26,8 +24,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  int _headlineIndex = 0;
-  Timer? _headlineTimer;
+  // 图标区翻页（第 1 页单行 5+半露，第 2 页 3×5）
+  final PageController _iconPageController = PageController();
+  double _iconPage = 0;
   // 猜你喜欢：素材池加载完成后随机抽取一次（图+名对应）；池空时回退内置数据
   List<SearchResultItem>? _feedGoods;
   String? _feedSig;
@@ -37,18 +36,18 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _tabController =
         TabController(length: MockData.homeTabs.length, vsync: this);
-    _headlineTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _headlineIndex = (_headlineIndex + 1) % MockData.headlines.length;
-      });
+    _iconPageController.addListener(() {
+      final p = _iconPageController.page ?? 0;
+      if ((p - _iconPage).abs() > 0.001) {
+        setState(() => _iconPage = p);
+      }
     });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _headlineTimer?.cancel();
+    _iconPageController.dispose();
     super.dispose();
   }
 
@@ -76,9 +75,9 @@ class _HomeScreenState extends State<HomeScreen>
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      _buildKingKong(),
-                      _buildRecommend(),
-                      _buildHeadline(),
+                      _buildIconPages(),
+                      _buildLiveCards(),
+                      _buildSuperCutBanner(),
                     ],
                   ),
                 ),
@@ -184,68 +183,196 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ============ 金刚区 ============
-  Widget _buildKingKong() {
-    const pageCount = 10;
-    final pages = <Widget>[];
-    for (var i = 0; i < MockData.kingKongItems.length; i += pageCount) {
-      final end = (i + pageCount < MockData.kingKongItems.length)
-          ? i + pageCount
-          : MockData.kingKongItems.length;
-      final items = MockData.kingKongItems.sublist(i, end);
-      pages.add(
-        GridView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            childAspectRatio: 0.95,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) =>
-              _buildKingKongItem(items[index]),
-        ),
-      );
-    }
+  // ============ 图标区（两页滑动：P1 单行5+半露，P2 三行15；下方栏目固定不受影响） ============
+  static const double _kIconRowHeight = 84;
 
+  Widget _buildIconPages() {
+    // 翻页时高度在 单行(1页) 与 三行(2页) 之间平滑过渡
+    final height = _kIconRowHeight +
+        14 +
+        (_kIconRowHeight * 2) * _iconPage.clamp(0.0, 1.0);
     return Container(
       color: Colors.white,
-      height: 172,
-      child: PageView(children: pages),
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            height: height,
+            child: PageView(
+              controller: _iconPageController,
+              children: [
+                _buildIconPage1(),
+                _buildIconPage2(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 2),
+          _buildPageIndicator(),
+          const SizedBox(height: 6),
+        ],
+      ),
     );
   }
 
-  Widget _buildKingKongItem(KingKongItem item) {
-    return Column(
+  Widget _buildPageIndicator() {
+    final onSecond = _iconPage > 0.5;
+    return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        AppImage(url: item.picUrl, width: 44, height: 44),
-        const SizedBox(height: 4),
-        Text(item.title,
-            style: AppTextStyles.min.copyWith(color: Colors.black87)),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: onSecond ? 5 : 14,
+          height: 4,
+          decoration: BoxDecoration(
+            color: onSecond
+                ? const Color(0xFFdddddd)
+                : AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 5),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: onSecond ? 14 : 5,
+          height: 4,
+          decoration: BoxDecoration(
+            color: onSecond
+                ? AppColors.primary
+                : const Color(0xFFdddddd),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
       ],
     );
   }
 
-  // ============ 新品推荐 ============
-  Widget _buildRecommend() {
+  /// 第 1 页：单行 5 个，第 6 个"红包签到"右缘半露（不可独立滚动，横向手势交给翻页）
+  Widget _buildIconPage1() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 20) / 5.4;
+        return Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(),
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: 10),
+              ...MockData.homeIconPage1.map(
+                (e) => SizedBox(
+                    width: itemWidth, child: _buildIconEntry(e)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 第 2 页：3 行 × 5 = 15 个
+  Widget _buildIconPage2() {
+    final items = MockData.homeIconPage2;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+      child: Column(
+        children: [
+          for (var r = 0; r < 3; r++)
+            SizedBox(
+              height: _kIconRowHeight - 10,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var c = 0; c < 5; c++)
+                    Expanded(child: _buildIconEntry(items[r * 5 + c])),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIconEntry(HomeIconEntry e) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Color(e.color),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            e.badge,
+            maxLines: 1,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: e.badge.length > 1 ? 13 : 20,
+            ),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          e.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, color: Colors.black87),
+        ),
+      ],
+    );
+  }
+
+  // ============ 淘宝直播 / 直播有好价 / 百亿补贴 / 国家补贴（固定四卡） ============
+  Widget _buildLiveCards() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+      child: Row(
+        children: [
+          for (var i = 0; i < MockData.homeLiveCards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _buildLiveCard(MockData.homeLiveCards[i])),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveCard(HomeLiveCard card) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFf7f8fa),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('新品推荐', style: AppTextStyles.middleBold),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: MockData.recommendItems.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) =>
-                  _buildRecommendItem(MockData.recommendItems[index]),
+          Text(
+            card.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(card.titleColor),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Center(child: AppImage(url: card.imageUrl, height: 56)),
+          const SizedBox(height: 6),
+          Text(
+            card.priceText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Color(card.priceColor),
             ),
           ),
         ],
@@ -253,60 +380,56 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildRecommendItem(RecommendItem item) {
-    final bg = _hexToColor(item.bgColor);
-    final titleColor = _hexToColor(item.titleColor);
-    final subtitleColor = _hexToColor(item.subtitleColor);
-
+  // ============ 红色"超级立减"横幅 ============
+  Widget _buildSuperCutBanner() {
     return Container(
-      width: 72,
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      height: 46,
       decoration: BoxDecoration(
-        color: bg,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFff1e1e), Color(0xFFff5000)],
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Column(
-        children: [
-          AppImage(url: item.picUrl, width: 48, height: 48),
-          const SizedBox(height: 4),
-          if (item.title.isNotEmpty)
-            Text(item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.min.copyWith(color: titleColor)),
-          if (item.subtitle.isNotEmpty)
-            Text(item.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: subtitleColor)),
-        ],
-      ),
-    );
-  }
-
-  // ============ 头条 ============
-  Widget _buildHeadline() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          const Icon(AppIcons.notification,
-              color: AppColors.primary, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SizedBox(
-              height: 20,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: Text(
-                  MockData.headlines[_headlineIndex],
-                  key: ValueKey(_headlineIndex),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.small,
-                ),
-              ),
+          const SizedBox(width: 10),
+          const Icon(Icons.campaign, color: Colors.white, size: 20),
+          const SizedBox(width: 6),
+          const Text(
+            '超级立减',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold),
+          ),
+          Container(
+            width: 1,
+            height: 16,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            color: Colors.white54,
+          ),
+          const Expanded(
+            child: Text(
+              '好物立减，大牌9折起',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text(
+              '福利 立即查看',
+              style: TextStyle(
+                  color: Color(0xFFff2d2d),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -345,13 +468,6 @@ class _HomeScreenState extends State<HomeScreen>
       MaterialPageRoute(builder: (_) => SearchResultScreen(keyword: keyword)),
     );
   }
-}
-
-/// 颜色工具：hex 转 Color
-Color _hexToColor(String hex) {
-  var value = hex.replaceAll('#', '');
-  if (value.length == 6) value = 'FF$value';
-  return Color(int.parse(value, radix: 16));
 }
 
 /// TabBar 吸顶代理
