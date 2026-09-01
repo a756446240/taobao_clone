@@ -160,6 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
+          _buildQuickQuestions(),
           _buildInputBar(),
         ],
       ),
@@ -208,29 +209,92 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildBubble(ChatMessage message) {
     final isMe = message.isMe;
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.7,
+    final bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.65,
+      ),
+      decoration: BoxDecoration(
+        color: isMe ? AppColors.primary : Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(12),
+          topRight: const Radius.circular(12),
+          bottomLeft: Radius.circular(isMe ? 12 : 2),
+          bottomRight: Radius.circular(isMe ? 2 : 12),
         ),
-        decoration: BoxDecoration(
-          color: isMe ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(12),
-            topRight: const Radius.circular(12),
-            bottomLeft: Radius.circular(isMe ? 12 : 2),
-            bottomRight: Radius.circular(isMe ? 2 : 12),
-          ),
+      ),
+      child: Text(
+        message.content,
+        style: TextStyle(
+          color: isMe ? Colors.white : Colors.black87,
+          fontSize: 15,
         ),
-        child: Text(
-          message.content,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isMe) ...[_buildAvatar(), const SizedBox(width: 6)],
+          Flexible(child: bubble),
+          if (isMe) ...[const SizedBox(width: 6), _buildMyAvatar()],
+        ],
+      ),
+    );
+  }
+
+  /// 我方头像（橙色"我"字圆标）
+  Widget _buildMyAvatar() {
+    return const CircleAvatar(
+      radius: 16,
+      backgroundColor: Color(0xFFFFF1EC),
+      child: Text('我',
           style: TextStyle(
-            color: isMe ? Colors.white : Colors.black87,
-            fontSize: 15,
-          ),
+              color: AppColors.primary,
+              fontSize: 13,
+              fontWeight: FontWeight.bold)),
+    );
+  }
+
+  /// 快捷提问条（点击直接发送，命中关键词应答规则）
+  static const _quickQuestions = [
+    '什么时候发货？',
+    '有优惠券吗？',
+    '支持退货吗？',
+    '是正品吗？',
+  ];
+
+  Widget _buildQuickQuestions() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _quickQuestions.map((q) {
+            return GestureDetector(
+              onTap: () {
+                _controller.text = q;
+                _send();
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(q,
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.black87)),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
