@@ -140,6 +140,8 @@ class PersistenceService {
       'platformCouponLabel': item.platformCouponLabel,
       'showPlatformCoupon': item.showPlatformCoupon,
       'coDiscount': item.coDiscount,
+      'shippingFee': item.shippingFee,
+      'showShippingFee': item.showShippingFee,
       'taxContent': item.taxContent,
       'showTax': item.showTax,
       'detailTags': item.detailTags,
@@ -205,6 +207,8 @@ class PersistenceService {
       platformCouponLabel: j['platformCouponLabel'] ?? '满60元可减',
       showPlatformCoupon: j['showPlatformCoupon'] ?? true,
       coDiscount: (j['coDiscount'] as num?)?.toDouble() ?? 0,
+      shippingFee: (j['shippingFee'] as num?)?.toDouble() ?? 0,
+      showShippingFee: j['showShippingFee'] ?? false,
       taxContent: j['taxContent'] ?? '价格已含税',
       showTax: j['showTax'] ?? true,
       detailTags: (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
