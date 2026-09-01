@@ -227,31 +227,31 @@ class MockData {
 
   /// 首页图标区 第 1 页（单行 5 个 + 第 6 个半露"红包签到"）
   static const List<HomeIconEntry> homeIconPage1 = [
-    HomeIconEntry('天猫超市', '超市', 0xFF22c55e),
-    HomeIconEntry('淘宝秒杀', '秒', 0xFFff2d2d),
-    HomeIconEntry('领淘金币', '币', 0xFFf7b500),
-    HomeIconEntry('88VIP', '88', 0xFF2b2b2b),
-    HomeIconEntry('芭芭农场', '领', 0xFFff4d4f),
-    HomeIconEntry('红包签到', '¥', 0xFFff3b30),
+    HomeIconEntry('天猫超市', '超市', 0xFF22c55e, 'assets/images/icons/chaoshi.png'),
+    HomeIconEntry('淘宝秒杀', '秒', 0xFFff2d2d, 'assets/images/icons/miaosha.png'),
+    HomeIconEntry('领淘金币', '币', 0xFFf7b500, 'assets/images/icons/coin.png'),
+    HomeIconEntry('88VIP', '88', 0xFF2b2b2b, 'assets/images/icons/vip88.png'),
+    HomeIconEntry('芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png'),
+    HomeIconEntry('红包签到', '¥', 0xFFff3b30, 'assets/images/icons/redpacket.png'),
   ];
 
   /// 首页图标区 第 2 页（3 行 × 5 = 15 个）
   static const List<HomeIconEntry> homeIconPage2 = [
-    HomeIconEntry('红包签到', '¥', 0xFFff3b30),
-    HomeIconEntry('天猫新品', '新品', 0xFFa98548),
-    HomeIconEntry('淘工厂', '厂', 0xFFff6a00),
-    HomeIconEntry('活动日历', '历', 0xFFf43f5e),
-    HomeIconEntry('淘宝礼物', '礼', 0xFFef4444),
-    HomeIconEntry('淘鲜达', '鲜', 0xFF22c55e),
-    HomeIconEntry('淘宝闪购', '购', 0xFFff7d00),
-    HomeIconEntry('淘票票', '票', 0xFFff4d4f),
-    HomeIconEntry('聚划算', '聚', 0xFFe11d74),
-    HomeIconEntry('充值中心', '充', 0xFFff8c00),
-    HomeIconEntry('飞猪旅行', '猪', 0xFFfbbf24),
-    HomeIconEntry('分类', '三', 0xFF8b5cf6),
-    HomeIconEntry('天猫国际', '际', 0xFF7c3aed),
-    HomeIconEntry('资质规则', '✓', 0xFF3b82f6),
-    HomeIconEntry('全部频道', '●', 0xFFf59e0b),
+    HomeIconEntry('红包签到', '¥', 0xFFff3b30, 'assets/images/icons/redpacket.png'),
+    HomeIconEntry('天猫新品', '新品', 0xFFa98548, 'assets/images/icons/tianmao_new.png'),
+    HomeIconEntry('淘工厂', '厂', 0xFFff6a00, 'assets/images/icons/taogongchang.png'),
+    HomeIconEntry('活动日历', '历', 0xFFf43f5e, 'assets/images/icons/calendar.png'),
+    HomeIconEntry('淘宝礼物', '礼', 0xFFef4444, 'assets/images/icons/gift.png'),
+    HomeIconEntry('淘鲜达', '鲜', 0xFF22c55e, 'assets/images/icons/fresh.png'),
+    HomeIconEntry('淘宝闪购', '购', 0xFFff7d00, 'assets/images/icons/flashbuy.png'),
+    HomeIconEntry('淘票票', '票', 0xFFff4d4f, 'assets/images/icons/piaowu.png'),
+    HomeIconEntry('聚划算', '聚', 0xFFe11d74, 'assets/images/icons/jubuy.png'),
+    HomeIconEntry('充值中心', '充', 0xFFff8c00, 'assets/images/icons/recharge.png'),
+    HomeIconEntry('飞猪旅行', '猪', 0xFFfbbf24, 'assets/images/icons/feizhu.png'),
+    HomeIconEntry('分类', '三', 0xFF8b5cf6, 'assets/images/icons/category.png'),
+    HomeIconEntry('天猫国际', '际', 0xFF7c3aed, 'assets/images/icons/global.png'),
+    HomeIconEntry('资质规则', '✓', 0xFF3b82f6, 'assets/images/icons/qualification.png'),
+    HomeIconEntry('全部频道', '●', 0xFFf59e0b, 'assets/images/icons/all_channels.png'),
   ];
 
   /// 首页"淘宝直播/直播有好价/百亿补贴/国家补贴"四卡（固定不随图标滑动）
