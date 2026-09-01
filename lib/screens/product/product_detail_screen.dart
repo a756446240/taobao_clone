@@ -608,8 +608,54 @@ class _SkuSheet extends StatefulWidget {
 
 class _SkuSheetState extends State<_SkuSheet> {
   static const _specs = ['默认款', '升级款', '礼盒装'];
+
+  /// 各规格的加价（在商品基础价上叠加）
+  static const _specDelta = {'默认款': 0.0, '升级款': 30.0, '礼盒装': 60.0};
+
   String _spec = _specs[0];
   int _qty = 1;
+
+  /// 各规格库存：由商品名哈希生成（同一商品稳定，不同商品各异），礼盒装小概率缺货
+  late final Map<String, int> _stocks = _buildStocks();
+
+  Map<String, int> _buildStocks() {
+    var h = 0;
+    for (final c in widget.item.title.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return {
+      '默认款': 120 + h % 400,
+      '升级款': 20 + (h ~/ 7) % 180,
+      '礼盒装': h % 5 == 0 ? 0 : 5 + (h ~/ 13) % 60,
+    };
+  }
+
+  double get _basePrice => double.tryParse(widget.item.price) ?? 0;
+
+  int get _stock => _stocks[_spec] ?? 0;
+
+  /// 当前规格单价文案（整数不带小数点）
+  String get _priceText {
+    final p = _basePrice + (_specDelta[_spec] ?? 0);
+    return p % 1 == 0 ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
+  }
+
+  void _selectSpec(String s) {
+    final stock = _stocks[s] ?? 0;
+    if (stock <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('该规格暂时缺货，看看其他规格吧'),
+          duration: Duration(milliseconds: 1200),
+        ));
+      return;
+    }
+    setState(() {
+      _spec = s;
+      if (_qty > stock) _qty = stock;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -659,15 +705,20 @@ class _SkuSheetState extends State<_SkuSheet> {
                             Text('¥',
                                 style: AppTextStyles.price
                                     .copyWith(fontSize: 13)),
-                            Text(widget.item.price,
+                            Text(_priceText,
                                 style: AppTextStyles.price
                                     .copyWith(fontSize: 22)),
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text('库存 999 件',
-                            style: AppTextStyles.min.copyWith(
-                                color: AppColors.subText)),
+                        // 库存联动：紧张时橙色提示
+                        Text(
+                          _stock < 30 ? '库存紧张，仅剩 $_stock 件' : '库存 $_stock 件',
+                          style: AppTextStyles.min.copyWith(
+                              color: _stock < 30
+                                  ? AppColors.primary
+                                  : AppColors.subText),
+                        ),
                         const SizedBox(height: 2),
                         Text('已选：$_spec，$_qty 件',
                             style: AppTextStyles.min.copyWith(
@@ -687,8 +738,9 @@ class _SkuSheetState extends State<_SkuSheet> {
                 spacing: 8,
                 children: _specs.map((s) {
                   final selected = s == _spec;
+                  final outOfStock = (_stocks[s] ?? 0) <= 0;
                   return GestureDetector(
-                    onTap: () => setState(() => _spec = s),
+                    onTap: () => _selectSpec(s),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 7),
@@ -702,12 +754,16 @@ class _SkuSheetState extends State<_SkuSheet> {
                                 : Colors.transparent),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(s,
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: selected
-                                  ? AppColors.primary
-                                  : Colors.black87)),
+                      child: Text(
+                        outOfStock ? '$s（缺货）' : s,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: outOfStock
+                                ? const Color(0xFFBBBBBB)
+                                : selected
+                                    ? AppColors.primary
+                                    : Colors.black87),
+                      ),
                     ),
                   );
                 }).toList(),
@@ -729,22 +785,24 @@ class _SkuSheetState extends State<_SkuSheet> {
                     child: Text('$_qty',
                         style: const TextStyle(fontSize: 15)),
                   ),
-                  _qtyBtn(Icons.add,
-                      () => setState(() => _qty++)),
+                  _qtyBtn(
+                      Icons.add,
+                      _qty < _stock
+                          ? () => setState(() => _qty++)
+                          : null),
                 ],
               ),
               const SizedBox(height: 20),
               // 确认按钮
               GestureDetector(
-                onTap: _confirm,
+                onTap: _stock > 0 ? _confirm : null,
                 child: Container(
                   height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [
-                      Color(0xFFFF5000),
-                      Color(0xFFFF2E4D),
-                    ]),
+                    gradient: LinearGradient(colors: _stock > 0
+                        ? const [Color(0xFFFF5000), Color(0xFFFF2E4D)]
+                        : const [Color(0xFFCCCCCC), Color(0xFFBBBBBB)]),
                     borderRadius: BorderRadius.circular(22),
                   ),
                   child: Text(
@@ -784,7 +842,9 @@ class _SkuSheetState extends State<_SkuSheet> {
   }
 
   void _confirm() {
-    final price = double.tryParse(widget.item.price) ?? 0;
+    // 结算价 = 基础价 + 规格加价；数量兜底不超过库存
+    final price = _basePrice + (_specDelta[_spec] ?? 0);
+    final qty = _qty > _stock ? _stock : _qty;
     final overrideUrl = context
         .read<ProductImageProvider>()
         .imageFor(widget.item.title);
@@ -794,7 +854,7 @@ class _SkuSheetState extends State<_SkuSheet> {
           price: price,
           imageUrl: overrideUrl ?? widget.item.imageUrl,
           spec: _spec,
-          quantity: _qty,
+          quantity: qty,
           asPendingOrder: widget.buyNow,
         );
     Navigator.of(context).pop();
