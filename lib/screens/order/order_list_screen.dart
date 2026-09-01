@@ -396,8 +396,8 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = items.fold<double>(
-        0, (sum, item) => sum + item.price * item.quantity);
+    // 合计 = 各商品实付价直接相加（实付录入多少就是多少，不再乘规格数量）
+    final total = items.fold<double>(0, (sum, item) => sum + item.price);
     final isRefund = isRefundStatus(shop.orderSubStatus);
 
     return Container(
@@ -630,9 +630,8 @@ class _OrderItemTile extends StatelessWidget {
 
   // ============ 售后卡片布局（照搬真实淘宝退款/售后列表） ============
   Widget _buildRefundLayout(BuildContext context, String imageUrl) {
-    final amount = item.refundAmount > 0
-        ? item.refundAmount
-        : item.price * item.quantity;
+    final amount =
+        item.refundAmount > 0 ? item.refundAmount : item.price;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -695,7 +694,7 @@ class _OrderItemTile extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        // 退款条：灰底圆角整宽（退款成功 + 变体文案 + 金额橘色）
+        // 退款条：灰底圆角整宽（状态跟随退款详情页改动实时同步 + 变体文案 + 金额橘色）
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -708,7 +707,7 @@ class _OrderItemTile extends StatelessWidget {
               Expanded(
                 child: Text.rich(
                   TextSpan(
-                    text: '退款成功 ',
+                    text: '$_refundBarStatus ',
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -728,17 +727,26 @@ class _OrderItemTile extends StatelessWidget {
     );
   }
 
+  /// 退款条状态文字：与退款详情页的退款状态实时同步（退款成功/待商家退款/退款结束）
+  String get _refundBarStatus {
+    if (item.refundStatus.isNotEmpty) return item.refundStatus;
+    if (orderStatus.contains('成功')) return '退款成功';
+    if (orderStatus.contains('结束')) return '退款结束';
+    return '待商家退款';
+  }
+
   /// 退款条变体文案：0极速退款成功/1退款金额/2支付渠道/3平台支持退款
   /// 支付渠道跟订单内选择的支付方式一致；优惠随机生成、可在编辑菜单隐藏
   List<TextSpan> _refundBarSpans(double amount) {
     const grey = TextStyle(fontSize: 12, color: Color(0xFF999999));
     const orange = TextStyle(fontSize: 12, color: Color(0xFFFF5000));
+    final pending = _refundBarStatus == '待商家退款';
     final style = item.refundBarStyle < 0 ? 1 : item.refundBarStyle;
     if (style == 3) {
       return [const TextSpan(text: '平台支持退款', style: grey)];
     }
     final label = switch (style) {
-      0 => '极速退款成功 ',
+      0 => pending ? '极速退款中 ' : '极速退款成功 ',
       2 => item.paymentMethod.contains('微信') ? '微信 ' : '支付宝 ',
       _ => '退款金额 ',
     };
@@ -855,9 +863,11 @@ class _OrderItemTile extends StatelessWidget {
     final s = orderStatus;
     if (s.contains('退款') || s.contains('退货') || s.contains('售后')) {
       if (s.contains('成功')) {
-        final amount = (item.price * item.quantity).toStringAsFixed(2);
+        final amount = (item.refundAmount > 0 ? item.refundAmount : item.price)
+            .toStringAsFixed(2);
         return '退款成功 退款金额 ¥$amount';
       }
+      if (s.contains('结束')) return '退款结束';
       return '退款中 · 等待商家处理';
     }
     if (s.contains('交易关闭')) return '交易关闭';
@@ -1064,9 +1074,8 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
 
   /// 修改退款金额（售后订单）：退款卡片的"退款: ¥金额"与退款条金额即时更新
   void _editRefundAmount(CartProvider provider) {
-    final current = _item.refundAmount > 0
-        ? _item.refundAmount
-        : _item.price * _item.quantity;
+    final current =
+        _item.refundAmount > 0 ? _item.refundAmount : _item.price;
     Navigator.of(context).pop();
     DialogHelpers.showTextInput(
       widget.parentContext,
