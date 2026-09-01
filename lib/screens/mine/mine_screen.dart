@@ -17,6 +17,8 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import '../order/order_list_screen.dart';
+import 'ai_order_audit_screen.dart';
+import 'ai_order_import_screen.dart';
 import 'material_pool_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -564,23 +566,44 @@ class _MineScreenState extends State<MineScreen> {
         children: [
           _toolIcon(Icons.local_shipping_outlined, '快递', '暂无在途包裹'),
           _toolIcon(Icons.star_border, '收藏的宝贝', '逛逛多宝贝'),
-          _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态'),
-          _toolIcon(Icons.access_time, '足迹', '看过的内容'),
+          _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
+              onDoubleTap: _openAiAudit),
+          _toolIcon(Icons.access_time, '足迹', '看过的内容',
+              onDoubleTap: _openAiImport),
         ],
       ),
     );
   }
 
-  Widget _toolIcon(IconData icon, String title, String subtitle) {
+  /// 双击"足迹" → AI 订单截图解析
+  void _openAiImport() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AiOrderImportScreen()),
+    );
+  }
+
+  /// 双击"关注店铺" → AI 数据校验
+  void _openAiAudit() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AiOrderAuditScreen()),
+    );
+  }
+
+  Widget _toolIcon(IconData icon, String title, String subtitle,
+      {VoidCallback? onDoubleTap}) {
     return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          const SizedBox(height: 6),
-          Text(title, style: AppTextStyles.small),
-          Text(subtitle,
-              style: const TextStyle(color: Color(0xFF999999), fontSize: 10)),
-        ],
+      child: GestureDetector(
+        onDoubleTap: onDoubleTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 28),
+            const SizedBox(height: 6),
+            Text(title, style: AppTextStyles.small),
+            Text(subtitle,
+                style: const TextStyle(color: Color(0xFF999999), fontSize: 10)),
+          ],
+        ),
       ),
     );
   }
