@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'address_screen.dart';
 
 /// 淘宝式设置页：分组列表 + 开关 + 清除缓存 + 退出登录
 class SettingsScreen extends StatefulWidget {
@@ -56,7 +57,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _group([
             _arrowRow('账号与安全', onTap: () => _toast('账号与安全（演示）')),
             _arrowRow('支付设置', onTap: () => _toast('支付设置（演示）')),
-            _arrowRow('收货地址管理', onTap: () => _toast('地址管理（演示）')),
+            _arrowRow('收货地址管理',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const AddressScreen()))),
           ]),
           _group([
             _switchRow('消息通知', '接收订单/物流/优惠推送', _msgNotify,
