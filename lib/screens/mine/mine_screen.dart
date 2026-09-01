@@ -20,6 +20,7 @@ import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
+import 'benefits_screen.dart';
 import 'coupon_center_screen.dart';
 import 'favorites_screen.dart';
 import 'footprints_screen.dart';
@@ -419,7 +420,12 @@ class _MineScreenState extends State<MineScreen> {
           ...items.asMap().entries.expand((e) {
             final w = Expanded(
               child: GestureDetector(
-                onTap: () {},
+                // 单击进入权益钱包页对应标签
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          BenefitsScreen(initialIndex: e.key)),
+                ),
                 child: Column(
                   children: [
                     Text(e.value.label,
@@ -442,7 +448,9 @@ class _MineScreenState extends State<MineScreen> {
             ];
           }).toList(),
           GestureDetector(
-            onTap: () {},
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+            ),
             child: Container(
               padding: const EdgeInsets.only(left: 6, right: 4),
               child: const Column(
@@ -460,29 +468,35 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  // ============ 领红包 Banner ============
+  // ============ 领红包 Banner（单击进入红包权益页）============
   Widget _buildRedPacketBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF1E0),
-        borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const BenefitsScreen()),
       ),
-      child: const Row(
-        children: [
-          Icon(Icons.local_fire_department, color: Colors.red, size: 18),
-          SizedBox(width: 6),
-          Expanded(
-            child: Text('点击领取今日红包，限时发放错过可惜',
-                style: TextStyle(fontSize: 12, color: Color(0xFF8d4a1f))),
-          ),
-          Text('去领取',
-              style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold)),
-        ],
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1E0),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.local_fire_department, color: Colors.red, size: 18),
+            SizedBox(width: 6),
+            Expanded(
+              child: Text('点击领取今日红包，限时发放错过可惜',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF8d4a1f))),
+            ),
+            Text('去领取',
+                style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
