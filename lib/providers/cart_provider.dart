@@ -283,6 +283,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   bool get isAllSelected =>
+      _shops.isNotEmpty &&
       _shops.every((shop) => shop.items.every((item) => item.isSelected));
 
   int get selectedCount {
@@ -290,6 +291,17 @@ class CartProvider extends ChangeNotifier {
     for (final shop in _shops) {
       for (final item in shop.items) {
         if (item.isSelected) count += item.quantity;
+      }
+    }
+    return count;
+  }
+
+  /// 选中的商品行数（批量管理用，与 selectedCount 的件数口径区分）
+  int get selectedItemCount {
+    var count = 0;
+    for (final shop in _shops) {
+      for (final item in shop.items) {
+        if (item.isSelected) count++;
       }
     }
     return count;
@@ -366,6 +378,7 @@ class CartProvider extends ChangeNotifier {
     String? createTime,
     String? payTime,
     String? shipTime,
+    bool? showShipTime,
     String? address,
     String? receiver,
     bool? isSigned,
@@ -426,6 +439,7 @@ class CartProvider extends ChangeNotifier {
       item.wechatTradeNo = _composeTradeNo(first8);
     }
     if (shipTime != null) item.shipTime = shipTime;
+    if (showShipTime != null) item.showShipTime = showShipTime;
     if (address != null) item.address = address;
     if (receiver != null) item.receiver = receiver;
     if (isSigned != null) item.isSigned = isSigned;
