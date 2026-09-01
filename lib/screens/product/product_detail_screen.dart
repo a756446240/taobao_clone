@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'shop_home_screen.dart';
 
 /// 商品详情页（1:1 对齐淘宝详情页结构）
 /// 图廊 → 价格横幅 → 标题 → 服务 → 规格 → 评价 → 店铺 → 看了又看
@@ -109,6 +110,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         content: Text(msg),
         duration: const Duration(milliseconds: 1200),
       ));
+  }
+
+  /// 进店逛逛 / 底部店铺图标 → 店铺主页
+  void _gotoShop(String shopName) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ShopHomeScreen(shopName: shopName)),
+    );
   }
 
   // ============ 图廊（同图 3 页可滑动，右下页码胶囊） ============
@@ -421,7 +429,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
           GestureDetector(
-            onTap: () => _toast('已进入店铺（演示）'),
+            onTap: () => _gotoShop(name),
             child: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 5),
@@ -489,7 +497,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Row(
             children: [
               _bottomIcon(Icons.storefront_outlined, '店铺',
-                  () => _toast('已进入店铺（演示）')),
+                  () => _gotoShop(widget.item.shopName)),
               _bottomIcon(Icons.headset_mic_outlined, '客服',
                   () => _toast('客服小二马上来（演示）')),
               _bottomIcon(
