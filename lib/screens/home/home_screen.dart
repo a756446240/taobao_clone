@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen>
                     onTap: () => _gotoSearch(),
                     child: const Row(
                       children: [
-                        Icon(Icons.search,
+                        Icon(AppIcons.search,
                             color: Color(0xFF999999), size: 18),
                         SizedBox(width: 4),
                         Flexible(
