@@ -97,13 +97,21 @@ class _OrderListScreenState extends State<OrderListScreen>
               child: TabBar(
                 controller: _tab,
                 isScrollable: true,
-                labelColor: AppColors.primary,
+                tabAlignment: TabAlignment.start,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
                 unselectedLabelColor: Colors.black87,
-                indicatorColor: AppColors.primary,
-                indicatorSize: TabBarIndicatorSize.label,
                 labelStyle: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.bold),
                 unselectedLabelStyle: const TextStyle(fontSize: 14),
+                indicator: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 10),
                 tabs: _tabs.map((t) => Tab(text: t)).toList(),
               ),
             ),
