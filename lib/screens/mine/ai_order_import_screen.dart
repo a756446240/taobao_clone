@@ -1,13 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/cart_provider.dart';
 
 /// AI 订单截图解析页（双击"足迹"进入）
-/// 用户发截图 → SenseNova AI 解析订单字段 → 预览 → 追加 preset_orders.json
-///
-/// 注：当前实现为演示骨架，AI 调用通过对话框收集字段；
-/// 真实接入 SenseNova 时替换 _analyzeImage 即可。
+/// 用户发截图 → SenseNova 视觉模型解析订单字段 → 预览 → 追加 preset_orders.json
 class AiOrderImportScreen extends StatefulWidget {
   const AiOrderImportScreen({super.key});
 
@@ -16,6 +17,11 @@ class AiOrderImportScreen extends StatefulWidget {
 }
 
 class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
+  // SenseNova 接入配置（OpenAI 兼容协议）
+  static const _apiKey = 'sk-v2RICYtDbMvU7HTQ9tIOoBRFLr6WYLIh';
+  static const _baseUrl = 'https://token.sensenova.cn/v1';
+  static const _model = 'sensenova-6.7-flash-lite';
+
   final List<_ParsedOrder> _queue = [];
   bool _parsing = false;
 
@@ -26,29 +32,92 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
 
     setState(() => _parsing = true);
     for (final x in picked) {
-      final parsed = await _analyzeImage(File(x.path));
-      if (parsed != null) {
-        _queue.add(parsed);
+      try {
+        final parsed = await _analyzeImage(File(x.path));
+        if (parsed != null) {
+          _queue.add(parsed);
+        }
+      } catch (e) {
+        _toast('第 ${_queue.length + 1} 张识别失败：$e');
       }
     }
     setState(() => _parsing = false);
   }
 
-  /// 调用 SenseNova 解析订单截图
-  /// TODO: 接入 sensenova_generate_image / sensenova_chat MCP
+  /// 调用 SenseNova 视觉模型解析订单截图，返回结构化字段
   Future<_ParsedOrder?> _analyzeImage(File file) async {
-    // 模拟解析延迟
-    await Future.delayed(const Duration(milliseconds: 800));
-    // 模拟返回结果（真实环境应调用 SenseNova 视觉模型）
-    return _ParsedOrder(
-      imagePath: file.path,
-      shopName: '示例店铺',
-      productTitle: '从截图识别的商品标题',
-      price: 99.00,
-      status: '待发货',
-      confidence: 0.85,
-      rawJson: '{"source":"sensenova","mock":true}',
-    );
+    final bytes = await file.readAsBytes();
+    final b64 = base64Encode(bytes);
+
+    final uri = Uri.parse('$_baseUrl/chat/completions');
+    final body = jsonEncode({
+      'model': _model,
+      'messages': [
+        {
+          'role': 'user',
+          'content': [
+            {
+              'type': 'text',
+              'text': '这是一张淘宝订单截图。请提取订单信息，只输出 JSON，不要输出任何其他文字：\n'
+                  '{"shopName":"店铺名","productTitle":"商品标题","price":实付金额数字,'
+                  '"status":"订单状态(待付款/待发货/待收货/已完成/退款中之一)","confidence":0到1的置信度}\n'
+                  '如果图片不是订单截图，输出 {"error":"not_order"}'
+            },
+            {
+              'type': 'image_url',
+              'image_url': {'url': 'data:image/jpeg;base64,$b64'}
+            }
+          ]
+        }
+      ],
+      'max_tokens': 512,
+      'temperature': 0.1,
+    });
+
+    final client = HttpClient();
+    try {
+      final req = await client.postUrl(uri).timeout(
+          const Duration(seconds: 60));
+      req.headers.set('Authorization', 'Bearer $_apiKey');
+      req.headers.set('Content-Type', 'application/json');
+      req.write(body);
+      final resp = await req.close().timeout(const Duration(seconds: 60));
+      final respBody = await resp.transform(utf8.decoder).join();
+
+      if (resp.statusCode != 200) {
+        throw Exception('HTTP ${resp.statusCode}');
+      }
+      final data = jsonDecode(respBody);
+      final content =
+          data['choices']?[0]?['message']?['content'] as String? ?? '';
+
+      // 从回复中提取 JSON（模型可能包一层 ```json）
+      final match =
+          RegExp(r'\{[\s\S]*\}').firstMatch(content);
+      if (match == null) {
+        throw Exception('AI 未返回有效 JSON');
+      }
+      final parsed = jsonDecode(match.group(0)!) as Map<String, dynamic>;
+      if (parsed.containsKey('error')) {
+        throw Exception('图片不是订单截图');
+      }
+
+      return _ParsedOrder(
+        imagePath: file.path,
+        shopName: (parsed['shopName'] ?? '未知店铺').toString(),
+        productTitle: (parsed['productTitle'] ?? '未识别标题').toString(),
+        price: (parsed['price'] is num)
+            ? (parsed['price'] as num).toDouble()
+            : double.tryParse('${parsed['price']}') ?? 0,
+        status: (parsed['status'] ?? '待发货').toString(),
+        confidence: (parsed['confidence'] is num)
+            ? (parsed['confidence'] as num).toDouble()
+            : 0.6,
+        rawJson: match.group(0)!,
+      );
+    } finally {
+      client.close();
+    }
   }
 
   Future<void> _appendToPresetOrders() async {
@@ -59,9 +128,9 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('追加到 preset_orders.json？'),
+        title: const Text('追加到订单列表？'),
         content: Text(
-            '将追加 ${_queue.length} 条订单，追加后需重新构建 IPA 生效。\n\n继续吗？'),
+            '将追加 ${_queue.length} 条订单到"我的订单"，立即生效并自动保存。\n\n继续吗？'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
@@ -74,8 +143,16 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
       ),
     );
     if (confirmed != true) return;
-    // TODO: 实际写入 preset_orders.json（通过 path_provider 拿到文档目录）
-    _toast('已追加 ${_queue.length} 条订单，请重新构建 IPA');
+    final provider = context.read<CartProvider>();
+    for (final o in _queue) {
+      provider.importAiParsedOrder(
+        shopName: o.shopName,
+        productTitle: o.productTitle,
+        price: o.price,
+        status: o.status,
+      );
+    }
+    _toast('已追加 ${_queue.length} 条订单，去"我的订单"查看');
     setState(() => _queue.clear());
   }
 
@@ -132,8 +209,8 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  '发订单截图给我，我会自动提取：店铺名、商品标题、实付价、状态。\n'
-                  '识别完成后可一键追加到 preset_orders.json，下次构建 IPA 自动生效。',
+                  '发订单截图给我，SenseNova 视觉模型自动提取：店铺名、商品标题、实付价、状态。\n'
+                  '识别完成后一键追加到订单列表，立即生效并自动保存。',
                   style: TextStyle(fontSize: 12, color: Color(0xFF8B4513), height: 1.5),
                 ),
               ],
