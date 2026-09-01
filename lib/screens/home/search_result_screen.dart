@@ -7,7 +7,7 @@ import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/product_card.dart';
 
-/// 搜索结果页（列表/网格切换 + 筛选）
+/// 搜索结果页（列表/网格切换 + 真实排序 + 筛选抽屉）
 class SearchResultScreen extends StatefulWidget {
   final String keyword;
 
@@ -19,10 +19,61 @@ class SearchResultScreen extends StatefulWidget {
 
 class _SearchResultScreenState extends State<SearchResultScreen> {
   bool _isGrid = true;
+  // 排序：0 综合 / 1 销量 / 2 价格；价格含升降序
   int _sortIndex = 0;
-  final List<String> _sorts = ['综合', '销量', '价格', '筛选'];
+  bool _priceAsc = true;
 
-  List<SearchResultItem> get _results => MockData.guessLikeGoods;
+  // 筛选条件
+  int _priceRange = 0; // 0全部 1:0-50 2:50-200 3:200-500 4:500+
+  bool _onlyTmall = false;
+  bool _onlyFreeShip = false;
+
+  /// 从 commentCount 文本估算销量（"已售1万+"→10000，"20万人付款"→200000）
+  int _soldOf(SearchResultItem e) {
+    final m = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(e.commentCount);
+    if (m == null) return 0;
+    var n = double.tryParse(m.group(1)!) ?? 0;
+    if (e.commentCount.contains('万')) n *= 10000;
+    return n.toInt();
+  }
+
+  List<SearchResultItem> get _results {
+    var list = List<SearchResultItem>.of(MockData.guessLikeGoods);
+    // 筛选：价格区间
+    bool inRange(SearchResultItem e) {
+      final p = double.tryParse(e.price) ?? 0;
+      switch (_priceRange) {
+        case 1:
+          return p < 50;
+        case 2:
+          return p >= 50 && p < 200;
+        case 3:
+          return p >= 200 && p < 500;
+        case 4:
+          return p >= 500;
+        default:
+          return true;
+      }
+    }
+
+    list = list.where(inRange).toList();
+    if (_onlyTmall) {
+      list = list.where((e) => e.shopName.contains('旗舰')).toList();
+    }
+    // 排序
+    switch (_sortIndex) {
+      case 1:
+        list.sort((a, b) => _soldOf(b).compareTo(_soldOf(a)));
+        break;
+      case 2:
+        int cmp(SearchResultItem a, SearchResultItem b) =>
+            (double.tryParse(a.price) ?? 0)
+                .compareTo(double.tryParse(b.price) ?? 0);
+        list.sort((a, b) => _priceAsc ? cmp(a, b) : cmp(b, a));
+        break;
+    }
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +117,42 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
         children: [
           _buildSortBar(),
           Expanded(
-            child: _isGrid ? _buildGrid() : _buildList(),
+            child: _results.isEmpty
+                ? _buildEmpty()
+                : (_isGrid ? _buildGrid() : _buildList()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.search_off, size: 56, color: Color(0xFFDDDDDD)),
+          const SizedBox(height: 8),
+          Text('没有符合筛选条件的宝贝',
+              style: AppTextStyles.middleSub),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => setState(() {
+              _priceRange = 0;
+              _onlyTmall = false;
+              _onlyFreeShip = false;
+            }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 18, vertical: 7),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.primary),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text('清除筛选条件',
+                  style:
+                      TextStyle(color: AppColors.primary, fontSize: 13)),
+            ),
           ),
         ],
       ),
@@ -82,24 +168,12 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_sorts.length, (index) {
-                final active = _sortIndex == index;
-                return GestureDetector(
-                  onTap: () => setState(() => _sortIndex = index),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      _sorts[index],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: active ? AppColors.primary : Colors.black87,
-                        fontWeight:
-                            active ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                );
-              }),
+              children: [
+                _sortTab('综合', 0),
+                _sortTab('销量', 1),
+                _sortTab('价格', 2, arrows: true),
+                _filterTab(),
+              ],
             ),
           ),
           // 列表/网格切换
@@ -113,6 +187,207 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _sortTab(String label, int index, {bool arrows = false}) {
+    final active = _sortIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (arrows && _sortIndex == 2) {
+          _priceAsc = !_priceAsc; // 已在价格档：切换升降序
+        } else {
+          _sortIndex = index;
+          if (arrows) _priceAsc = true;
+        }
+      }),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: active ? AppColors.primary : Colors.black87,
+                fontWeight:
+                    active ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            if (arrows)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.arrow_drop_up,
+                      size: 14,
+                      color: active && _priceAsc
+                          ? AppColors.primary
+                          : const Color(0xFFBBBBBB)),
+                  Icon(Icons.arrow_drop_down,
+                      size: 14,
+                      color: active && !_priceAsc
+                          ? AppColors.primary
+                          : const Color(0xFFBBBBBB)),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterTab() {
+    final hasFilter = _priceRange != 0 || _onlyTmall || _onlyFreeShip;
+    return GestureDetector(
+      onTap: _openFilterSheet,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Text(
+              '筛选',
+              style: TextStyle(
+                fontSize: 14,
+                color: hasFilter ? AppColors.primary : Colors.black87,
+                fontWeight:
+                    hasFilter ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            Icon(Icons.filter_list,
+                size: 15,
+                color: hasFilter
+                    ? AppColors.primary
+                    : const Color(0xFF999999)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 筛选底部抽屉 ============
+  void _openFilterSheet() {
+    var range = _priceRange;
+    var tmall = _onlyTmall;
+    var freeShip = _onlyFreeShip;
+    const ranges = ['全部', '0-50元', '50-200元', '200-500元', '500元以上'];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            Widget chip(String label, bool selected, VoidCallback onTap) {
+              return GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8, bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFFFF1EC)
+                        : const Color(0xFFF5F5F5),
+                    border: Border.all(
+                        color: selected
+                            ? AppColors.primary
+                            : Colors.transparent),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: selected
+                              ? AppColors.primary
+                              : Colors.black87)),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text('筛选',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('价格区间',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      children: [
+                        for (var i = 0; i < ranges.length; i++)
+                          chip(ranges[i], range == i,
+                              () => setSheet(() => range = i)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('服务与保障',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      children: [
+                        chip('天猫旗舰店', tmall,
+                            () => setSheet(() => tmall = !tmall)),
+                        chip('包邮', freeShip,
+                            () => setSheet(() => freeShip = !freeShip)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _priceRange = 0;
+                                _onlyTmall = false;
+                                _onlyFreeShip = false;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('重置'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary),
+                            onPressed: () {
+                              setState(() {
+                                _priceRange = range;
+                                _onlyTmall = tmall;
+                                _onlyFreeShip = freeShip;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('完成'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
