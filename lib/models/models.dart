@@ -184,6 +184,18 @@ class OrderItem {
   double refundDiscount; // 退款优惠金额（随机生成，0=无）
   bool showRefundDiscount; // 是否在退款条显示优惠
 
+  // ===== 退款详情扩展字段（3.5 整改新增） =====
+  String refundNumber; // 退款编号（4 开头 17 位，留空=自动生成）
+  String refundReason; // 退款原因（可选，留空=未选择）
+  bool isInstantRefund; // 是否未发货秒退（控制"未发货秒退"横幅显示）
+  bool showInstantRefundBanner; // 是否显示"未发货秒退"横幅（用户可关）
+  bool hasFreightInsurance; // 是否有运费保障
+  double freightInsuranceAmount; // 运费保障金额（元）
+  int returnedCoins; // 退回淘金币数（0=不显示该行）
+  bool refundInfoCollapsed; // 协商历史是否折叠（true=折叠，显示"查看全部售后信息"）
+  bool showHelpSection; // 是否显示"您是否遇到以下问题？"反馈区
+  bool showShipDetailBtn; // 是否显示"寄件详情"按钮（退款成功状态）
+
   OrderItem({
     required this.imageUrl,
     required this.title,
@@ -243,6 +255,16 @@ class OrderItem {
     this.refundBarStyle = -1,
     this.refundDiscount = 0,
     this.showRefundDiscount = true,
+    this.refundNumber = '',
+    this.refundReason = '',
+    this.isInstantRefund = false,
+    this.showInstantRefundBanner = true,
+    this.hasFreightInsurance = false,
+    this.freightInsuranceAmount = 0,
+    this.returnedCoins = 0,
+    this.refundInfoCollapsed = true,
+    this.showHelpSection = true,
+    this.showShipDetailBtn = true,
   });
 }
 
