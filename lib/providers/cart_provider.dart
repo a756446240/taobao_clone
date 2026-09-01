@@ -51,6 +51,57 @@ class CartProvider extends ChangeNotifier {
   List<ShoppingCartShop> _shops = [];
   bool _loading = true;
 
+  /// AI 截图解析导入：把识别出的订单追加为新店铺卡片（自动持久化，无需重新构建）
+  void importAiParsedOrder({
+    required String shopName,
+    required String productTitle,
+    required double price,
+    required String status,
+  }) {
+    final now = DateTime.now();
+    String fmt(DateTime t) =>
+        '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+    final item = OrderItem(
+      imageUrl: '',
+      title: productTitle,
+      configuration: '默认规格',
+      stock: 99,
+      price: price,
+      quantity: 1,
+      createTime: fmt(now),
+      payTime: status.contains('待付款') ? '' : fmt(now),
+      orderNo: '5127${List.generate(15, (_) => Random().nextInt(10)).join()}',
+      productTotal: price,
+      statusTitle: status,
+    );
+    // 尝试塞进已有同名店铺，否则新建店铺
+    ShoppingCartShop? target;
+    for (final s in _shops) {
+      if (s.shopName == shopName) {
+        target = s;
+        break;
+      }
+    }
+    if (target != null) {
+      target.items.insert(0, item);
+    } else {
+      _shops.insert(
+        0,
+        ShoppingCartShop(
+          shopName: shopName,
+          shopType: ShopType.taoBao,
+          items: [item],
+          orderStatus: status,
+          orderSubStatus: status,
+          orderTotalTip: '共1件商品 合计：',
+        ),
+      );
+    }
+    _persist();
+    notifyListeners();
+  }
+
   /// 读取本地持久化的订单；有则覆盖默认生成
   Future<void> _restoreFromDisk() async {
     try {
