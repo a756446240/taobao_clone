@@ -21,6 +21,7 @@ import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
 import 'favorites_screen.dart';
+import 'footprints_screen.dart';
 import 'material_pool_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -573,7 +574,7 @@ class _MineScreenState extends State<MineScreen> {
           _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
               onDoubleTap: _openAiAudit),
           _toolIcon(Icons.access_time, '足迹', '看过的内容',
-              onDoubleTap: _openAiImport),
+              onTap: _openFootprints, onDoubleTap: _openAiImport),
         ],
       ),
     );
@@ -604,6 +605,13 @@ class _MineScreenState extends State<MineScreen> {
   void _openFavorites() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+    );
+  }
+
+  /// 单击"足迹" → 我的足迹（双击仍是 AI 订单截图解析）
+  void _openFootprints() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FootprintsScreen()),
     );
   }
 
