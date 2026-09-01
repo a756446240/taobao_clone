@@ -13,6 +13,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
 import 'category_screen.dart';
 import 'channel_screen.dart';
+import 'live_list_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
 
@@ -379,6 +380,29 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildLiveCard(HomeLiveCard card) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // 直播类进直播列表页，补贴类进频道页
+      onTap: () {
+        final Widget dest = card.title.contains('直播')
+            ? const LiveListScreen()
+            : ChannelScreen(
+                entry: HomeIconEntry(
+                  card.title,
+                  card.title == '国家补贴' ? '国' : '补',
+                  card.title == '国家补贴'
+                      ? 0xFF16a34a
+                      : 0xFFff2d55,
+                ),
+              );
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => dest));
+      },
+      child: _buildLiveCardContent(card),
+    );
+  }
+
+  Widget _buildLiveCardContent(HomeLiveCard card) {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
