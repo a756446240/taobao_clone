@@ -297,24 +297,16 @@ class _HomeScreenState extends State<HomeScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Color(e.color),
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            e.badge,
-            maxLines: 1,
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: e.badge.length > 1 ? 13 : 20,
-            ),
-          ),
-        ),
+        if (e.asset != null)
+          Image.asset(
+            e.asset!,
+            width: 48,
+            height: 48,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => _buildFallbackBadge(e),
+          )
+        else
+          _buildFallbackBadge(e),
         const SizedBox(height: 5),
         Text(
           e.title,
@@ -323,6 +315,27 @@ class _HomeScreenState extends State<HomeScreen>
           style: const TextStyle(fontSize: 11, color: Colors.black87),
         ),
       ],
+    );
+  }
+
+  Widget _buildFallbackBadge(HomeIconEntry e) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Color(e.color),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        e.badge,
+        maxLines: 1,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: e.badge.length > 1 ? 13 : 20,
+        ),
+      ),
     );
   }
 
