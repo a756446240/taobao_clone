@@ -58,6 +58,32 @@ class HomeTab {
   const HomeTab({required this.title, this.subtitle = ''});
 }
 
+/// 首页新版图标入口（圆形彩色徽标 + 文字，离线绘制）
+class HomeIconEntry {
+  final String title; // 图标下方文字
+  final String badge; // 圆形徽标内文字（1-2 字）
+  final int color; // 徽标主色 0xFFRRGGBB
+
+  const HomeIconEntry(this.title, this.badge, this.color);
+}
+
+/// 首页"淘宝直播/百亿补贴"四卡栏目
+class HomeLiveCard {
+  final String title;
+  final int titleColor;
+  final String imageUrl; // 本地 asset 路径
+  final String priceText;
+  final int priceColor;
+
+  const HomeLiveCard({
+    required this.title,
+    required this.titleColor,
+    required this.imageUrl,
+    required this.priceText,
+    required this.priceColor,
+  });
+}
+
 // ============================= 搜索 =============================
 
 /// 搜索结果项
@@ -130,6 +156,8 @@ class OrderItem {
   String platformCouponLabel; // 平台优惠券门槛文案
   bool showPlatformCoupon; // 是否显示平台优惠券
   double coDiscount; // 共减金额
+  double shippingFee; // 运费金额（默认 0）
+  bool showShippingFee; // 是否显示运费行（默认 false）
   String taxContent; // 进口税内容
   bool showTax; // 是否显示进口税
   List<String> detailTags; // 详情页红色标签（极速退款/7天无理由等）
@@ -147,7 +175,7 @@ class OrderItem {
   String refundStatus; // 退款状态：待商家退款/退款成功/退款结束
   String refundTitle; // 退款大标题
   String refundSubtitle; // 退款副标题（空=自动生成）
-  double refundAmount; // 退款金额（<=0 时自动取实付价*数量）
+  double refundAmount; // 退款金额（<=0 时自动取实付价）
   String refundMethod; // 退款方式：支付宝/银行卡/微信支付
   String refundLogistics; // 退款物流（空=不显示物流卡）
   String refundApplyTime; // 申请时间
@@ -194,6 +222,8 @@ class OrderItem {
     this.platformCouponLabel = '满60元可减',
     this.showPlatformCoupon = true,
     this.coDiscount = 0,
+    this.shippingFee = 0,
+    this.showShippingFee = false,
     this.taxContent = '价格已含税',
     this.showTax = true,
     this.detailTags = const ['极速退款', '7天无理由'],
