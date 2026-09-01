@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import 'address_screen.dart';
+import 'settings_detail_screens.dart';
 
 /// 淘宝式设置页：分组列表 + 开关 + 清除缓存 + 退出登录
 class SettingsScreen extends StatefulWidget {
@@ -73,8 +74,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _group([
             _arrowRow('清除缓存',
                 trailing: _cacheSize, onTap: _clearCache),
-            _arrowRow('隐私', onTap: () => _toast('隐私设置（演示）')),
-            _arrowRow('通用', onTap: () => _toast('通用设置（演示）')),
+            _arrowRow('隐私',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const PrivacyScreen()))),
+            _arrowRow('通用',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const GeneralScreen()))),
           ]),
           _group([
             _arrowRow('关于淘宝',
@@ -82,7 +89,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ? 'v${widget.version}'
                     : null,
                 onTap: () => _toast('已是最新版本')),
-            _arrowRow('意见反馈', onTap: () => _toast('意见反馈（演示）')),
+            _arrowRow('意见反馈',
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const FeedbackScreen()))),
           ]),
           const SizedBox(height: 16),
           Padding(
