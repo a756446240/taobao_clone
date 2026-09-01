@@ -419,12 +419,13 @@ class _OrderCard extends StatelessWidget {
                   child: ShopTypeBadge(shop: shop),
                 ),
                 const SizedBox(width: 6),
-                Expanded(
+                Flexible(
                   child: Text(shop.shopName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.smallBold),
                 ),
+                const SizedBox(width: 2),
                 const Icon(Icons.chevron_right,
                     color: Color(0xFF999999), size: 18),
                 const Spacer(),
