@@ -14,6 +14,7 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/shop_type_badge.dart';
+import '../product/shop_home_screen.dart';
 import 'logistics_screen.dart';
 import 'order_detail_screen.dart';
 import 'rate_order_screen.dart';
@@ -595,10 +596,19 @@ class _OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Flexible(
-                  child: Text(shop.shopName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.smallBold),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ShopHomeScreen(
+                            shopName: shop.shopName,
+                            shopType: shop.shopType),
+                      ),
+                    ),
+                    child: Text(shop.shopName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.smallBold),
+                  ),
                 ),
                 const SizedBox(width: 2),
                 const Icon(Icons.chevron_right,
