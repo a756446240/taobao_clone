@@ -11,6 +11,7 @@ import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'channel_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
 
@@ -305,27 +306,34 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildIconEntry(HomeIconEntry e) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (e.asset != null)
-          Image.asset(
-            e.asset!,
-            width: 48,
-            height: 48,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => _buildFallbackBadge(e),
-          )
-        else
-          _buildFallbackBadge(e),
-        const SizedBox(height: 5),
-        Text(
-          e.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: Colors.black87),
-        ),
-      ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // 单击进入对应频道页
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ChannelScreen(entry: e)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (e.asset != null)
+            Image.asset(
+              e.asset!,
+              width: 48,
+              height: 48,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => _buildFallbackBadge(e),
+            )
+          else
+            _buildFallbackBadge(e),
+          const SizedBox(height: 5),
+          Text(
+            e.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: Colors.black87),
+          ),
+        ],
+      ),
     );
   }
 
