@@ -184,7 +184,8 @@ class _OrderListScreenState extends State<OrderListScreen>
             shop.orderSubStatus.contains('评价');
       case '全部订单':
       default:
-        return true;
+        // 购物车状态的条目不进订单列表（对齐真实淘宝：购物车 ≠ 订单）
+        return !shop.orderSubStatus.contains('购物车');
     }
   }
 
