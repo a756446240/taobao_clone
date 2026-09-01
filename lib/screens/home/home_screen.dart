@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -77,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       _buildIconPages(),
                       _buildLiveCards(),
+                      _buildBannerCarousel(),
                       _buildSuperCutBanner(),
                     ],
                   ),
@@ -144,12 +146,21 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _gotoSearch(),
-                    child: const Text(
-                      '搜索你想要的宝贝',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Color(0xFF999999), fontSize: 14),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.search,
+                            color: Color(0xFF999999), size: 18),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '搜索你想要的宝贝',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: Color(0xFF999999), fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -393,6 +404,11 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ============ AI 生成大促 banner 轮播（SenseNova 定期换肤） ============
+  Widget _buildBannerCarousel() {
+    return const _BannerCarousel();
+  }
+
   // ============ 红色"超级立减"横幅 ============
   Widget _buildSuperCutBanner() {
     return Container(
@@ -506,4 +522,95 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
+}
+
+/// 大促 banner 轮播（AI 生图，自动播放 + 手势滑动 + 圆点指示器）
+class _BannerCarousel extends StatefulWidget {
+  const _BannerCarousel();
+
+  @override
+  State<_BannerCarousel> createState() => _BannerCarouselState();
+}
+
+class _BannerCarouselState extends State<_BannerCarousel> {
+  static const _banners = [
+    'assets/images/banner/banner_618.png',
+    'assets/images/banner/banner_fashion.png',
+  ];
+
+  final PageController _controller = PageController();
+  int _current = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_controller.hasClients) return;
+      final next = (_current + 1) % _banners.length;
+      _controller.animateToPage(next,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      height: 100,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: _banners.length,
+              onPageChanged: (i) => setState(() => _current = i),
+              itemBuilder: (_, i) => Image.asset(
+                _banners[i],
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (_, __, ___) => Container(
+                  color: const Color(0xFFFFE0D6),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.image,
+                      color: Color(0xFFFF5000), size: 32),
+                ),
+              ),
+            ),
+          ),
+          // 圆点指示器
+          Positioned(
+            right: 10,
+            bottom: 8,
+            child: Row(
+              children: [
+                for (var i = 0; i < _banners.length; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    margin: const EdgeInsets.only(left: 4),
+                    width: _current == i ? 12 : 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: _current == i
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
