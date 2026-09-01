@@ -63,8 +63,9 @@ class HomeIconEntry {
   final String title; // 图标下方文字
   final String badge; // 圆形徽标内文字（1-2 字）
   final int color; // 徽标主色 0xFFRRGGBB
+  final String? asset; // 真实图标 PNG 路径（优先于 badge 渲染）
 
-  const HomeIconEntry(this.title, this.badge, this.color);
+  const HomeIconEntry(this.title, this.badge, this.color, [this.asset]);
 }
 
 /// 首页"淘宝直播/百亿补贴"四卡栏目
