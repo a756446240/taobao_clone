@@ -29,6 +29,16 @@ class _MessageScreenState extends State<MessageScreen> {
   late final List<_HistoryMsg> _history;
   final _rand = Random();
 
+  /// 会话搜索
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   /// 4 个圆圈入口（固定，badge 为未读角标，0 表示不显示）
   static const _quickEntries = <_QuickEntry>[
     _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350), badge: 3),
@@ -242,27 +252,85 @@ class _MessageScreenState extends State<MessageScreen> {
       body: Column(
         children: [
           _buildQuickEntries(),
+          _buildSearchBar(),
           Expanded(
             child: ListView(
               children: [
-                _systemEntry('交易物流', '暂无包裹动态更新', Icons.local_shipping, const Color(0xFFFF6E40)),
-                _systemEntry('售后保障', '暂无新消息', Icons.assignment_return, const Color(0xFF2196F3)),
-                _systemEntry('AI 购物助手', 'Hi! 我是你的购物助手~帮你挑好货、找优惠！有什么需要，都可以来找我~', Icons.smart_toy, const Color(0xFF7c4dff), date: '26/07/24'),
-                const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text('两周前的消息',
-                      style: TextStyle(
-                          color: Color(0xFF999999),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500)),
-                ),
-                ..._history.map((m) => _historyTile(m)),
+                if (_query.isNotEmpty) ...[
+                  // 搜索模式：只显示命中的会话
+                  ..._history
+                      .where((m) =>
+                          m.shopName.contains(_query) ||
+                          m.message.contains(_query))
+                      .map((m) => _historyTile(m)),
+                  if (_history.every((m) =>
+                      !m.shopName.contains(_query) &&
+                      !m.message.contains(_query)))
+                    const Padding(
+                      padding: EdgeInsets.only(top: 60),
+                      child: Center(
+                        child: Text('没有找到相关会话',
+                            style: TextStyle(
+                                color: Color(0xFF999999), fontSize: 13)),
+                      ),
+                    ),
+                ] else ...[
+                  _systemEntry('交易物流', '暂无包裹动态更新', Icons.local_shipping, const Color(0xFFFF6E40)),
+                  _systemEntry('售后保障', '暂无新消息', Icons.assignment_return, const Color(0xFF2196F3)),
+                  _systemEntry('AI 购物助手', 'Hi! 我是你的购物助手~帮你挑好货、找优惠！有什么需要，都可以来找我~', Icons.smart_toy, const Color(0xFF7c4dff), date: '26/07/24'),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Text('两周前的消息',
+                        style: TextStyle(
+                            color: Color(0xFF999999),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500)),
+                  ),
+                  ..._history.map((m) => _historyTile(m)),
+                ],
                 const SizedBox(height: 16),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 搜索栏：按店铺名 / 消息内容过滤会话
+  Widget _buildSearchBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _query = v.trim()),
+        decoration: InputDecoration(
+          hintText: '搜索会话',
+          hintStyle:
+              const TextStyle(color: Color(0xFFBBBBBB), fontSize: 13),
+          prefixIcon: const Icon(Icons.search,
+              color: Color(0xFF999999), size: 20),
+          suffixIcon: _query.isEmpty
+              ? null
+              : GestureDetector(
+                  onTap: () {
+                    _searchCtrl.clear();
+                    setState(() => _query = '');
+                  },
+                  child: const Icon(Icons.cancel,
+                      color: Color(0xFFBBBBBB), size: 18),
+                ),
+          filled: true,
+          fillColor: const Color(0xFFF5F5F5),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+        ),
       ),
     );
   }
