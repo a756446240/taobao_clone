@@ -225,6 +225,63 @@ class MockData {
     '天猫双11手机&配件预售会场满减大促',
   ];
 
+  /// 首页图标区 第 1 页（单行 5 个 + 第 6 个半露"红包签到"）
+  static const List<HomeIconEntry> homeIconPage1 = [
+    HomeIconEntry('天猫超市', '超市', 0xFF22c55e),
+    HomeIconEntry('淘宝秒杀', '秒', 0xFFff2d2d),
+    HomeIconEntry('领淘金币', '币', 0xFFf7b500),
+    HomeIconEntry('88VIP', '88', 0xFF2b2b2b),
+    HomeIconEntry('芭芭农场', '领', 0xFFff4d4f),
+    HomeIconEntry('红包签到', '¥', 0xFFff3b30),
+  ];
+
+  /// 首页图标区 第 2 页（3 行 × 5 = 15 个）
+  static const List<HomeIconEntry> homeIconPage2 = [
+    HomeIconEntry('红包签到', '¥', 0xFFff3b30),
+    HomeIconEntry('天猫新品', '新品', 0xFFa98548),
+    HomeIconEntry('淘工厂', '厂', 0xFFff6a00),
+    HomeIconEntry('活动日历', '历', 0xFFf43f5e),
+    HomeIconEntry('淘宝礼物', '礼', 0xFFef4444),
+    HomeIconEntry('淘鲜达', '鲜', 0xFF22c55e),
+    HomeIconEntry('淘宝闪购', '购', 0xFFff7d00),
+    HomeIconEntry('淘票票', '票', 0xFFff4d4f),
+    HomeIconEntry('聚划算', '聚', 0xFFe11d74),
+    HomeIconEntry('充值中心', '充', 0xFFff8c00),
+    HomeIconEntry('飞猪旅行', '猪', 0xFFfbbf24),
+    HomeIconEntry('分类', '三', 0xFF8b5cf6),
+    HomeIconEntry('天猫国际', '际', 0xFF7c3aed),
+    HomeIconEntry('资质规则', '✓', 0xFF3b82f6),
+    HomeIconEntry('全部频道', '●', 0xFFf59e0b),
+  ];
+
+  /// 首页"淘宝直播/直播有好价/百亿补贴/国家补贴"四卡（固定不随图标滑动）
+  static const List<HomeLiveCard> homeLiveCards = [
+    HomeLiveCard(
+        title: '淘宝直播',
+        titleColor: 0xFF1a1a1a,
+        imageUrl: 'assets/images/remote/r0040.jpg',
+        priceText: '直播价¥32',
+        priceColor: 0xFFff2d55),
+    HomeLiveCard(
+        title: '直播有好价',
+        titleColor: 0xFFff2d55,
+        imageUrl: 'assets/images/remote/r0042.jpg',
+        priceText: '直播价¥4',
+        priceColor: 0xFFff2d55),
+    HomeLiveCard(
+        title: '百亿补贴',
+        titleColor: 0xFF1a1a1a,
+        imageUrl: 'assets/images/remote/r0044.jpg',
+        priceText: '补贴价¥47',
+        priceColor: 0xFFff2d55),
+    HomeLiveCard(
+        title: '国家补贴',
+        titleColor: 0xFF16a34a,
+        imageUrl: 'assets/images/remote/r0047.jpg',
+        priceText: '补贴价¥9.43',
+        priceColor: 0xFFff2d55),
+  ];
+
   /// 首页顶部 Tab
   static const List<HomeTab> homeTabs = [
     HomeTab(title: '猜你喜欢'),
