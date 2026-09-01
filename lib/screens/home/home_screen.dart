@@ -537,6 +537,8 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     'assets/images/banner/banner_618.png',
     'assets/images/banner/banner_fashion.png',
     'assets/images/banner/banner_fresh.png',
+    'assets/images/banner/banner_autumn.png',
+    'assets/images/banner/banner_digital.png',
   ];
 
   final PageController _controller = PageController();
