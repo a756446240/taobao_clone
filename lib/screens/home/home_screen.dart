@@ -536,6 +536,7 @@ class _BannerCarouselState extends State<_BannerCarousel> {
   static const _banners = [
     'assets/images/banner/banner_618.png',
     'assets/images/banner/banner_fashion.png',
+    'assets/images/banner/banner_fresh.png',
   ];
 
   final PageController _controller = PageController();
