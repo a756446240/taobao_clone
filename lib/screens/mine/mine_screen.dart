@@ -23,6 +23,7 @@ import 'ai_order_import_screen.dart';
 import 'coupon_center_screen.dart';
 import 'favorites_screen.dart';
 import 'footprints_screen.dart';
+import 'settings_screen.dart';
 import 'material_pool_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -197,6 +198,7 @@ class _MineScreenState extends State<MineScreen> {
                 _headerIcon(Icons.headset_mic_outlined, '官方客服'),
                 const SizedBox(width: 16),
                 GestureDetector(
+                  onTap: _openSettings,
                   onDoubleTap: _gotoEdit,
                   child: _headerIcon(Icons.settings_outlined, '设置'),
                 ),
@@ -613,6 +615,13 @@ class _MineScreenState extends State<MineScreen> {
   void _openFootprints() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const FootprintsScreen()),
+    );
+  }
+
+  /// 单击"设置" → 设置页（双击仍是编辑资料）
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.8.7')),
     );
   }
 
