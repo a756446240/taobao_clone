@@ -629,13 +629,21 @@ class _MineScreenState extends State<MineScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _bigCoupon('¥61', '消费券'),
+              _bigCoupon('¥61', '消费券',
+                  bg: const Color(0xFFFFF1E8),
+                  fg: const Color(0xFFFF5000)),
               const SizedBox(width: 8),
-              _bigCoupon('¥10', '超市加补券'),
+              _bigCoupon('¥10', '超市加补券',
+                  bg: const Color(0xFFE8F8EE),
+                  fg: const Color(0xFF12A150)),
               const SizedBox(width: 8),
-              _bigCoupon('¥50', '珠宝加补券'),
+              _bigCoupon('¥50', '珠宝加补券',
+                  bg: const Color(0xFFF3EBFF),
+                  fg: const Color(0xFF7C3AED)),
               const SizedBox(width: 8),
-              _bigCoupon('¥45', '玩具加补券'),
+              _bigCoupon('¥45', '玩具加补券',
+                  bg: const Color(0xFFE8F1FF),
+                  fg: const Color(0xFF2B6DEF)),
             ],
           ),
         ],
@@ -643,29 +651,30 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _bigCoupon(String value, String label) {
+  Widget _bigCoupon(String value, String label,
+      {required Color bg, required Color fg}) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF6E5),
+          color: bg,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Column(
           children: [
             Text(value,
-                style: const TextStyle(
-                    color: Color(0xFFB85A00),
+                style: TextStyle(
+                    color: fg,
                     fontSize: 20,
                     fontWeight: FontWeight.bold)),
             Text(label,
-                style: const TextStyle(
-                    color: Color(0xFF8d6e63), fontSize: 11)),
+                style: TextStyle(
+                    color: fg.withValues(alpha: 0.65), fontSize: 11)),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.red,
+                color: fg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text('去领取',
