@@ -14,6 +14,7 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/shop_type_badge.dart';
+import 'logistics_screen.dart';
 import 'order_detail_screen.dart';
 import 'order_manager_screen.dart';
 import 'refund_detail_screen.dart';
@@ -27,15 +28,43 @@ class OrderListScreen extends StatefulWidget {
   State<OrderListScreen> createState() => _OrderListScreenState();
 }
 
-class _OrderListScreenState extends State<OrderListScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tab;
+class _OrderListScreenState extends State<OrderListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
 
-  static const _tabs = ['全部订单', '待付款', '待发货', '已发货', '售后'];
+  /// 顶部频道：全部订单 / 购物 / 闪购(外卖) / 飞猪(旅行)（可横向滑动）
+  static const _channels = ['全部订单', '购物', '闪购', '飞猪'];
+  static const _channelBadges = {2: '外卖', 3: '旅行'};
+  int _channel = 0;
+  int _subIndex = 0;
 
-  String get _currentTab => _tabs[_tab.index];
+  /// 各频道的子 Tab（对齐真实淘宝）
+  static const _subTabs = [
+    ['全部', '待付款', '待发货', '待收货', '退款·售后'], // 全部订单
+    ['全部', '待付款', '待发货', '待收货', '退款·售后'], // 购物
+    ['全部', '待付款', '待收货', '退款·售后'], // 闪购
+    ['全部', '待付款', '待出行', '待评价', '已关闭'], // 飞猪
+  ];
+
+  List<String> get _tabs => _subTabs[_channel];
+
+  /// 子 Tab 标签 → 内部状态过滤 key
+  String get _currentTab {
+    final label = _tabs[_subIndex.clamp(0, _tabs.length - 1)];
+    switch (label) {
+      case '全部':
+        return '全部订单';
+      case '待收货':
+        return '已发货';
+      case '退款·售后':
+        return '售后';
+      default:
+        return label; // 待付款/待发货/待出行/待评价/已关闭
+    }
+  }
+
+  /// 闪购/飞猪频道暂无订单数据 → 显示空态
+  bool get _isEmptyChannel => _channel >= 2;
 
   String get _actionText {
     switch (_currentTab) {
@@ -55,29 +84,30 @@ class _OrderListScreenState extends State<OrderListScreen>
   @override
   void initState() {
     super.initState();
-    final idx = _tabs.indexOf(_normalizeType(widget.type));
-    _tab = TabController(
-      length: _tabs.length,
-      vsync: this,
-      initialIndex: idx >= 0 ? idx : 0,
-    );
-    _tab.addListener(() {
-      if (_tab.indexIsChanging) setState(() {});
-    });
+    _subIndex = _initialSubIndex(widget.type);
   }
 
-  String _normalizeType(String type) {
-    if (type == '全部' || type == '全部订单') return '全部订单';
-    if (type.contains('待付款')) return '待付款';
-    if (type.contains('待发货')) return '待发货';
-    if (type.contains('已发货') || type.contains('待收货')) return '已发货';
-    if (type.contains('售后') || type.contains('退款') || type.contains('评价')) return '售后';
-    return '全部订单';
+  int _initialSubIndex(String type) {
+    final tabs = _tabs;
+    int idx;
+    if (type.contains('待付款')) {
+      idx = tabs.indexOf('待付款');
+    } else if (type.contains('待发货')) {
+      idx = tabs.indexOf('待发货');
+    } else if (type.contains('已发货') || type.contains('待收货')) {
+      idx = tabs.indexOf('待收货');
+    } else if (type.contains('售后') ||
+        type.contains('退款') ||
+        type.contains('评价')) {
+      idx = tabs.indexOf('退款·售后');
+    } else {
+      idx = 0;
+    }
+    return idx >= 0 ? idx : 0;
   }
 
   @override
   void dispose() {
-    _tab.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -85,7 +115,7 @@ class _OrderListScreenState extends State<OrderListScreen>
   @override
   Widget build(BuildContext context) {
     final shops = context.watch<CartProvider>().shops;
-    final filtered = _visibleShops(shops);
+    final filtered = _isEmptyChannel ? <_ShopView>[] : _visibleShops(shops);
 
     return Scaffold(
       backgroundColor: const Color(0xFFf5f5f5),
@@ -93,29 +123,8 @@ class _OrderListScreenState extends State<OrderListScreen>
         child: Column(
           children: [
             _buildTopBar(),
-            Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tab,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.black87,
-                labelStyle: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.bold),
-                unselectedLabelStyle: const TextStyle(fontSize: 14),
-                indicator: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 10),
-                tabs: _tabs.map((t) => Tab(text: t)).toList(),
-              ),
-            ),
+            _buildChannelBar(),
+            _buildSubTabBar(),
             Expanded(
               child: filtered.isEmpty
                   ? _empty()
@@ -133,6 +142,120 @@ class _OrderListScreenState extends State<OrderListScreen>
                           ),
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 频道滚动行（全部订单/购物/闪购/飞猪，可横滑） ============
+  Widget _buildChannelBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.only(top: 2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            for (var i = 0; i < _channels.length; i++)
+              GestureDetector(
+                onTap: () => setState(() {
+                  _channel = i;
+                  _subIndex = 0;
+                }),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        width: 2.5,
+                        color: _channel == i
+                            ? AppColors.primary
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _channels[i],
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: _channel == i
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: _channel == i
+                              ? AppColors.primary
+                              : Colors.black87,
+                        ),
+                      ),
+                      if (_channelBadges.containsKey(i)) ...[
+                        const SizedBox(width: 3),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 3, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFff5000),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            _channelBadges[i]!,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 9),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 子 Tab 行（选中橙底白字胶囊） ============
+  Widget _buildSubTabBar() {
+    return Container(
+      color: Colors.white,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          children: [
+            for (var i = 0; i < _tabs.length; i++)
+              GestureDetector(
+                onTap: () => setState(() => _subIndex = i),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _subIndex == i
+                        ? AppColors.primary
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    _tabs[i],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: _subIndex == i
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: _subIndex == i
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -245,7 +368,48 @@ class _OrderListScreenState extends State<OrderListScreen>
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
+          // AI助手（对齐真实淘宝订单页，图标为用户提供的官方素材）
+          GestureDetector(
+            onTap: _openAiAssistant,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Image.asset(
+                      'assets/images/icons/ai_assistant.png',
+                      width: 24,
+                      height: 24,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                          Icons.auto_awesome,
+                          color: AppColors.primary,
+                          size: 22),
+                    ),
+                    Positioned(
+                      right: -4,
+                      top: -3,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text('AI助手',
+                    style:
+                        TextStyle(color: Colors.black87, fontSize: 10)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
           // 筛选 → 订单始终按创建时间自动排序（新订单在最上方），点击仅提示
           GestureDetector(
             onTap: () {
@@ -266,36 +430,18 @@ class _OrderListScreenState extends State<OrderListScreen>
             ),
             child: _topAction(AppIcons.list, '管理'),
           ),
-          const SizedBox(width: 12),
-          // 消息 → 订单管理入口（编辑入口，双击进入）
-          GestureDetector(
-            onDoubleTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const OrderManagerScreen()),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(AppIcons.message,
-                    color: Colors.black87, size: 26),
-                Positioned(
-                  right: -8,
-                  top: -4,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.all(Radius.circular(9)),
-                    ),
-                    child: const Text('22',
-                        style: TextStyle(color: Colors.white, fontSize: 10)),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
+    );
+  }
+
+  // ============ AI助手底部面板（订单智能问答） ============
+  void _openAiAssistant() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AiAssistantSheet(),
     );
   }
 
@@ -498,7 +644,8 @@ class _OrderCard extends StatelessWidget {
                       const Spacer(),
                       _outlineBtn('催物流'),
                       const SizedBox(width: 8),
-                      _outlineBtn('查看物流', onTap: () => onDetail(items.first)),
+                      _outlineBtn('查看物流',
+                          onTap: () => _gotoLogistics(context, items.first)),
                       const SizedBox(width: 8),
                       _primaryBtn(actionText, onTap: () => onDetail(items.first)),
                     ],
@@ -506,6 +653,13 @@ class _OrderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// 跳转物流详情页（带商品信息）
+  void _gotoLogistics(BuildContext context, OrderItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LogisticsScreen(item: item)),
     );
   }
 
