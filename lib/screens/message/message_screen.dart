@@ -8,11 +8,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
 import '../../widgets/app_image.dart';
 import 'chat_screen.dart';
+import 'quick_messages_screen.dart';
 
 /// 消息页（1:1 复刻 3.4）
 /// - 顶部 4 个圆圈入口保留
@@ -342,53 +342,67 @@ class _MessageScreenState extends State<MessageScreen> {
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: _quickEntries.map((e) {
-          return GestureDetector(
-            onTap: () => _openChat(
-                title: e.title, lastMessage: '暂无新消息', color: e.color),
-            behavior: HitTestBehavior.opaque,
-            child: Column(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: e.color,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(e.icon, color: Colors.white, size: 24),
-                    ),
-                    if (e.badge > 0)
-                      Positioned(
-                        right: -4,
-                        top: -4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(9),
-                            border:
-                                Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 18),
-                          child: Text('${e.badge}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 10)),
-                        ),
-                      ),
-                  ],
+        children: [
+          for (var i = 0; i < _quickEntries.length; i++)
+            _buildQuickEntry(_quickEntries[i], i),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickEntry(_QuickEntry e, int index) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuickMessagesScreen(
+            title: e.title,
+            icon: e.icon,
+            color: e.color,
+            kind: QuickMsgKind.values[index],
+          ),
+        ),
+      ),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: e.color,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 6),
-                Text(e.title, style: AppTextStyles.min),
-              ],
-            ),
-          );
-        }).toList(),
+                child: Icon(e.icon, color: Colors.white, size: 24),
+              ),
+              if (e.badge > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(9),
+                      border:
+                          Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18),
+                    child: Text('${e.badge}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(e.title, style: AppTextStyles.min),
+        ],
       ),
     );
   }
