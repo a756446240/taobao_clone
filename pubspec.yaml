@@ -1,0 +1,52 @@
+name: taobao_clone
+description: 1:1 复刻淘宝 App 的全新架构 Flutter 项目（练习用）
+publish_to: "none"
+version: 1.5.0+22
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 状态管理
+  provider: ^6.1.1
+  # 网络图片缓存
+  cached_network_image: ^3.3.1
+  # 本地存储（搜索历史、收藏）
+  shared_preferences: ^2.2.2
+
+  cupertino_icons: ^1.0.6
+  # 视频播放（微淘 AI 视频轮播）
+  video_player: ^2.9.2
+  # 相册选图（商品图自定义替换）
+  image_picker: ^1.1.2
+  # 应用文档目录（保存替换后的商品图）
+  path_provider: ^2.1.2
+  # 侧滑操作按钮（购物车/消息列表）
+  flutter_slidable: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/remote/
+    - assets/images/mine_icons/
+    - assets/videos/
+    - assets/data/
+    - assets/materials/
+
+  fonts:
+    - family: TaobaoIconFont
+      fonts:
+        - asset: assets/fonts/taobao_iconfont.ttf
+    - family: WeixinIconFont
+      fonts:
+        - asset: assets/fonts/weixin_iconfont.ttf
