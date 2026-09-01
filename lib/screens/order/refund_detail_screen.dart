@@ -38,6 +38,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     _shop = widget.shop;
     _ensureDefaults();
     _startTimerIfPending();
+    // 默认值补齐后落盘一次，保证退款详情页与售后列表卡片数据一致
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CartProvider>().updateOrderItem(_item);
+    });
   }
 
   @override
@@ -46,7 +51,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     super.dispose();
   }
 
-  /// 补齐退款字段默认值（不落盘，仅展示用推导）
+  /// 补齐退款字段默认值（initState 后统一落盘，与售后列表保持同步）
   void _ensureDefaults() {
     // 状态：优先读持久化字段；根据订单状态标题推导
     if (_item.refundStatus.isEmpty) {
@@ -59,8 +64,9 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           _item.paymentMethod.contains('微信') ? '微信支付' : '支付宝';
     }
     if (_item.refundAmount <= 0) {
+      // 退款金额默认 = 实付价（录入多少就是多少，不乘规格数量）
       _item.refundAmount =
-          double.parse((_item.price * _item.quantity).toStringAsFixed(2));
+          double.parse(_item.price.toStringAsFixed(2));
     }
     if (_item.refundApplyTime.isEmpty) {
       _item.refundApplyTime =
@@ -798,98 +804,121 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 右上角编辑菜单 ============
+  // ============ 右上角编辑菜单（限高可滚动，底部按钮不再超出屏幕） ============
   void _showEditMenu() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border:
-                    Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  border:
+                      Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
+                ),
+                child: Row(
+                  children: [
+                    const Text('退款编辑',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child:
+                          const Icon(Icons.close, color: Color(0xFF999999)),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  const Text('退款编辑',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => Navigator.of(ctx).pop(),
-                    child: const Icon(Icons.close, color: Color(0xFF999999)),
-                  ),
-                ],
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _menuTile(ctx, Icons.flag, '修改退款状态', _pickRefundStatus),
+                    _menuTile(ctx, Icons.account_balance_wallet, '修改退款方式',
+                        _editRefundMethod),
+                    _menuTile(ctx, Icons.title, '修改大标题', _editTitle),
+                    _menuTile(ctx, Icons.notes, '修改副标题', _editSubtitle),
+                    _menuTile(
+                        ctx, Icons.payments, '修改退款金额', _editRefundAmount),
+                    _menuTile(ctx, Icons.local_shipping, '修改退款物流',
+                        _editRefundLogistics),
+                    _menuTile(ctx, Icons.schedule, '修改申请时间（滚动选择）', () {
+                      _editTime('修改申请时间', _item.refundApplyTime, (v) {
+                        context
+                            .read<CartProvider>()
+                            .updateOrderItem(_item, refundApplyTime: v);
+                        setState(() {});
+                      });
+                    }),
+                    _menuTile(ctx, Icons.event_available, '修改完成时间（滚动选择）',
+                        () {
+                      _editTime('修改完成时间', _item.refundDoneTime, (v) {
+                        context
+                            .read<CartProvider>()
+                            .updateOrderItem(_item, refundDoneTime: v);
+                        setState(() {});
+                      });
+                    }),
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline,
+                          color: Color(0xFFA32D2D)),
+                      title: const Text('删除',
+                          style: TextStyle(color: Color(0xFFA32D2D))),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        _confirmDelete();
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            _menuTile(ctx, Icons.flag, '修改退款状态', () {
-              DialogHelpers.showOptionPicker(
-                context,
-                title: '选择退款状态',
-                options: const ['待商家退款', '退款成功', '退款结束'],
-                currentValue: _item.refundStatus,
-              ).then((v) {
-                if (v != null) {
-                  final provider = context.read<CartProvider>();
-                  provider.updateOrderItem(_item, refundStatus: v);
-                  // 大标题跟随状态（未手动改过的话）
-                  if (_item.refundTitle == '退款成功' ||
-                      _item.refundTitle == '待商家退款' ||
-                      _item.refundTitle == '退款结束') {
-                    provider.updateOrderItem(_item, refundTitle: v);
-                  }
-                  // 同步订单栏目归类
-                  provider.updateOrderStatus(_shop, _item, v);
-                  setState(() {});
-                  _startTimerIfPending();
-                  _toast('退款状态已修改为「$v」');
-                }
-              });
-            }),
-            _menuTile(ctx, Icons.account_balance_wallet, '修改退款方式',
-                _editRefundMethod),
-            _menuTile(ctx, Icons.title, '修改大标题', _editTitle),
-            _menuTile(ctx, Icons.notes, '修改副标题', _editSubtitle),
-            _menuTile(ctx, Icons.payments, '修改退款金额', _editRefundAmount),
-            _menuTile(ctx, Icons.local_shipping, '修改退款物流',
-                _editRefundLogistics),
-            _menuTile(ctx, Icons.schedule, '修改申请时间（滚动选择）', () {
-              _editTime('修改申请时间', _item.refundApplyTime, (v) {
-                context
-                    .read<CartProvider>()
-                    .updateOrderItem(_item, refundApplyTime: v);
-                setState(() {});
-              });
-            }),
-            _menuTile(ctx, Icons.event_available, '修改完成时间（滚动选择）', () {
-              _editTime('修改完成时间', _item.refundDoneTime, (v) {
-                context
-                    .read<CartProvider>()
-                    .updateOrderItem(_item, refundDoneTime: v);
-                setState(() {});
-              });
-            }),
-            ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: Color(0xFFA32D2D)),
-              title: const Text('删除',
-                  style: TextStyle(color: Color(0xFFA32D2D))),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _confirmDelete();
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// 修改退款状态：双向可逆。
+  /// 可选三个退款状态（待商家退款/退款成功/退款结束），也可直接改回
+  /// 待发货/已发货/交易成功等普通状态，订单自动归入对应栏目。
+  void _pickRefundStatus() {
+    DialogHelpers.showOptionPicker(
+      context,
+      title: '修改退款状态（可改回待发货等状态）',
+      options: CartProvider.orderStatusOptions,
+      currentValue: _item.statusTitle.isNotEmpty
+          ? _item.statusTitle
+          : _item.refundStatus,
+    ).then((v) {
+      if (v == null) return;
+      final provider = context.read<CartProvider>();
+      // 统一走 updateOrderStatus：同步退款字段 + 订单栏目归类（双向可逆）
+      provider.updateOrderStatus(_shop, _item, v);
+      final isRefund = CartProvider.statusCategory(v) == '退款/售后';
+      if (!mounted) return;
+      if (isRefund) {
+        setState(() {});
+        _startTimerIfPending();
+        _toast('退款状态已修改为「$v」');
+      } else {
+        // 改回普通状态：退出退款详情页，订单已归入对应栏目
+        _toast('已改回「$v」，可在订单列表对应栏目查看');
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   Widget _menuTile(
