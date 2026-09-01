@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'qa_screen.dart';
 import 'reviews_screen.dart';
 import 'shop_home_screen.dart';
 
@@ -56,6 +57,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 _buildSelectRow(),
                 const SizedBox(height: 8),
                 _buildReviewBlock(),
+                const SizedBox(height: 8),
+                _buildQaBlock(),
                 const SizedBox(height: 8),
                 _buildShopCard(),
                 const SizedBox(height: 8),
@@ -400,6 +403,74 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               )),
         ],
+      ),
+    );
+  }
+
+  // ============ 问大家区 ============
+  Widget _buildQaBlock() {
+    final entries = buildQaEntries(widget.item.title);
+    final totalAnswers =
+        entries.fold<int>(0, (sum, e) => sum + e.answers.length);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      // 单击进入问大家列表页
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => QaScreen(item: widget.item)),
+      ),
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('问大家（${entries.length}）',
+                    style: AppTextStyles.smallBold),
+                const Spacer(),
+                Text('共$totalAnswers个回答',
+                    style: const TextStyle(
+                        color: AppColors.primary, fontSize: 12)),
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFFC4C4C4), size: 16),
+              ],
+            ),
+            const SizedBox(height: 10),
+            for (final e in entries.take(2))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text('问',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(e.question,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.small),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${e.answers.length}个回答',
+                        style: AppTextStyles.min),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
