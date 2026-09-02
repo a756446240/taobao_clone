@@ -44,6 +44,19 @@ class _CartScreenState extends State<CartScreen> {
     return (item.price * pct).round() / 100;
   }
 
+  /// 下拉刷新购物车
+  Future<void> _onRefresh(BuildContext context) async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('购物车已刷新'),
+        duration: Duration(seconds: 1),
+      ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
@@ -77,11 +90,15 @@ class _CartScreenState extends State<CartScreen> {
               child: shops.isEmpty
                   ? const Center(
                       child: Text('购物车是空的', style: AppTextStyles.middleSub))
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      itemCount: shops.length,
-                      itemBuilder: (ctx, i) =>
-                          _ShopCard(ctx, shop: shops[i], pool: pool),
+                  : RefreshIndicator(
+                      onRefresh: () => _onRefresh(context),
+                      color: AppColors.primary,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        itemCount: shops.length,
+                        itemBuilder: (ctx, i) =>
+                            _ShopCard(ctx, shop: shops[i], pool: pool),
+                      ),
                     ),
             ),
             _buildBottomBar(context, cart),
