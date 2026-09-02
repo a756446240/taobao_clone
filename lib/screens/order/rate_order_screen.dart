@@ -2,9 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/models.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/reviews_provider.dart';
 import '../../widgets/app_image.dart';
 
 /// 淘宝式发表评价页：店铺头 + 商品行 + 三项星级 + 文字 + 图片 + 匿名开关
@@ -39,7 +43,55 @@ class _RateOrderScreenState extends State<RateOrderScreen> {
     });
   }
 
-  void _publish() {
+  /// 把相册临时路径的照片复制到 App 文档目录，防止缓存被系统清理后晒图丢失
+  Future<List<String>> _persistPhotos() async {
+    if (_photos.isEmpty) return const [];
+    final dir = await getApplicationDocumentsDirectory();
+    final saveDir = Directory('${dir.path}/review_photos');
+    if (!saveDir.existsSync()) saveDir.createSync(recursive: true);
+    final saved = <String>[];
+    for (final f in _photos) {
+      try {
+        final ext = f.path.contains('.')
+            ? f.path.substring(f.path.lastIndexOf('.'))
+            : '.jpg';
+        final name =
+            'review_${DateTime.now().millisecondsSinceEpoch}_${saved.length}$ext';
+        final copied = await File(f.path).copy('${saveDir.path}/$name');
+        saved.add(copied.path);
+      } catch (_) {}
+    }
+    return saved;
+  }
+
+  Future<void> _publish() async {
+    final text = _reviewCtrl.text.trim();
+    if (text.isEmpty && _photos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('写点内容或晒张图再发布吧～'),
+          duration: Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final photos = await _persistPhotos();
+    if (!mounted) return;
+    // 三项星级取平均（四舍五入）
+    final avg = (_ratings.values.reduce((a, b) => a + b) / _ratings.length);
+    context.read<ReviewsProvider>().add(UserReview(
+          productTitle: widget.item.title,
+          shopName: widget.shop.shopName,
+          content: text.isEmpty ? '此用户没有填写文字评价' : text,
+          stars: avg.round().clamp(1, 5),
+          spec: widget.item.configuration,
+          photoPaths: photos,
+          anonymous: _anonymous,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
+        ));
+    // 订单移出「待评价」→ 交易成功
+    context.read<CartProvider>().markRated(widget.shop, widget.item);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('评价发布成功，感谢分享！'),
