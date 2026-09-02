@@ -276,6 +276,9 @@ class MaterialPoolProvider extends ChangeNotifier {
     return String.fromCharCodes(runes.take(runes.length > 3 ? 3 : runes.length));
   }
 
+  /// 品牌词（对外暴露：我的淘宝-我的收藏列表等复用）
+  static String brandOf(String title) => _brandOf(title);
+
   /// 推荐区商品流：优先用素材池（图+名严格对应，按名称去重），不足时用内置 mock 补齐
   List<SearchResultItem> recommendGoods(int count, {Random? rand}) {
     final r = rand ?? Random();
