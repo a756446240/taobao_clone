@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/favorites_provider.dart';
 import '../../widgets/app_image.dart';
+import '../home/search_result_screen.dart';
+import '../product/product_detail_screen.dart';
 import '../product/shop_home_screen.dart';
 
 /// 收藏店铺条目
@@ -25,9 +28,9 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   int _tab = 0; // 0=商品 1=店铺
 
-  /// 收藏的宝贝：复用素材库商品（取前 8 条作为已收藏演示数据）
-  List<SearchResultItem> get _goods =>
-      MockData.guessLikeGoods.take(8).toList();
+  /// 收藏的宝贝：真实收藏数据（商品详情页收藏按钮写入，持久化）
+  List<SearchResultItem> _goodsOf(BuildContext context) =>
+      context.watch<FavoritesProvider>().items;
 
   static const List<_FavShop> _shops = [
     _FavShop('SINE海外旗舰店', '12.6万粉丝', '天猫国际'),
@@ -69,7 +72,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       child: Row(
         children: [
-          _tabCapsule('商品', 0, count: _goods.length),
+          _tabCapsule('商品', 0, count: _goodsOf(context).length),
           const SizedBox(width: 8),
           _tabCapsule('店铺', 1, count: _shops.length),
         ],
@@ -101,6 +104,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   // ============ 商品 Tab：双列网格 ============
   Widget _buildGoodsGrid() {
+    final goods = _goodsOf(context);
+    if (goods.isEmpty) {
+      return const Center(
+        child: Text('还没有收藏宝贝\n去商品详情页点"收藏"吧',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Color(0xFF999999))),
+      );
+    }
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -109,13 +120,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         crossAxisSpacing: 8,
         childAspectRatio: 0.68,
       ),
-      itemCount: _goods.length,
-      itemBuilder: (_, i) => _goodsCard(_goods[i]),
+      itemCount: goods.length,
+      itemBuilder: (_, i) => _goodsCard(goods[i]),
     );
   }
 
   Widget _goodsCard(SearchResultItem g) {
-    return Container(
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(item: g)),
+      ),
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -165,16 +180,30 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               color: Color(0xFF999999), fontSize: 10),
                           overflow: TextOverflow.ellipsis),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1E8),
-                        borderRadius: BorderRadius.circular(10),
+                    GestureDetector(
+                      onTap: () {
+                        // 找相似：取标题前 6 个字作关键词搜同款
+                        final kw = g.title.length <= 6
+                            ? g.title
+                            : g.title.substring(0, 6);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                SearchResultScreen(keyword: kw),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1E8),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('找相似',
+                            style: TextStyle(
+                                color: AppColors.primary, fontSize: 10)),
                       ),
-                      child: const Text('找相似',
-                          style: TextStyle(
-                              color: AppColors.primary, fontSize: 10)),
                     ),
                   ],
                 ),
@@ -182,6 +211,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
