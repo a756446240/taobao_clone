@@ -56,11 +56,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<SearchProvider>().history;
-    final suggestions = _controller.text.isNotEmpty
-        ? MockData.searchHints
-            .where((e) => e.contains(_controller.text))
-            .toList()
-        : <String>[];
+    final input = _controller.text.trim();
+    // 输入中：整页切换为联想词列表（热搜词库+真实商品标题匹配，对齐真淘宝）
+    final suggestions =
+        input.isNotEmpty ? MockData.searchSuggestions(input) : <String>[];
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -107,94 +106,134 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          // 搜索历史
-          if (history.isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('历史搜索', style: AppTextStyles.middleBold),
-                IconButton(
-                  icon: const Icon(AppIcons.deleteLight,
-                      color: AppColors.subText, size: 20),
-                  onPressed: () => context.read<SearchProvider>().clear(),
-                ),
-              ],
-            ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: history.map((e) {
-                return GestureDetector(
-                  onTap: () => _search(e),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(e, style: AppTextStyles.small),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-          ],
+      body: input.isNotEmpty
+          ? _buildSuggestionList(input, suggestions)
+          : _buildDefaultBody(history),
+    );
+  }
 
-          // 热搜榜（淘宝式双列排行：1-3 名橙序号 + 热/新/爆角标）
+  /// 输入中的联想词列表：关键词高亮 + 点击直达搜索结果
+  Widget _buildSuggestionList(String input, List<String> suggestions) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: suggestions.length,
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, indent: 44, color: Color(0xFFF0F0F0)),
+      itemBuilder: (_, i) {
+        final word = suggestions[i];
+        return ListTile(
+          dense: true,
+          leading: const Icon(AppIcons.search,
+              color: AppColors.subText, size: 18),
+          title: _highlightKeyword(word, input),
+          trailing: const Icon(Icons.north_west,
+              size: 14, color: Color(0xFFCCCCCC)),
+          onTap: () => _search(word),
+        );
+      },
+    );
+  }
+
+  /// 把命中输入的部分标橙（真淘宝联想词样式）
+  Widget _highlightKeyword(String text, String kw) {
+    final idx = text.indexOf(kw);
+    if (idx < 0 || kw.isEmpty) {
+      return Text(text, style: AppTextStyles.small);
+    }
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: text.substring(0, idx)),
+          TextSpan(
+              text: kw,
+              style: const TextStyle(
+                  color: AppColors.primary, fontWeight: FontWeight.bold)),
+          TextSpan(text: text.substring(idx + kw.length)),
+        ],
+      ),
+      style: AppTextStyles.small,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  /// 默认页（未输入）：历史搜索 + 热搜榜
+  Widget _buildDefaultBody(List<String> history) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        // 搜索历史
+        if (history.isNotEmpty) ...[
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('热搜榜', style: AppTextStyles.middleBold),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1EC),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: const Text('实时热点，每分钟更新',
-                    style:
-                        TextStyle(color: AppColors.primary, fontSize: 10)),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: _reshuffleHot,
-                behavior: HitTestBehavior.opaque,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  child: Row(
-                    children: [
-                      Icon(Icons.refresh, size: 14, color: Color(0xFF999999)),
-                      SizedBox(width: 2),
-                      Text('换一换',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF999999))),
-                    ],
-                  ),
-                ),
+              Text('历史搜索', style: AppTextStyles.middleBold),
+              IconButton(
+                icon: const Icon(AppIcons.deleteLight,
+                    color: AppColors.subText, size: 20),
+                onPressed: () => context.read<SearchProvider>().clear(),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _buildHotRank(),
-
-          // 实时建议
-          if (suggestions.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ...suggestions.map((e) => ListTile(
-                  dense: true,
-                  leading: const Icon(AppIcons.search,
-                      color: AppColors.subText, size: 18),
-                  title: Text(e, style: AppTextStyles.small),
-                  onTap: () => _search(e),
-                )),
-          ],
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: history.map((e) {
+              return GestureDetector(
+                onTap: () => _search(e),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(e, style: AppTextStyles.small),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
         ],
-      ),
+
+        // 热搜榜（淘宝式双列排行：1-3 名橙序号 + 热/新/爆角标）
+        Row(
+          children: [
+            Text('热搜榜', style: AppTextStyles.middleBold),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1EC),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: const Text('实时热点，每分钟更新',
+                  style:
+                      TextStyle(color: AppColors.primary, fontSize: 10)),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: _reshuffleHot,
+              behavior: HitTestBehavior.opaque,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 14, color: Color(0xFF999999)),
+                    SizedBox(width: 2),
+                    Text('换一换',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF999999))),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _buildHotRank(),
+      ],
     );
   }
 
