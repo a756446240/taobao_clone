@@ -16,6 +16,9 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
+import '../message/chat_screen.dart';
+import '../product/shop_home_screen.dart';
+import 'logistics_screen.dart';
 import 'refund_detail_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
@@ -429,18 +432,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFff5000)),
-                  borderRadius: BorderRadius.circular(14),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ShopHomeScreen(
+                        shopName: _shop.shopName,
+                        shopType: _shop.shopType,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFff5000)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Text('进店逛逛',
+                      style: TextStyle(
+                          color: Color(0xFFff5000),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
                 ),
-                child: const Text('进店逛逛',
-                    style: TextStyle(
-                        color: Color(0xFFff5000),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500)),
               ),
             ],
           ),
@@ -1240,33 +1255,108 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
-          _bottomAction(Icons.headset_mic_outlined, '客服'),
-          _bottomAction(Icons.report_problem_outlined, '投诉'),
+          _bottomAction(Icons.headset_mic_outlined, '客服',
+              onTap: _gotoServiceChat),
+          _bottomAction(Icons.report_problem_outlined, '投诉',
+              onTap: _reportShop),
           const Spacer(),
           if (_isPendingShip) ...[
-            _primaryBtn('催发货', color: const Color(0xFFff5000)),
+            _primaryBtn('催发货',
+                color: const Color(0xFFff5000), onTap: _urgeShipping),
             const SizedBox(width: 8),
-            _primaryBtn('修改地址', color: const Color(0xFFff0036)),
+            _primaryBtn('修改地址',
+                color: const Color(0xFFff0036), onTap: _editAddress),
           ] else
             Expanded(
-              child: _primaryBtn('查看详情', color: const Color(0xFFff5000)),
+              child: _primaryBtn('查看详情',
+                  color: const Color(0xFFff5000), onTap: _gotoFurtherDetail),
             ),
         ],
       ),
     );
   }
 
-  Widget _bottomAction(IconData icon, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: const Color(0xFF666666), size: 22),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(color: Color(0xFF666666), fontSize: 10)),
-        ],
+  Widget _bottomAction(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: const Color(0xFF666666), size: 22),
+            const SizedBox(height: 2),
+            Text(label,
+                style: const TextStyle(color: Color(0xFF666666), fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 底部「客服」→ 进入店铺客服会话
+  void _gotoServiceChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: Conversation(
+            avatar: '',
+            title: _shop.shopName,
+            description: '订单咨询',
+            createAt: '',
+          ),
+          accentColor: const Color(0xFFFF5000),
+        ),
+      ),
+    );
+  }
+
+  /// 底部「投诉」→ 选择原因后提交
+  void _reportShop() {
+    DialogHelpers.showOptionPicker(
+      context,
+      title: '选择投诉原因',
+      options: const ['发货问题', '商品与描述不符', '服务态度差', '虚假宣传', '其他'],
+      currentValue: '',
+    ).then((v) {
+      if (v == null) return;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已提交「$v」投诉，平台将在48小时内处理')),
+      );
+    });
+  }
+
+  /// 待发货「催发货」→ 提醒卖家
+  void _urgeShipping() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已提醒卖家尽快发货'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// 待发货「修改地址」
+  void _editAddress() {
+    final provider = context.read<CartProvider>();
+    _editText('修改地址', _item.address, (v) {
+      provider.updateOrderItem(_item, address: v);
+    });
+  }
+
+  /// 非待发货「查看详情」：售后单进退款详情，其余看物流
+  void _gotoFurtherDetail() {
+    final isRefund = _shop.orderSubStatus.contains('退款') ||
+        _shop.orderSubStatus.contains('退货') ||
+        _shop.orderSubStatus.contains('售后');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => isRefund
+            ? RefundDetailScreen(shop: _shop, item: _item)
+            : LogisticsScreen(item: _item),
       ),
     );
   }
