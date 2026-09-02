@@ -18,6 +18,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
+import 'cart_compare_screen.dart';
 
 /// 购物车页（1:1 复刻 3.4 新版）
 /// 商品项右滑显示“换图 / 编辑 / 删除”，不再直接显示编辑入口。
@@ -330,6 +331,38 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  // ============ 商品对比 ============
+  /// 收集勾选的商品进入对比页（2~4 件）
+  void _openCompare(BuildContext context) {
+    final cart = context.read<CartProvider>();
+    final entries = <CompareEntry>[
+      for (final s in cart.shops)
+        for (final it in s.items)
+          if (it.isSelected) CompareEntry(shop: s, item: it),
+    ];
+    if (entries.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('请先勾选 2~4 件要对比的商品'),
+            duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    if (entries.length > 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('最多同时对比 4 件，已为你取前 4 件'),
+            duration: Duration(seconds: 1)),
+      );
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => CartCompareScreen(
+              entries: entries.take(4).toList())),
+    );
+  }
+
   // ============ 顶部工具栏（AI省钱 / 搜索 / 对比 / 管理）============
   Widget _buildTopBar(BuildContext context) {
     return Container(
@@ -375,17 +408,7 @@ class _CartScreenState extends State<CartScreen> {
               ),
               const SizedBox(width: 14),
               GestureDetector(
-                onTap: () {
-                  // 点击"对比"：随机添加 4-5 个商品
-                  final added =
-                      context.read<CartProvider>().addRandomProducts();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('已随机添加 $added 个商品'),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                },
+                onTap: () => _openCompare(context),
                 child: const Text('对比',
                     style: TextStyle(fontSize: 13, color: Colors.black87)),
               ),
