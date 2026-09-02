@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -77,6 +78,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       () => Navigator.of(context).pop()),
                   const Spacer(),
                   _circleBtn(Icons.share_outlined, () {
+                    Clipboard.setData(ClipboardData(
+                        text:
+                            '【淘宝】https://m.tb.cn/h.pD42 ${widget.item.title}，快来看看吧'));
                     _toast('链接已复制，快去分享吧');
                   }),
                   const SizedBox(width: 8),
@@ -133,6 +137,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             _moreAction(ctx, Icons.share_outlined, '分享宝贝', () {
+              Clipboard.setData(ClipboardData(
+                  text:
+                      '【淘宝】https://m.tb.cn/h.pD42 ${widget.item.title}，快来看看吧'));
               _toast('链接已复制，快去分享吧');
             }),
             _moreAction(ctx, Icons.star_border, '收藏宝贝', () {
