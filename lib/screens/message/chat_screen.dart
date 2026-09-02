@@ -221,6 +221,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: Color(0xFFCCCCCC)),
                     onTap: () {
                       Navigator.pop(sheetCtx);
+                      prov.clear(_convKey);
                       setState(() => _messages.clear());
                       ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
