@@ -87,7 +87,9 @@ class ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.shopName,
+                  item.shipFrom.isEmpty
+                      ? item.shopName
+                      : '${item.shopName} · ${item.shipFrom}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.min.copyWith(color: AppColors.subText),
@@ -198,7 +200,9 @@ class ProductRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  item.shopName,
+                  item.shipFrom.isEmpty
+                      ? item.shopName
+                      : '${item.shopName} · ${item.shipFrom}发货',
                   style: AppTextStyles.min.copyWith(color: AppColors.subText),
                 ),
               ],
