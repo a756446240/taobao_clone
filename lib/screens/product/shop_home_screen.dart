@@ -7,6 +7,8 @@ import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/follow_shops_provider.dart';
 import '../../widgets/app_image.dart';
+import '../../widgets/dialog_helpers.dart';
+import 'product_detail_screen.dart';
 
 /// 淘宝式店铺主页：头部信息卡 + 关注切换 + 精选/上新/热销 Tab + 商品网格
 class ShopHomeScreen extends StatefulWidget {
@@ -247,11 +249,25 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
               ListTile(
                 leading: const Icon(Icons.report_outlined, size: 20),
                 title: const Text('投诉店铺', style: TextStyle(fontSize: 14)),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(sheetCtx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('已收到你的投诉，平台将在 24 小时内处理'),
-                      duration: Duration(seconds: 2)));
+                  final reason = await DialogHelpers.showOptionPicker(
+                    context,
+                    title: '选择投诉原因',
+                    options: const [
+                      '商品与描述不符',
+                      '疑似售假',
+                      '发货超时',
+                      '客服态度恶劣',
+                      '其他问题',
+                    ],
+                    currentValue: '',
+                  );
+                  if (reason != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('已提交「$reason」投诉，平台将在 24 小时内处理'),
+                        duration: const Duration(seconds: 2)));
+                  }
                 },
               ),
               const SizedBox(height: 8),
@@ -434,51 +450,56 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
   }
 
   Widget _goodsCard(SearchResultItem g) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(item: g)),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: 1,
-            child: AppImage(url: g.imageUrl, fit: BoxFit.cover),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  g.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, height: 1.3),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text('¥${g.price}',
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(g.commentCount,
-                          style: const TextStyle(
-                              color: Color(0xFF999999), fontSize: 10),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                  ],
-                ),
-              ],
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: AppImage(url: g.imageUrl, fit: BoxFit.cover),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    g.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, height: 1.3),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text('¥${g.price}',
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(g.commentCount,
+                            style: const TextStyle(
+                                color: Color(0xFF999999), fontSize: 10),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
