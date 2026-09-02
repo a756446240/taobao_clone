@@ -8,15 +8,16 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/banner_pool_provider.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import 'banner_pool_screen.dart';
 import 'category_screen.dart';
 import 'channel_screen.dart';
 import 'live_list_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
-import '../mine/material_pool_screen.dart';
 
 /// 首页（搜索栏 + 图标两页滑动 + 直播四卡 + 超级立减横幅 + 吸顶 Tab + 猜你喜欢）
 class HomeScreen extends StatefulWidget {
@@ -285,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 第 2 页：3 行 × 5 = 15 个
+  /// 第 2 页：3 行 × 5 = 15 个（图标下方不显示文字）
   Widget _buildIconPage2() {
     final items = MockData.homeIconPage2;
     return Padding(
@@ -299,7 +300,9 @@ class _HomeScreenState extends State<HomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (var c = 0; c < 5; c++)
-                    Expanded(child: _buildIconEntry(items[r * 5 + c])),
+                    Expanded(
+                        child: _buildIconEntry(items[r * 5 + c],
+                            showLabel: false)),
                 ],
               ),
             ),
@@ -308,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildIconEntry(HomeIconEntry e) {
+  Widget _buildIconEntry(HomeIconEntry e, {bool showLabel = true}) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       // 单击进入对应页面：分类走专属分类页，其余走频道页
@@ -331,13 +334,15 @@ class _HomeScreenState extends State<HomeScreen>
             )
           else
             _buildFallbackBadge(e),
-          const SizedBox(height: 5),
-          Text(
-            e.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, color: Colors.black87),
-          ),
+          if (showLabel) ...[
+            const SizedBox(height: 5),
+            Text(
+              e.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: Colors.black87),
+            ),
+          ],
         ],
       ),
     );
@@ -561,8 +566,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
 }
 
-/// 首购 banner 轮播（内置大促图 + 素材池素材，自动播放 + 手势滑动 + 圆点指示器）
-/// 双击进入素材池更换素材；素材池有素材时一并参与滚动轮播
+/// 首购 banner 轮播（独立 banner 素材池，与商品素材库不共用、不接 AI 素材）
+/// 双击进入 banner 素材库管理；有多少素材就轮播多少张，池空时回退内置大促图
 class _BannerCarousel extends StatefulWidget {
   const _BannerCarousel();
 
@@ -571,8 +576,8 @@ class _BannerCarousel extends StatefulWidget {
 }
 
 class _BannerCarouselState extends State<_BannerCarousel> {
-  /// 内置大促 banner（始终展示在前）
-  static const _banners = [
+  /// 内置大促 banner（仅在用户 banner 素材池为空时兜底展示）
+  static const _fallbackBanners = [
     'assets/images/banner/banner_618.png',
     'assets/images/banner/banner_fashion.png',
     'assets/images/banner/banner_fresh.png',
@@ -598,10 +603,12 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     });
   }
 
-  /// 当前轮播页数（内置 banner + 素材池素材）
+  /// 当前轮播页数（用户 banner 素材优先，池空回退内置）
   int get _pageCount {
-    final pool = context.read<MaterialPoolProvider>();
-    return _banners.length + pool.entries.length;
+    final pool = context.read<BannerPoolProvider>();
+    return pool.entries.isNotEmpty
+        ? pool.entries.length
+        : _fallbackBanners.length;
   }
 
   @override
@@ -611,23 +618,21 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     super.dispose();
   }
 
-  /// 双击进入素材池更换素材
-  void _openMaterialPool() {
+  /// 双击进入 banner 素材库更换素材
+  void _openBannerPool() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MaterialPoolScreen()),
+      MaterialPageRoute(builder: (_) => const BannerPoolScreen()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final pool = context.watch<MaterialPoolProvider>();
-    final pages = [
-      ..._banners,
-      for (final e in pool.entries) e.imagePath,
-    ];
+    final pool = context.watch<BannerPoolProvider>();
+    final pages =
+        pool.entries.isNotEmpty ? pool.entries : _fallbackBanners;
     if (_current >= pages.length) _current = pages.length - 1;
     return GestureDetector(
-      onDoubleTap: _openMaterialPool,
+      onDoubleTap: _openBannerPool,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         height: 100,
