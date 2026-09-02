@@ -18,6 +18,9 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
+import '../mine/coupon_center_screen.dart';
+import '../order/order_list_screen.dart';
+import '../product/shop_home_screen.dart';
 import 'cart_compare_screen.dart';
 
 /// 购物车页（1:1 复刻 3.4 新版）
@@ -370,30 +373,34 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          // AI省钱：更紧凑，避免小屏溢出
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+          // AI省钱：点击打开 AI 省钱助手（凑单/用券建议）
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _showAiSavingSheet(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text('AI',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold)),
+                  ),
                 ),
-                child: const Center(
-                  child: Text('AI',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 3),
-              const Text('省钱',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.bold)),
-            ],
+                const SizedBox(width: 3),
+                const Text('省钱',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
           const Spacer(),
           // 右侧操作统一放在一个紧凑 Row 里
@@ -428,6 +435,94 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  // ============ AI 省钱助手（按当前勾选金额给出凑单/用券建议）============
+  void _showAiSavingSheet(BuildContext context) {
+    final cart = context.read<CartProvider>();
+    final total = cart.totalPrice;
+    const couponThreshold = 599.0;
+    const couponValue = 61.0;
+    final gap = couponThreshold - total;
+    final List<String> tips;
+    if (cart.selectedItemCount == 0) {
+      tips = [
+        '先勾选想买的商品，我帮你算怎么买最划算',
+        '领券中心有 3 张共 61 元消费券待领取',
+      ];
+    } else if (gap > 0) {
+      tips = [
+        '当前勾选 ¥${total.toStringAsFixed(2)}，再凑 ¥${gap.toStringAsFixed(2)} 即可用 61 元消费券（满 599 可用）',
+        '去「猜你喜欢」挑一件小件凑单最划算',
+        '领券中心还有超市/服饰/数码加补券可叠加',
+      ];
+    } else {
+      tips = [
+        '当前勾选 ¥${total.toStringAsFixed(2)}，已满足 61 元消费券使用门槛，结算立减 ¥${couponValue.toStringAsFixed(0)}',
+        '记得先去领券中心领取消费券再结算',
+      ];
+    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Text('AI 省钱助手',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 12),
+              for (final tip in tips)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.auto_awesome,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(tip,
+                            style: const TextStyle(
+                                fontSize: 13, height: 1.4)),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CouponCenterScreen()),
+                    );
+                  },
+                  child: const Text('去领券中心看看'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ============ 顶部消费券提示条 ============
   Widget _buildCouponBar(BuildContext context) {
     return Container(
@@ -445,18 +540,24 @@ class _CartScreenState extends State<CartScreen> {
             child: Text('您有3张共61元消费券待领取',
                 style: TextStyle(fontSize: 12, color: Colors.red)),
           ),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => const CouponCenterScreen()),
             ),
-            child: const Text('领61元',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold)),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text('领61元',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
@@ -622,26 +723,50 @@ class _CartScreenState extends State<CartScreen> {
                     child: ShopTypeBadge(shop: shop),
                   ),
                 ),
+                // 店名 + 箭头：点击进店逛逛（同商品详情页）
                 Expanded(
-                  child: Text(shop.shopName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.smallBold),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => ShopHomeScreen(
+                              shopName: shop.shopName,
+                              shopType: shop.shopType)),
+                    ),
+                    child: Text(shop.shopName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.smallBold),
+                  ),
                 ),
-                const Icon(Icons.chevron_right,
-                    color: Color(0xFFc4c4c4), size: 16),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => ShopHomeScreen(
+                            shopName: shop.shopName,
+                            shopType: shop.shopType)),
+                  ),
+                  child: const Icon(Icons.chevron_right,
+                      color: Color(0xFFc4c4c4), size: 16),
+                ),
                 const SizedBox(width: 8),
                 if (shop.hasCoupons)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.primary),
-                      borderRadius: BorderRadius.circular(3),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CouponCenterScreen()),
                     ),
-                    child: const Text('领券',
-                        style: TextStyle(
-                            color: AppColors.primary, fontSize: 10)),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.primary),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: const Text('领券',
+                          style: TextStyle(
+                              color: AppColors.primary, fontSize: 10)),
+                    ),
                   ),
               ],
             ),
@@ -1218,15 +1343,7 @@ class _CartScreenState extends State<CartScreen> {
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      '结算 ${cart.selectedCount} 件商品，共 ¥${cart.totalPrice.toStringAsFixed(2)}'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            },
+            onTap: () => _checkout(context, cart),
             child: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 22, vertical: 12),
@@ -1314,6 +1431,33 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ============ 结算：勾选商品转待付款订单并跳订单页 ============
+  void _checkout(BuildContext context, CartProvider cart) {
+    if (cart.selectedItemCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请先勾选要结算的商品'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+    final count = cart.selectedCount;
+    final total = cart.totalPrice;
+    cart.checkoutSelected();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(
+            '已生成待付款订单（$count 件，共 ¥${total.toStringAsFixed(2)}）'),
+        duration: const Duration(milliseconds: 1500),
+      ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+          builder: (_) => const OrderListScreen(type: '待付款')),
     );
   }
 
