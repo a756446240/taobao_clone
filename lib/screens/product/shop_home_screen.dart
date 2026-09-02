@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/mock_data.dart';
@@ -39,6 +40,219 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
     }
   }
 
+  /// 店内搜索：底部弹层输入关键词，实时过滤本店商品
+  void _showShopSearchSheet() {
+    final ctrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final q = ctrl.text.trim();
+            final matches = q.isEmpty
+                ? <SearchResultItem>[]
+                : MockData.guessLikeGoods
+                    .where((g) => g.title.contains(q))
+                    .toList();
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.7,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(19),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search,
+                                size: 18, color: Color(0xFF999999)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: TextField(
+                                controller: ctrl,
+                                autofocus: true,
+                                onChanged: (_) => setSheet(() {}),
+                                decoration: InputDecoration(
+                                  hintText: '搜索「${widget.shopName}」店内商品',
+                                  hintStyle: const TextStyle(
+                                      fontSize: 13, color: Color(0xFFBBBBBB)),
+                                  border: InputBorder.none,
+                                  isCollapsed: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: q.isEmpty
+                          ? const Center(
+                              child: Text('输入关键词，搜索本店商品',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF999999))))
+                          : matches.isEmpty
+                              ? const Center(
+                                  child: Text('店内没有相关商品',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF999999))))
+                              : ListView.separated(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  itemCount: matches.length,
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (_, i) {
+                                    final g = matches[i];
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      child: Row(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            child: AppImage(
+                                                url: g.imageUrl,
+                                                width: 44,
+                                                height: 44),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(g.title,
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontSize: 13)),
+                                          ),
+                                          Text('¥${g.price}',
+                                              style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Color(0xFFFF5000),
+                                                  fontWeight:
+                                                      FontWeight.bold)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// 更多菜单：分享店铺 / 关注 / 店铺资质 / 投诉
+  void _showShopMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.share_outlined, size: 20),
+                title: const Text('分享店铺', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  Clipboard.setData(ClipboardData(
+                      text:
+                          '【${widget.shopName}】复制这条信息，打开淘宝即可看到 https://s.tb.cn/shop'));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('店铺链接已复制，去粘贴分享给好友吧'),
+                      duration: Duration(seconds: 2)));
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                    _following
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    size: 20,
+                    color: _following
+                        ? const Color(0xFFFF5000)
+                        : Colors.black87),
+                title: Text(_following ? '取消关注' : '关注店铺',
+                    style: const TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  setState(() => _following = !_following);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content:
+                          Text(_following ? '已关注店铺' : '已取消关注'),
+                      duration: const Duration(seconds: 1)));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.verified_outlined, size: 20),
+                title: const Text('店铺资质', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  showDialog(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      title: const Text('店铺资质',
+                          style: TextStyle(fontSize: 16)),
+                      content: Text(
+                          '${widget.shopName}\n\n营业执照：已审核\n经营时长：5 年\n保证金：已缴纳\n主营类目：母婴用品'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx),
+                          child: const Text('知道了',
+                              style: TextStyle(color: Color(0xFFFF5000))),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.report_outlined, size: 20),
+                title: const Text('投诉店铺', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('已收到你的投诉，平台将在 24 小时内处理'),
+                      duration: Duration(seconds: 2)));
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,11 +272,11 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {},
+            onPressed: _showShopSearchSheet,
           ),
           IconButton(
             icon: const Icon(Icons.more_horiz, color: Colors.black87),
-            onPressed: () {},
+            onPressed: _showShopMoreSheet,
           ),
         ],
       ),
