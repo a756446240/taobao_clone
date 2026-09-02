@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -8,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/favorites_provider.dart';
@@ -233,16 +235,16 @@ class _CartScreenState extends State<CartScreen> {
             if (dropped.isNotEmpty) _buildPriceDropBar(context, dropped),
             Expanded(
               child: shops.isEmpty
-                  ? const Center(
-                      child: Text('购物车是空的', style: AppTextStyles.middleSub))
+                  ? _buildEmptyWithRecs(context)
                   : RefreshIndicator(
                       onRefresh: () => _onRefresh(context),
                       color: AppColors.primary,
                       child: ListView.builder(
                         padding: const EdgeInsets.only(bottom: 8),
-                        itemCount: shops.length,
-                        itemBuilder: (ctx, i) =>
-                            _ShopCard(ctx, shop: shops[i], pool: pool),
+                        itemCount: shops.length + 1,
+                        itemBuilder: (ctx, i) => i < shops.length
+                            ? _ShopCard(ctx, shop: shops[i], pool: pool)
+                            : _buildGuessYouLike(context),
                       ),
                     ),
             ),
@@ -250,6 +252,81 @@ class _CartScreenState extends State<CartScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // ============ 猜你喜欢（淘宝式购物车推荐流）============
+  /// 推荐商品：内置池排除已在购物车的商品，按购物车内容哈希确定性排序
+  List<SearchResultItem> _recGoods(BuildContext context) {
+    final cart = context.read<CartProvider>();
+    final inCart = <String>{
+      for (final s in cart.shops)
+        for (final it in s.items) it.title,
+    };
+    final pool =
+        MockData.guessLikeGoods.where((e) => !inCart.contains(e.title)).toList();
+    final seed = inCart.fold<int>(7, (a, t) => (a * 31 + t.length) & 0x7fffffff);
+    pool.shuffle(Random(seed));
+    return pool.take(6).toList();
+  }
+
+  Widget _buildGuessYouLike(BuildContext context) {
+    final recs = _recGoods(context);
+    if (recs.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(width: 40, height: 0.5, color: AppColors.divider),
+            const SizedBox(width: 8),
+            const Icon(Icons.favorite, color: AppColors.primary, size: 14),
+            const SizedBox(width: 4),
+            const Text('猜你喜欢',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF333333))),
+            const SizedBox(width: 8),
+            Container(width: 40, height: 0.5, color: AppColors.divider),
+          ],
+        ),
+        const SizedBox(height: 8),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.68,
+          ),
+          itemCount: recs.length,
+          itemBuilder: (_, i) => ProductCard(item: recs[i]),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// 空购物车：提示文案 + 推荐流（对齐真淘宝空态）
+  Widget _buildEmptyWithRecs(BuildContext context) {
+    return ListView(
+      children: [
+        const SizedBox(height: 60),
+        const Icon(Icons.shopping_cart_outlined,
+            size: 56, color: Color(0xFFCCCCCC)),
+        const SizedBox(height: 10),
+        const Center(
+            child: Text('购物车是空的', style: AppTextStyles.middleSub)),
+        const SizedBox(height: 4),
+        const Center(
+            child: Text('再忙，也要记得买点什么犒劳自己',
+                style: TextStyle(fontSize: 11, color: Color(0xFFBBBBBB)))),
+        _buildGuessYouLike(context),
+      ],
     );
   }
 
