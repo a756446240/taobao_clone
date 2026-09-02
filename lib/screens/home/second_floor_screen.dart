@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/banner_pool_provider.dart';
+import '../../providers/coupons_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
 import '../product/product_detail_screen.dart';
+import 'search_result_screen.dart';
 
 /// 淘宝「二楼」活动页：首页顶部继续下拉超过阈值进入。
 /// 品牌活动聚合页——大 banner + 福利券 + 活动专区 + 精选商品。
@@ -31,9 +33,6 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
 
   final PageController _bannerCtrl = PageController();
   int _bannerIndex = 0;
-
-  /// 已领取的券（面值）
-  final Set<int> _claimed = {};
 
   /// 精选商品：内置池确定性抽 6 个
   late final _goods = ([...MockData.guessLikeGoods]..shuffle(Random(20260902)))
@@ -186,10 +185,10 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                 child: Row(
                   children: [
                     _zoneCard('新品首发', '每周三上新', const Color(0xFF7B2FF7),
-                        Icons.new_releases),
+                        Icons.new_releases, keyword: '新品'),
                     const SizedBox(width: 8),
                     _zoneCard('品牌日', '大牌5折起', const Color(0xFFFF2E4D),
-                        Icons.verified),
+                        Icons.verified, keyword: '品牌'),
                     const SizedBox(width: 8),
                     _zoneCard('限时秒杀', '距开抢 $_seckillClock',
                         const Color(0xFFFF8C00), Icons.bolt),
@@ -235,13 +234,24 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
   }
 
   Widget _couponCard(int value, String cond) {
-    final claimed = _claimed.contains(value);
+    // 领取状态以全局卡券包为准：重启不丢，且与「我的-红包卡券」互通
+    final claimed =
+        context.watch<CouponsProvider>().isClaimed('二楼狂欢券', '$value');
     return Expanded(
       child: GestureDetector(
         onTap: () {
           if (claimed) return;
-          setState(() => _claimed.add(value));
-          _toast('已领取 $value 元券，放入"我的-红包卡券"');
+          final ok = context.read<CouponsProvider>().claim(ClaimedCoupon(
+                value: '$value',
+                name: '二楼狂欢券',
+                condition: cond,
+                scope: '二楼活动会场商品通用',
+                expiry: '领取后 3 天内有效',
+                bg: 0xFFFFF1E8,
+                fg: 0xFFFF5000,
+                claimedAt: DateTime.now().millisecondsSinceEpoch,
+              ));
+          if (ok) _toast('已领取 $value 元券，可在"我的-红包卡券"查看');
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -421,10 +431,21 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
     );
   }
 
-  Widget _zoneCard(String title, String sub, Color color, IconData icon) {
+  Widget _zoneCard(String title, String sub, Color color, IconData icon,
+      {String? keyword}) {
     return Expanded(
       child: GestureDetector(
-        onTap: () => _toast('$title 会场：$sub'),
+        onTap: () {
+          if (keyword != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => SearchResultScreen(keyword: keyword)),
+            );
+          } else {
+            _toast('$title 会场：$sub');
+          }
+        },
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
