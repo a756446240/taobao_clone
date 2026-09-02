@@ -55,7 +55,7 @@ class _CartScreenState extends State<CartScreen> {
   /// 下拉刷新购物车
   Future<void> _onRefresh(BuildContext context) async {
     await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
+    if (!context.mounted) return;
     setState(() {});
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -957,6 +957,7 @@ class _CartScreenState extends State<CartScreen> {
       currentValue: ShopTypeBadge.resolve(shop).text,
     ).then((v) {
       if (v == null) return;
+      if (!context.mounted) return;
       context.read<CartProvider>().updateShop(
             shop,
             shopBadge: v,
