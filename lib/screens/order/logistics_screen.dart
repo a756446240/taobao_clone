@@ -20,7 +20,7 @@ class LogisticsScreen extends StatelessWidget {
 
   const LogisticsScreen({super.key, this.item});
 
-  static const List<_TraceNode> _traces = [
+  static const List<_TraceNode> _demoTraces = [
     _TraceNode('【杭州市】快件已到达 杭州转运中心，下一站 上海转运中心', '今天 08:24'),
     _TraceNode('【金华市】快件已发车，发往 杭州转运中心', '今天 02:10'),
     _TraceNode('【金华市】快件已到达 金华集散点', '昨天 21:47'),
@@ -28,6 +28,88 @@ class LogisticsScreen extends StatelessWidget {
     _TraceNode('商家已发货，包裹等待揽收', '昨天 16:32'),
     _TraceNode('包裹已出库，正在通知快递揽收', '昨天 15:20'),
   ];
+
+  static DateTime? _parseT(String s) =>
+      s.isEmpty ? null : DateTime.tryParse(s.replaceAll(' ', 'T'));
+
+  static String _fmtT(DateTime t) =>
+      '${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// 从收货地址里提取城市名（默认杭州）
+  static String _cityOf(String address) {
+    final m = RegExp(r'([一-龥]{2,4})市').firstMatch(address);
+    return m?.group(1) ?? '杭州';
+  }
+
+  /// 物流阶段：0=已下单 1=已付款 2=运输中 3=已签收
+  int get _stage {
+    final it = item;
+    if (it == null) return 2;
+    final st = it.statusTitle;
+    if (st.contains('完成') || st.contains('签收') || st.contains('评价')) {
+      return 3;
+    }
+    if (it.shipTime.isNotEmpty ||
+        st.contains('运输') ||
+        st.contains('发货') ||
+        st.contains('收货')) {
+      return 2;
+    }
+    if (it.payTime.isNotEmpty || st.contains('付款')) return 1;
+    return 0;
+  }
+
+  /// 顶部横幅状态文案
+  String get _bannerStatus => const ['等待付款', '等待发货', '运输中', '已签收'][_stage];
+
+  /// 根据订单时间线动态生成物流跟踪（每单不同，且与订单状态一致）
+  List<_TraceNode> _buildTraces() {
+    final it = item;
+    if (it == null) return _demoTraces;
+    final city = _cityOf(it.address);
+    final create = _parseT(it.createTime) ?? DateTime.now();
+    final pay = _parseT(it.payTime);
+    final ship = _parseT(it.shipTime) ??
+        (pay ?? create).add(const Duration(hours: 8));
+    final traces = <_TraceNode>[];
+    if (_stage >= 3) {
+      traces.add(_TraceNode('【$city市】快件已签收，签收人：本人。感谢使用顺丰速运，期待再次为您服务',
+          _fmtT(ship.add(const Duration(hours: 52)))));
+      traces.add(_TraceNode('【$city市】快件正在派送中，快递员：李师傅 139****8877，请保持电话畅通',
+          _fmtT(ship.add(const Duration(hours: 46)))));
+    }
+    if (_stage >= 2) {
+      traces.addAll([
+        _TraceNode('【$city市】快件已到达 $city转运中心，下一站 上海转运中心',
+            _fmtT(ship.add(const Duration(hours: 26)))),
+        _TraceNode('【金华市】快件已发车，发往 $city转运中心',
+            _fmtT(ship.add(const Duration(hours: 14)))),
+        _TraceNode(
+            '【金华市】快件已到达 金华集散点', _fmtT(ship.add(const Duration(hours: 5)))),
+        _TraceNode('【金华市】顺丰速运 已收取快件，揽件员：王师傅 138****6621',
+            _fmtT(ship.add(const Duration(hours: 2)))),
+        _TraceNode('商家已发货，包裹等待揽收', _fmtT(ship)),
+        _TraceNode('包裹已出库，正在通知快递揽收',
+            _fmtT(ship.subtract(const Duration(hours: 1)))),
+      ]);
+    } else if (_stage == 1) {
+      traces.add(_TraceNode(
+          '订单已付款，商家正在备货，将在 48 小时内发出', _fmtT(pay ?? create)));
+    }
+    if (_stage <= 1) {
+      traces.add(_TraceNode('订单已创建，等待买家付款', _fmtT(create)));
+    }
+    return traces;
+  }
+
+  /// 由订单号派生的确定性运单号
+  String get _waybillNo {
+    final it = item;
+    if (it == null) return 'SF3102886642157';
+    final digits = it.orderNo.replaceAll(RegExp(r'\D'), '');
+    return 'SF${digits.padLeft(13, '0').substring(0, 13)}';
+  }
 
   void _copy(BuildContext context, String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -127,7 +209,7 @@ class LogisticsScreen extends StatelessWidget {
 
   /// 快递公司 + 运单号卡
   Widget _buildExpressCard(BuildContext context) {
-    const waybillNo = 'SF3102886642157';
+    final waybillNo = _waybillNo;
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(14),
@@ -152,8 +234,9 @@ class LogisticsScreen extends StatelessWidget {
                     style:
                         TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 3),
-                const Text('运单号 $waybillNo',
-                    style: TextStyle(color: Color(0xFF999999), fontSize: 12)),
+                Text('运单号 $waybillNo',
+                    style:
+                        const TextStyle(color: Color(0xFF999999), fontSize: 12)),
               ],
             ),
           ),
@@ -206,6 +289,7 @@ class LogisticsScreen extends StatelessWidget {
 
   /// 物流跟踪时间线
   Widget _buildTraceCard() {
+    final traces = _buildTraces();
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
@@ -215,8 +299,8 @@ class LogisticsScreen extends StatelessWidget {
           const Text('物流跟踪',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
-          for (var i = 0; i < _traces.length; i++)
-            _traceRow(_traces[i], isFirst: i == 0, isLast: i == _traces.length - 1),
+          for (var i = 0; i < traces.length; i++)
+            _traceRow(traces[i], isFirst: i == 0, isLast: i == traces.length - 1),
         ],
       ),
     );
