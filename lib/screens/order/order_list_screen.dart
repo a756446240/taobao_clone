@@ -18,6 +18,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
+import '../message/chat_screen.dart';
 import '../product/shop_home_screen.dart';
 import 'channel_orders.dart';
 import 'logistics_screen.dart';
@@ -835,12 +836,15 @@ class _OrderCard extends StatelessWidget {
                       _moreBtn('更多',
                           onDoubleTap: () => onEditItem(items.first)),
                       const Spacer(),
-                      _capsuleBtn('加入购物车'),
+                      _capsuleBtn('加入购物车',
+                          onTap: () => _reAddToCart(context)),
                       const SizedBox(width: 8),
                       _capsuleBtn('钱款去向',
                           onTap: () => onDetail(items.first)),
                       const SizedBox(width: 8),
-                      _capsuleBtn('联系商家', highlight: true),
+                      _capsuleBtn('联系商家',
+                          highlight: true,
+                          onTap: () => _contactShop(context)),
                     ],
                   )
                 : Row(
@@ -849,7 +853,7 @@ class _OrderCard extends StatelessWidget {
                       _moreBtn('更多',
                           onDoubleTap: () => onEditItem(items.first)),
                       const Spacer(),
-                      _outlineBtn('催物流'),
+                      _outlineBtn('催物流', onTap: () => _urgeLogistics(context)),
                       const SizedBox(width: 8),
                       _outlineBtn('查看物流',
                           onTap: () => _gotoLogistics(context, items.first)),
@@ -868,6 +872,54 @@ class _OrderCard extends StatelessWidget {
   void _gotoLogistics(BuildContext context, OrderItem item) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => LogisticsScreen(item: item)),
+    );
+  }
+
+  /// 售后卡片「加入购物车」：把商品重新加回购物车
+  void _reAddToCart(BuildContext context) {
+    final item = items.first;
+    context.read<CartProvider>().addToCart(
+          shopName: shop.shopName,
+          title: item.title,
+          price: item.price,
+          imageUrl: item.imageUrl,
+          spec: item.configuration,
+          quantity: item.quantity,
+        );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已加入购物车'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// 售后卡片「联系商家」：进入店铺客服会话
+  void _contactShop(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: Conversation(
+            avatar: '',
+            title: shop.shopName,
+            description: '退款售后咨询',
+            createAt: '',
+          ),
+          accentColor: const Color(0xFFFF5000),
+        ),
+      ),
+    );
+  }
+
+  /// 「催物流」：提醒物流加紧配送
+  void _urgeLogistics(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已提醒物流加紧配送'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
