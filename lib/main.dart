@@ -52,6 +52,8 @@ class TaobaoCloneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CouponsProvider()..load()),
         ChangeNotifierProvider(create: (_) => ReviewsProvider()..load()),
         ChangeNotifierProvider(create: (_) => ChatHistoryProvider()..load()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()..load()),
+        ChangeNotifierProvider(create: (_) => FootprintsProvider()..load()),
       ],
       child: const AppRoot(),
     );
