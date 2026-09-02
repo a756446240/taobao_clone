@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -21,6 +22,48 @@ class _BenefitsScreenState extends State<BenefitsScreen> {
 
   late int _tab = widget.initialIndex.clamp(0, _tabs.length - 1);
   bool _signedIn = false; // 淘金币今日签到状态
+
+  // 充值金：余额 + 充值记录（SharedPreferences 持久化）
+  static const _kRechargeBalance = 'benefits_recharge_balance';
+  static const _kRechargeRecords = 'benefits_recharge_records';
+  double _rechargeBalance = 0;
+  List<String> _rechargeRecords = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecharge();
+  }
+
+  Future<void> _loadRecharge() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _rechargeBalance = prefs.getDouble(_kRechargeBalance) ?? 0;
+      _rechargeRecords = prefs.getStringList(_kRechargeRecords) ?? [];
+    });
+  }
+
+  /// 充值：余额累加 + 记录 + 持久化
+  Future<void> _recharge(double amount) async {
+    final now = DateTime.now();
+    final date =
+        '${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    setState(() {
+      _rechargeBalance += amount;
+      _rechargeRecords.insert(
+          0, '充值 ¥${amount.toStringAsFixed(0)}|$date');
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_kRechargeBalance, _rechargeBalance);
+    await prefs.setStringList(_kRechargeRecords, _rechargeRecords);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('充值成功，当前余额 ¥${_rechargeBalance.toStringAsFixed(2)}'),
+      duration: const Duration(seconds: 1),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
 
   // ============ 数据（稳定）============
   static const _redPackets = [
@@ -347,7 +390,8 @@ class _BenefitsScreenState extends State<BenefitsScreen> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        _balanceCard('充值金余额', '¥0.00', '充值金全场通用，永不过期'),
+        _balanceCard('充值金余额',
+            '¥${_rechargeBalance.toStringAsFixed(2)}', '充值金全场通用，永不过期'),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
@@ -366,9 +410,8 @@ class _BenefitsScreenState extends State<BenefitsScreen> {
                     if (v != '¥50') const SizedBox(width: 10),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(
-                                content: Text('充值 $v（演示环境，未真实扣款）'))),
+                        onTap: () =>
+                            _recharge(double.parse(v.substring(1))),
                         child: Container(
                           padding:
                               const EdgeInsets.symmetric(vertical: 12),
@@ -395,14 +438,43 @@ class _BenefitsScreenState extends State<BenefitsScreen> {
         const SizedBox(height: 12),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(30),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Center(
-            child: Text('暂无充值记录', style: AppTextStyles.smallSubLight),
-          ),
+          child: _rechargeRecords.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child:
+                        Text('暂无充值记录', style: AppTextStyles.smallSubLight),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('充值记录', style: AppTextStyles.smallBold),
+                    const SizedBox(height: 8),
+                    for (final r in _rechargeRecords)
+                      Builder(builder: (_) {
+                        final parts = r.split('|');
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(parts[0],
+                                    style: const TextStyle(fontSize: 13)),
+                              ),
+                              Text(parts.length > 1 ? parts[1] : '',
+                                  style: AppTextStyles.smallSubLight),
+                            ],
+                          ),
+                        );
+                      }),
+                  ],
+                ),
         ),
       ],
     );
