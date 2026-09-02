@@ -668,6 +668,15 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 发表评价后调用：订单移出「待评价」，标记为交易成功
+  void markRated(ShoppingCartShop shop, OrderItem item) {
+    item.statusTitle = '交易成功';
+    shop.orderStatus = '交易成功';
+    shop.orderSubStatus = '交易成功';
+    _persist();
+    notifyListeners();
+  }
+
   /// 重置全部数据为默认（清空所有修改）
   Future<void> resetAll() async {
     _shops = CartGenerator.generate(count: 4);
