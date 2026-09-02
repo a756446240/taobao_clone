@@ -92,7 +92,7 @@ class _MineScreenState extends State<MineScreen> {
           _buildToolCards(),
           _buildCouponCards(),
           _buildAppGrid(),
-          _buildRecommendSection(),
+          _buildFeedSection(),
           const SizedBox(height: 16),
         ],
       ),
@@ -786,11 +786,85 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  // ============ 推荐商品（素材池随机，图+名对应） ============
+  // ============ 猜你喜欢 / 我的收藏 / 我的评价（三栏目切换） ============
+  int _feedTab = 0;
+
+  /// 猜你喜欢商品缓存（素材池随机，图+名对应）
   List<SearchResultItem>? _recPicks;
   String? _recSig;
 
-  Widget _buildRecommendSection() {
+  Widget _buildFeedSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 栏目切换条（白底贴近上方卡片，选中橙色下划线）
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              _feedTabItem(0, '猜你喜欢'),
+              _feedTabItem(1, '我的收藏'),
+              _feedTabItem(2, '我的评价', badge: 1),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 内容区（直接贴近栏目条，不再留大段空白）
+        if (_feedTab == 0) _buildGuessLike(),
+        if (_feedTab == 1) _buildFavoritesFeed(),
+        if (_feedTab == 2) _buildMyReviews(),
+      ],
+    );
+  }
+
+  Widget _feedTabItem(int index, String label, {int badge = 0}) {
+    final selected = _feedTab == index;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _feedTab = index),
+      child: Container(
+        margin: const EdgeInsets.only(right: 24),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              width: 2.5,
+              color: selected ? AppColors.primary : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? Colors.black87 : const Color(0xFF666666),
+              ),
+            ),
+            if (badge > 0) ...[
+              const SizedBox(width: 3),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFff2d2d),
+                  shape: BoxShape.circle,
+                ),
+                child: Text('$badge',
+                    style: const TextStyle(color: Colors.white, fontSize: 8)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 猜你喜欢（原"为你推荐"，商品推荐上提贴近栏目条） ============
+  Widget _buildGuessLike() {
     final pool = context.watch<MaterialPoolProvider>();
     final sig =
         '${pool.entries.length}/${pool.entries.where((e) => e.title.isNotEmpty).length}';
@@ -802,46 +876,19 @@ class _MineScreenState extends State<MineScreen> {
         (([...MockData.guessLikeGoods]..shuffle(Random()))
             .take(6)
             .toList());
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('为你推荐',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
-              ),
-              GestureDetector(
-                onTap: () {},
-                child: const Text('更多 >',
-                    style: TextStyle(color: Color(0xFF999999), fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 0.58,
-            ),
-            itemCount: picks.length,
-            itemBuilder: (_, i) => _recommendCard(picks[i]),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.58,
+        ),
+        itemCount: picks.length,
+        itemBuilder: (_, i) => _recommendCard(picks[i]),
       ),
     );
   }
@@ -851,33 +898,346 @@ class _MineScreenState extends State<MineScreen> {
     final overrideUrl =
         context.watch<ProductImageProvider>().imageFor(item.title);
     final imageUrl = overrideUrl ?? item.imageUrl;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onDoubleTap: () => pickProductImageFromGallery(context, item.title),
+            child: AppImage(url: imageUrl, width: double.infinity, height: 170),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(fontSize: 13, color: Colors.black87)),
+                const SizedBox(height: 4),
+                Text('¥${item.price}',
+                    style: const TextStyle(
+                        color: Color(0xFFff5000),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
+                Text(item.shopName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Color(0xFF999999), fontSize: 10)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 我的收藏（共用商品素材库，列表式） ============
+
+  /// 确定性哈希（项目惯例：同一份素材每次展示一致）
+  static int _hashOf(String s) {
+    var h = 0;
+    for (final c in s.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return h;
+  }
+
+  Widget _buildFavoritesFeed() {
+    final pool = context.watch<MaterialPoolProvider>();
+    final titled =
+        pool.entries.where((e) => e.title.isNotEmpty).toList(growable: false);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onDoubleTap: () => pickProductImageFromGallery(context, item.title),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child:
-                AppImage(url: imageUrl, width: double.infinity, height: 170),
+        // 筛选行（有降价 / 宝贝分类 / 宝贝状态 / 收藏时间）
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              _favFilterChip('有降价'),
+              _favFilterChip('宝贝分类', arrow: true),
+              _favFilterChip('宝贝状态', arrow: true),
+              _favFilterChip('收藏时间', arrow: true),
+            ],
           ),
         ),
         const SizedBox(height: 8),
-        Text(item.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, color: Colors.black87)),
-        const SizedBox(height: 4),
-        Text('¥${item.price}',
-            style: const TextStyle(
-                color: Color(0xFFff5000),
-                fontSize: 15,
-                fontWeight: FontWeight.bold)),
-        Text(item.shopName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF999999), fontSize: 10)),
+        if (titled.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(
+              child: Text('素材库还没有命名的素材，双击「地址」去导入',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+            ),
+          )
+        else
+          for (final e in titled.take(10)) _favoriteRow(e),
       ],
+    );
+  }
+
+  Widget _favFilterChip(String label, {bool arrow = false}) {
+    return Container(
+      margin: const EdgeInsets.only(right: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 13, color: Colors.black87)),
+          if (arrow)
+            const Icon(Icons.keyboard_arrow_down,
+                size: 14, color: Color(0xFF999999)),
+        ],
+      ),
+    );
+  }
+
+  /// 收藏条目：左图右文（标题/规格/淘金币抵/价格/店铺 + 降价提醒/找相似）
+  Widget _favoriteRow(MaterialEntry e) {
+    final h = _hashOf(e.title);
+    final price = 20 + (h % 2800) / 10 + (h % 9);
+    final priceText =
+        price >= 100 ? price.toStringAsFixed(1) : price.toStringAsFixed(2);
+    final collectors = 1 + h % 200;
+    final coinBack = (h % 300) / 100 + 0.5;
+    final shop =
+        '${MaterialPoolProvider.brandOf(e.title)}海外旗舰店';
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AppImage(url: e.imagePath, width: 92, height: 92),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(e.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
+                const SizedBox(height: 4),
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('请选择规格',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF999999))),
+                    Icon(Icons.chevron_right,
+                        size: 14, color: Color(0xFF999999)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                    '淘金币抵${coinBack.toStringAsFixed(2)}元  $collectors人收藏',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFFff8f00))),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('¥$priceText',
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFff5000))),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(shop,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF999999))),
+                              ),
+                              const Icon(Icons.chevron_right,
+                                  size: 12, color: Color(0xFF999999)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    _favBtn('降价提醒'),
+                    const SizedBox(width: 6),
+                    _favBtn('找相似'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _favBtn(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFdddddd)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child:
+          Text(text, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+    );
+  }
+
+  // ============ 我的评价（固定 4 条用户提供的素材） ============
+  static const _myReviews = [
+    (
+      image: 'assets/images/reviews/coffee_box.jpg',
+      text: '口感挺好的，不过还是期待瘦身效果！！',
+      product: '防弹咖啡粉',
+      user: '君君',
+      likes: '1',
+    ),
+    (
+      image: 'assets/images/reviews/return_question.jpg',
+      text: '这年头为什么卖家能拉黑买家，不科学啊',
+      product: '',
+      user: '什么都好奇只会害了你',
+      likes: '456',
+    ),
+    (
+      image: 'assets/images/reviews/kid_probiotics.jpg',
+      text: '一到换季孩子就容易拉肚子，今年提前用这款益生菌滴剂调理',
+      product: '婴幼儿益生菌滴剂',
+      user: '匿名买家',
+      likes: '',
+    ),
+    (
+      image: 'assets/images/reviews/smart_socket.jpg',
+      text: '太赞了，开始发的教程没有X99主板的，自己捣鼓了半天终于成功了',
+      product: '智能遥控插座',
+      user: '我卟是小白',
+      likes: '17',
+    ),
+  ];
+
+  Widget _buildMyReviews() {
+    // 双列瀑布流（左右列高度自然错开）
+    final left = <Widget>[];
+    final right = <Widget>[];
+    for (var i = 0; i < _myReviews.length; i++) {
+      final card = _reviewCard(_myReviews[i]);
+      (i.isEven ? left : right).add(card);
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                for (final w in left)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10), child: w),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              children: [
+                for (final w in right)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10), child: w),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _reviewCard(
+      ({String image, String text, String product, String user, String likes})
+          r) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppImage(url: r.image, width: double.infinity),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(r.text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        const TextStyle(fontSize: 13, color: Colors.black87)),
+                if (r.product.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(r.product,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF999999))),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 9,
+                      backgroundColor: Color(0xFFffd180),
+                      child: Icon(Icons.person,
+                          size: 12, color: Colors.white),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(r.user,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF999999))),
+                    ),
+                    const Icon(Icons.favorite_border,
+                        size: 14, color: Color(0xFF999999)),
+                    if (r.likes.isNotEmpty)
+                      Text(' ${r.likes}',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF999999))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
