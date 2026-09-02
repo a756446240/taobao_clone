@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
@@ -832,8 +831,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           provider.updateOrderItem(_item, payTime: v);
         }),
       ),
-      // 发货时间：可显示/隐藏（眼睛开关，持久化）
-      _shipTimeRow(provider),
+      // 发货时间：与其他信息行一致的普通行；显示/隐藏控制在右上角 ⋯ 菜单里
+      if (_item.showShipTime)
+        _infoRow(
+          label: '发货时间',
+          value: _displayTime(_item.shipTime),
+          onTap: () => _editDateTime('修改发货时间', _item.shipTime, (v) {
+            provider.updateOrderItem(_item, shipTime: v);
+          }),
+        ),
     ];
 
     return Container(
@@ -876,92 +882,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
-  }
-
-  /// 发货时间行：点击"已隐藏/时间文本"或眼睛图标切换显示/隐藏（持久化到订单数据）
-  Widget _shipTimeRow(CartProvider provider) {
-    final visible = _item.showShipTime;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: visible
-                ? () => _editDateTime('修改发货时间', _item.shipTime, (v) {
-                      provider.updateOrderItem(_item, shipTime: v);
-                    })
-                : null,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('发货时间', style: AppTextStyles.small),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right,
-                    color: Color(0xFFcccccc), size: 16),
-              ],
-            ),
-          ),
-          const Spacer(),
-          // 右侧整块（文本 + 眼睛）都是切换显示/隐藏的热区，单击即生效
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _toggleShipTimeVisible(provider),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 0, 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    visible ? _displayTime(_item.shipTime) : '已隐藏',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: visible
-                          ? const Color(0xFF666666)
-                          : const Color(0xFFbbbbbb),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      visible
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 18,
-                      color: const Color(0xFF999999),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 切换发货时间显示/隐藏；切回显示时若时间为空自动补一个合理时间，
-  /// 保证用户一定能看到变化（之前空时间导致"点了没反应"）
-  void _toggleShipTimeVisible(CartProvider provider) {
-    final visible = _item.showShipTime;
-    if (visible) {
-      provider.updateOrderItem(_item, showShipTime: false);
-    } else {
-      var t = _item.shipTime;
-      if (t.trim().isEmpty) {
-        t = _defaultShipTime();
-        provider.updateOrderItem(_item, showShipTime: true, shipTime: t);
-      } else {
-        provider.updateOrderItem(_item, showShipTime: true);
-      }
-    }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(visible ? '发货时间已隐藏' : '发货时间已显示'),
-        duration: const Duration(milliseconds: 900),
-      ));
   }
 
   /// 生成兜底发货时间：付款/创建时间 + 24 小时，格式与 _fmtTime 输出一致
@@ -1605,6 +1525,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         _editText('修改送达文字', _item.deliveryText, (v) {
                           provider.updateOrderItem(_item, deliveryText: v);
                         });
+                      }),
+                      _switchTile(Icons.visibility_off, '隐藏"发货时间"行',
+                          value: !_item.showShipTime, onChanged: (v) {
+                        // 重新显示时若时间为空，自动按付款/创建时间 +24h 兜底
+                        if (!v && _item.shipTime.trim().isEmpty) {
+                          provider.updateOrderItem(_item,
+                              showShipTime: true,
+                              shipTime: _defaultShipTime());
+                        } else {
+                          provider.updateOrderItem(_item, showShipTime: !v);
+                        }
+                        setSheetState(() {});
                       }),
                       _switchTile(Icons.visibility_off, '隐藏"承诺发货"行',
                           value: !_item.showDeliveryPromise, onChanged: (v) {
