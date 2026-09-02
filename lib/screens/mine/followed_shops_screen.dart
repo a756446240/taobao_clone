@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
+import '../../providers/follow_shops_provider.dart';
 import '../product/shop_home_screen.dart';
 
 /// 关注店铺列表页（我的页「关注店铺」单击进入，双击仍是 AI 数据校验）
@@ -54,9 +56,6 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
 
-  /// 已取关的店铺（页面会话内有效）
-  final Set<String> _unfollowed = {};
-
   @override
   void dispose() {
     _searchCtrl.dispose();
@@ -65,8 +64,13 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final followed =
-        _shops.where((s) => !_unfollowed.contains(s.$1)).toList();
+    // 全局关注状态：店铺主页关注/取关会实时反映到这里，重启不丢
+    final followedNames = context.watch<FollowShopsProvider>().followed;
+    final catalog = {for (final s in _shops) s.$1: s.$2};
+    final followed = followedNames
+        .map((n) => (n, catalog[n] ?? '精选好店'))
+        .toList()
+      ..sort((a, b) => a.$1.compareTo(b.$1));
     final list = _query.isEmpty
         ? followed
         : followed.where((s) => s.$1.contains(_query)).toList();
@@ -284,13 +288,14 @@ class _FollowedShopsScreenState extends State<FollowedShopsScreen> {
   }
 
   void _toggleFollow(String name) {
-    setState(() => _unfollowed.add(name));
+    final provider = context.read<FollowShopsProvider>();
+    provider.unfollow(name);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('已取消关注「$name」'),
         action: SnackBarAction(
           label: '撤销',
-          onPressed: () => setState(() => _unfollowed.remove(name)),
+          onPressed: () => provider.follow(name),
         ),
       ),
     );
