@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'providers/banner_pool_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/material_pool_provider.dart';
 import 'providers/product_image_provider.dart';
@@ -39,6 +40,7 @@ class TaobaoCloneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SearchProvider()..load()),
         ChangeNotifierProvider(create: (_) => ProductImageProvider()..load()),
         ChangeNotifierProvider(create: (_) => MaterialPoolProvider()..load()),
+        ChangeNotifierProvider(create: (_) => BannerPoolProvider()..load()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
       ],
       child: const AppRoot(),
