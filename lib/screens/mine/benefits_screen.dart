@@ -179,9 +179,13 @@ class _BenefitsScreenState extends State<BenefitsScreen> {
                   padding: const EdgeInsets.only(right: 12),
                   child: r.$5
                       ? GestureDetector(
-                          onTap: () => ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(
-                                  content: Text('已为你跳转可用商品（演示）'))),
+                          onTap: () {
+                            Navigator.of(context)
+                                .popUntil((r) => r.isFirst);
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(
+                                    content: Text('去挑选心仪商品吧')));
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 5),
