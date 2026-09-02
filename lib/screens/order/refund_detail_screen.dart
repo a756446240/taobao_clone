@@ -1228,6 +1228,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                       backgroundColor: const Color(0xFFFF5000)),
                   onPressed: () {
                     Navigator.pop(ctx);
+                    setState(() {
+                      _item.refundStatus = '平台介入处理中';
+                      _item.refundTitle = '平台介入处理中';
+                      _item.refundSubtitle = '客服将在 48 小时内根据双方凭证做出判定';
+                    });
+                    context.read<CartProvider>().updateOrderItem(_item);
                     _toast('平台介入申请已提交，客服将在 48 小时内处理');
                   },
                   child: const Text('提交申请'),
