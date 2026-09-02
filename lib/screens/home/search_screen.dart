@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +20,10 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
+
+  /// 热搜榜：从大词库随机抽 10 个，每次进搜索页都不一样
+  late final List<String> _hotWords =
+      ([...MockData.searchHints]..shuffle(Random())).take(10).toList();
 
   @override
   void initState() {
@@ -169,7 +175,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// 双列热搜排行：左列 1/3/5/7…，右列 2/4/6/8…
   Widget _buildHotRank() {
-    final hints = MockData.searchHints;
+    final hints = _hotWords;
     const tags = ['热', '新', '爆', '', '热', '', '新', '', '热', ''];
     final half = (hints.length + 1) ~/ 2;
     Widget rankItem(int i) {
