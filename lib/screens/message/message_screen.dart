@@ -29,7 +29,6 @@ class MessageScreen extends StatefulWidget {
 
 class _MessageScreenState extends State<MessageScreen> {
   late final List<_HistoryMsg> _history;
-  final _rand = Random();
 
   /// 会话搜索
   final TextEditingController _searchCtrl = TextEditingController();
@@ -41,11 +40,11 @@ class _MessageScreenState extends State<MessageScreen> {
     super.dispose();
   }
 
-  /// 4 个圆圈入口（固定，badge 为未读角标，0 表示不显示）
+  /// 4 个圆圈入口（固定；未读角标数在 _quickBadges 中，进入即清零）
   static const _quickEntries = <_QuickEntry>[
-    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350), badge: 3),
-    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5), badge: 12),
-    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a), badge: 1),
+    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350)),
+    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5)),
+    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a)),
     _QuickEntry('直播消息', Icons.videocam, Color(0xFFab47bc)),
   ];
 
@@ -87,12 +86,57 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCustomAvatars();
+    _init();
+  }
+
+  /// 初始化：先读持久化状态（自定义头像/已读会话/快捷入口角标），再生成历史
+  Future<void> _init() async {
+    await _loadCustomAvatars();
+    await _loadReadState();
     _history = _generateHistory();
+    if (mounted) setState(() {});
   }
 
   static const _avatarPrefKey = 'message_custom_avatars';
+  static const _readPrefKey = 'message_read_shops';
+  static const _quickBadgePrefKey = 'message_quick_badges';
   final Map<String, String> _customAvatars = {};
+
+  /// 已读会话（按店铺名持久化，重启后不再显示未读红点）
+  final Set<String> _readShops = {};
+
+  /// 4 个快捷入口的未读角标（进入对应页面即清零并持久化）
+  late List<int> _quickBadges = [3, 12, 1, 0];
+
+  Future<void> _loadReadState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _readShops.addAll(prefs.getStringList(_readPrefKey) ?? []);
+      final raw = prefs.getStringList(_quickBadgePrefKey);
+      if (raw != null && raw.length == _quickBadges.length) {
+        _quickBadges =
+            raw.map((s) => int.tryParse(s) ?? 0).toList();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveReadState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_readPrefKey, _readShops.toList());
+      await prefs.setStringList(_quickBadgePrefKey,
+          _quickBadges.map((v) => v.toString()).toList());
+    } catch (_) {}
+  }
+
+  /// 字符串确定性哈希（项目惯例）
+  static int _hashOf(String s) {
+    var h = 0;
+    for (final c in s.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return h;
+  }
 
   /// 读取已保存的自定义头像（按店铺名持久化，重启不丢）
   Future<void> _loadCustomAvatars() async {
@@ -116,16 +160,19 @@ class _MessageScreenState extends State<MessageScreen> {
     } catch (_) {}
   }
 
-  /// 每次启动随机生成 10-15 条历史对话
+  /// 生成 10-15 条历史对话（固定种子：每次启动列表一致；
+  /// 未读按店铺名哈希确定，已读过的会话不再显示红点）
   List<_HistoryMsg> _generateHistory() {
-    final count = 10 + _rand.nextInt(6); // 10-15
+    final rand = Random(20260903);
+    final count = 10 + rand.nextInt(6); // 10-15
     final result = <_HistoryMsg>[];
     for (var i = 0; i < count; i++) {
-      final tpl = _shopTemplates[_rand.nextInt(_shopTemplates.length)];
-      final shopName = tpl.shopNames[_rand.nextInt(tpl.shopNames.length)];
-      final msg = _msgTemplates[_rand.nextInt(_msgTemplates.length)];
-      final date = _datePool[_rand.nextInt(_datePool.length)];
-      final unread = _rand.nextDouble() < 0.4; // 40% 概率有未读
+      final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
+      final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
+      final msg = _msgTemplates[rand.nextInt(_msgTemplates.length)];
+      final date = _datePool[rand.nextInt(_datePool.length)];
+      final unread =
+          _hashOf(shopName) % 5 < 2 && !_readShops.contains(shopName);
       result.add(_HistoryMsg(
         shopName: shopName,
         message: msg,
@@ -179,7 +226,7 @@ class _MessageScreenState extends State<MessageScreen> {
     _HistoryMsg? markRead,
   }) {
     if (markRead != null && markRead.unread) {
-      setState(() => markRead.unread = false);
+      _markRead(markRead);
     }
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -205,12 +252,27 @@ class _MessageScreenState extends State<MessageScreen> {
       ));
   }
 
-  /// 下拉刷新消息列表（模拟向服务端拉取最新会话）
+  /// 下拉刷新消息列表（模拟拉取：收到一条新消息插入顶部，带未读红点）
   Future<void> _onRefresh() async {
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    setState(() {});
-    _showMsg('消息已刷新');
+    final rand = Random();
+    final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
+    final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
+    setState(() {
+      _history.insert(
+        0,
+        _HistoryMsg(
+          shopName: shopName,
+          message: _msgTemplates[rand.nextInt(_msgTemplates.length)],
+          date: '刚刚',
+          unread: true,
+          color: tpl.color,
+          avatarUrl: _avatarForShop(shopName),
+        ),
+      );
+    });
+    _showMsg('收到 1 条新消息');
   }
 
   /// 扫一扫：从相册选取图片识别二维码（真实走系统相册）
@@ -440,18 +502,27 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   Widget _buildQuickEntry(_QuickEntry e, int index) {
+    final badge =
+        index < _quickBadges.length ? _quickBadges[index] : 0;
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => QuickMessagesScreen(
-            title: e.title,
-            icon: e.icon,
-            color: e.color,
-            kind: QuickMsgKind.values[index],
+      onTap: () {
+        // 进入对应消息页即清零未读角标（持久化）
+        if (badge > 0) {
+          setState(() => _quickBadges[index] = 0);
+          _saveReadState();
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QuickMessagesScreen(
+              title: e.title,
+              icon: e.icon,
+              color: e.color,
+              kind: QuickMsgKind.values[index],
+            ),
           ),
-        ),
-      ),
+        );
+      },
       behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
@@ -467,7 +538,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 child: Icon(e.icon, color: Colors.white, size: 24),
               ),
-              if (e.badge > 0)
+              if (badge > 0)
                 Positioned(
                   right: -4,
                   top: -4,
@@ -481,7 +552,7 @@ class _MessageScreenState extends State<MessageScreen> {
                           Border.all(color: Colors.white, width: 1.5),
                     ),
                     constraints: const BoxConstraints(minWidth: 18),
-                    child: Text('${e.badge}',
+                    child: Text('$badge',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                             color: Colors.white, fontSize: 10)),
@@ -696,8 +767,12 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
+  /// 标记已读：更新 UI + 持久化（重启后该会话不再显示未读）
   void _markRead(_HistoryMsg m) {
+    if (!m.unread) return;
     setState(() => m.unread = false);
+    _readShops.add(m.shopName);
+    _saveReadState();
   }
 
   void _deleteHistory(_HistoryMsg m) {
@@ -728,8 +803,7 @@ class _QuickEntry {
   final String title;
   final IconData icon;
   final Color color;
-  final int badge;
-  const _QuickEntry(this.title, this.icon, this.color, {this.badge = 0});
+  const _QuickEntry(this.title, this.icon, this.color);
 }
 
 class _ShopTpl {
