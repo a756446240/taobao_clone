@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/cart_provider.dart';
 import '../../widgets/app_image.dart';
+import '../product/shop_home_screen.dart';
 import 'channel_order_sheets.dart';
 
 /// 闪购(外卖)/飞猪(旅行)频道订单：确定性随机生成 + 卡片渲染
@@ -208,17 +209,33 @@ class ShangouOrderCard extends StatelessWidget {
               const Icon(Icons.dinner_dining,
                   size: 16, color: Color(0xFFff5000)),
               const SizedBox(width: 4),
-              Flexible(
-                child: Text('${order.shopName}  ${order.location}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
+              // 店名行（含箭头）单击 → 店铺首页
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            ShopHomeScreen(shopName: order.shopName)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text('${order.shopName}  ${order.location}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87)),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          size: 16, color: Color(0xFF999999)),
+                    ],
+                  ),
+                ),
               ),
-              const Icon(Icons.chevron_right,
-                  size: 16, color: Color(0xFF999999)),
               Text(order.status,
                   style: const TextStyle(
                       fontSize: 13,
@@ -401,17 +418,33 @@ class FeizhuOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 6),
-              Flexible(
-                child: Text(order.shopName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87)),
+              // 店名行（含箭头）单击 → 店铺首页
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            ShopHomeScreen(shopName: order.shopName)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(order.shopName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87)),
+                      ),
+                      const Icon(Icons.chevron_right,
+                          size: 16, color: Color(0xFF999999)),
+                    ],
+                  ),
+                ),
               ),
-              const Icon(Icons.chevron_right,
-                  size: 16, color: Color(0xFF999999)),
               Text(order.status,
                   style: TextStyle(
                       fontSize: 13,
