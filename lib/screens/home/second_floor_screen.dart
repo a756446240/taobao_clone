@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/mock_data.dart';
+import '../../models/models.dart';
 import '../../providers/banner_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
+import '../product/product_detail_screen.dart';
 
 /// 淘宝「二楼」活动页：首页顶部继续下拉超过阈值进入。
 /// 品牌活动聚合页——大 banner + 福利券 + 活动专区 + 精选商品。
@@ -37,8 +40,42 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
       .take(6)
       .toList();
 
+  /// 秒杀商品：另一颗种子确定性抽 6 个，折扣/已抢进度按标题哈希派生
+  late final _seckillGoods =
+      ([...MockData.guessLikeGoods]..shuffle(Random(20260903)))
+          .take(6)
+          .toList();
+
+  /// 整点秒杀倒计时：每秒刷新一次
+  Timer? _seckillTimer;
+  DateTime _now = DateTime.now();
+
+  /// 距离下一整点的剩余时间
+  Duration get _seckillRemain {
+    final next = DateTime(_now.year, _now.month, _now.day, _now.hour)
+        .add(const Duration(hours: 1));
+    return next.difference(_now);
+  }
+
+  String _two(int v) => v.toString().padLeft(2, '0');
+
+  /// 倒计时文本 mm:ss（整点场永远小于 1 小时）
+  String get _seckillClock {
+    final r = _seckillRemain;
+    return '${_two(r.inMinutes)}:${_two(r.inSeconds % 60)}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _seckillTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
   @override
   void dispose() {
+    _seckillTimer?.cancel();
     _bannerCtrl.dispose();
     super.dispose();
   }
@@ -154,12 +191,14 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                     _zoneCard('品牌日', '大牌5折起', const Color(0xFFFF2E4D),
                         Icons.verified),
                     const SizedBox(width: 8),
-                    _zoneCard('限时秒杀', '整点开抢', const Color(0xFFFF8C00),
-                        Icons.bolt),
+                    _zoneCard('限时秒杀', '距开抢 $_seckillClock',
+                        const Color(0xFFFF8C00), Icons.bolt),
                   ],
                 ),
               ),
             ),
+            // 整点秒杀：实时倒计时 + 秒杀价横向列表
+            SliverToBoxAdapter(child: _buildSeckill()),
             // 精选商品标题
             const SliverToBoxAdapter(
               child: Padding(
@@ -227,6 +266,156 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                       const TextStyle(color: Colors.white70, fontSize: 10)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ============ 整点秒杀 ============
+  Widget _buildSeckill() {
+    final nextHour = (_now.hour + 1) % 24;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3B0F4F), Color(0xFF2A0A3E)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x66FF8C00)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.bolt, color: Color(0xFFFFB300), size: 18),
+              const SizedBox(width: 4),
+              const Text('整点秒杀',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF8C00),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('$nextHour:00 场',
+                    style:
+                        const TextStyle(color: Colors.white, fontSize: 10)),
+              ),
+              const SizedBox(width: 8),
+              Text('距开抢 $_seckillClock',
+                  style: const TextStyle(
+                      color: Color(0xFFFFB300), fontSize: 12)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => _toast('更多秒杀场次：每天 10/14/20 点整'),
+                child: const Text('全部场次 >',
+                    style: TextStyle(color: Colors.white54, fontSize: 11)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 168,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _seckillGoods.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => _seckillCard(_seckillGoods[i]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _seckillCard(SearchResultItem g) {
+    final hash = g.title.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    final origin = double.tryParse(g.price) ?? 99.0;
+    final seckill = (origin * (0.5 + hash % 3 * 0.1)); // 5~7 折
+    final grabbed = 20 + hash % 70; // 已抢 20%~89%
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(item: g)),
+      ),
+      child: Container(
+        width: 108,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(8)),
+              child: AppImage(
+                  url: g.imageUrl,
+                  width: 108,
+                  height: 84,
+                  fit: BoxFit.cover),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+              child: Text(g.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
+              child: Row(
+                children: [
+                  Text('¥${seckill.toStringAsFixed(1)}',
+                      style: const TextStyle(
+                          color: Color(0xFFFF2E4D),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text('¥${origin.toStringAsFixed(1)}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                            decoration: TextDecoration.lineThrough)),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: Stack(
+                  children: [
+                    Container(height: 12, color: const Color(0xFFFFE0D6)),
+                    FractionallySizedBox(
+                      widthFactor: grabbed / 100,
+                      child: Container(
+                          height: 12, color: const Color(0xFFFF5000)),
+                    ),
+                    Positioned.fill(
+                      child: Center(
+                        child: Text('已抢$grabbed%',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                height: 1)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
