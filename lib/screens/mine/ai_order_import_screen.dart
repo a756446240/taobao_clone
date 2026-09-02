@@ -149,6 +149,7 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
     final provider = context.read<CartProvider>();
     for (final o in _queue) {
       provider.importAiParsedOrder(
