@@ -61,6 +61,9 @@ class ReviewsProvider extends ChangeNotifier {
       .where((r) => r.productTitle == productTitle)
       .toList(growable: false);
 
+  /// 全部用户评价（最新在前，供"我的评价"页展示）
+  List<UserReview> get all => List.unmodifiable(_reviews);
+
   /// 发布一条评价
   void add(UserReview r) {
     _reviews.insert(0, r);
