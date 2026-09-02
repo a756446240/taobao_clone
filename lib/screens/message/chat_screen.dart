@@ -124,6 +124,76 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  /// 聊天设置：置顶 / 免打扰 / 清空聊天记录 / 投诉
+  void _showChatSettingsSheet() {
+    var pinned = false;
+    var muted = false;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title:
+                        const Text('置顶聊天', style: TextStyle(fontSize: 14)),
+                    value: pinned,
+                    activeColor: const Color(0xFFFF5000),
+                    onChanged: (v) => setSheet(() => pinned = v),
+                  ),
+                  SwitchListTile(
+                    title: const Text('消息免打扰',
+                        style: TextStyle(fontSize: 14)),
+                    value: muted,
+                    activeColor: const Color(0xFFFF5000),
+                    onChanged: (v) => setSheet(() => muted = v),
+                  ),
+                  ListTile(
+                    title: const Text('清空聊天记录',
+                        style: TextStyle(fontSize: 14)),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: Color(0xFFCCCCCC)),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      setState(() => _messages.clear());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('聊天记录已清空'),
+                              duration: Duration(seconds: 1)));
+                    },
+                  ),
+                  ListTile(
+                    title:
+                        const Text('投诉', style: TextStyle(fontSize: 14)),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: Color(0xFFCCCCCC)),
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('已收到你的投诉，平台将在 24 小时内处理'),
+                              duration: Duration(seconds: 2)));
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _pickReply(String userText) {
     for (final rule in _keywordRules) {
       if ((rule[0] as RegExp).hasMatch(userText)) return rule[1] as String;
@@ -167,7 +237,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(AppIcons.friendSettings,
                 color: Colors.black87, size: 22),
-            onPressed: () {},
+            onPressed: _showChatSettingsSheet,
           ),
         ],
       ),
