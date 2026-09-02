@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
+import '../../providers/chat_history_provider.dart';
 import '../../widgets/app_image.dart';
 import 'chat_screen.dart';
 import 'quick_messages_screen.dart';
@@ -266,6 +268,14 @@ class _MessageScreenState extends State<MessageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatProv = context.watch<ChatHistoryProvider>();
+    // 置顶会话浮到列表最前（组内保持原顺序）
+    final pinnedList = _history
+        .where((m) => chatProv.isPinned(m.shopName))
+        .toList();
+    final normalList = _history
+        .where((m) => !chatProv.isPinned(m.shopName))
+        .toList();
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -354,6 +364,9 @@ class _MessageScreenState extends State<MessageScreen> {
                   _systemEntry('售后保障', '暂无新消息', Icons.assignment_return, const Color(0xFF2196F3)),
                   _systemEntry('AI 购物助手', 'Hi! 我是你的购物助手~帮你挑好货、找优惠！有什么需要，都可以来找我~', Icons.smart_toy, const Color(0xFF7c4dff), date: '26/07/24'),
                   const SizedBox(height: 8),
+                  // 置顶会话区（灰底，排在所有普通会话之前）
+                  ...pinnedList.map((m) => _historyTile(m, pinned: true)),
+                  if (pinnedList.isNotEmpty) const SizedBox(height: 4),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text('两周前的消息',
@@ -362,7 +375,7 @@ class _MessageScreenState extends State<MessageScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w500)),
                   ),
-                  ..._history.map((m) => _historyTile(m)),
+                  ...normalList.map((m) => _historyTile(m)),
                 ],
                   const SizedBox(height: 16),
                 ],
@@ -528,7 +541,10 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   // ============ 历史消息项（右滑显示操作）============
-  Widget _historyTile(_HistoryMsg m) {
+  Widget _historyTile(_HistoryMsg m, {bool pinned = false}) {
+    final muted = context
+        .read<ChatHistoryProvider>()
+        .isMuted(m.shopName);
     return Slidable(
       key: ValueKey(m.shopName + m.date),
       direction: Axis.horizontal,
