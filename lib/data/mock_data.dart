@@ -242,6 +242,28 @@ class MockData {
 
   // ============================= 搜索 =============================
 
+  /// 发货地池（按标题哈希确定性分配，筛选与展示一致）
+  static const shipFromPool = ['浙江', '广东', '江苏', '上海', '福建', '北京', '山东', '海外'];
+
+  static int _hashOf(String s) {
+    var h = 0;
+    for (final c in s.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return h;
+  }
+
+  /// 商品发货地（确定性）
+  static String shipFromOf(SearchResultItem e) =>
+      e.shipFrom.isNotEmpty ? e.shipFrom : shipFromPool[_hashOf(e.title) % shipFromPool.length];
+
+  /// 是否包邮（约 3/4 商品包邮，确定性）
+  static bool isFreeShip(SearchResultItem e) => _hashOf(e.title) % 4 != 0;
+
+  /// 是否赠退货运费险（约 2/3，确定性）
+  static bool hasFreightInsurance(SearchResultItem e) =>
+      _hashOf('险${e.title}') % 3 != 0;
+
   /// 关键词搜索结果：真实素材池中匹配的商品排前面，
   /// 再按关键词确定性生成一批标题含关键词的商品补足一屏（哈希假数据，
   /// 同一关键词每次结果一致）。
@@ -263,17 +285,12 @@ class MockData {
 
     final matched = guessLikeGoods
         .where((e) => scoreOf(e.title) > 0)
+        .map((e) => e.withShipFrom(shipFromOf(e)))
         .toList()
       ..sort((a, b) => scoreOf(b.title).compareTo(scoreOf(a.title)));
 
     // 2) 关键词确定性生成（保证一屏 20+ 条且标题都含关键词）
-    int hash(String s) {
-      var h = 0;
-      for (final c in s.codeUnits) {
-        h = (h * 31 + c) & 0x7fffffff;
-      }
-      return h;
-    }
+    int hash(String s) => _hashOf(s);
 
     const titleTemplates = [
       '{kw} 官方旗舰店正品包邮',
@@ -319,6 +336,7 @@ class MockData {
         price: price.toStringAsFixed(2),
         commentCount: soldText,
         goodRate: '${95 + h % 5}%好评',
+        shipFrom: shipFromPool[h % shipFromPool.length],
       ));
     }
 
