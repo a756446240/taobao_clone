@@ -6,7 +6,6 @@ import 'app_colors.dart';
 class AppTextStyles {
   AppTextStyles._();
 
-  static const double _large = 30;
   static const double _big = 23;
   static const double _normal = 18;
   static const double _middle = 16;
