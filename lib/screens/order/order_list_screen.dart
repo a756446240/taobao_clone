@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,11 +9,14 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/material_pool_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
+import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
 import '../product/shop_home_screen.dart';
 import 'channel_orders.dart';
@@ -31,13 +35,15 @@ class OrderListScreen extends StatefulWidget {
   State<OrderListScreen> createState() => _OrderListScreenState();
 }
 
-class _OrderListScreenState extends State<OrderListScreen> {
+class _OrderListScreenState extends State<OrderListScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
 
-  /// 顶部频道：全部订单 / 购物 / 闪购(外卖) / 飞猪(旅行)（可横向滑动）
+  /// 顶部频道：全部订单 / 购物 / 闪购(外卖) / 飞猪(旅行)（撑满整宽，指示条滑动切换）
   static const _channels = ['全部订单', '购物', '闪购', '飞猪'];
   static const _channelBadges = {2: '外卖', 3: '旅行'};
+  late final TabController _channelCtrl;
   int _channel = 0;
   int _subIndex = 0;
 
@@ -92,6 +98,16 @@ class _OrderListScreenState extends State<OrderListScreen> {
   void initState() {
     super.initState();
     _subIndex = _initialSubIndex(widget.type);
+    _channelCtrl = TabController(length: _channels.length, vsync: this);
+    _channelCtrl.addListener(() {
+      if (_channelCtrl.indexIsChanging) return;
+      if (_channel != _channelCtrl.index) {
+        setState(() {
+          _channel = _channelCtrl.index;
+          _subIndex = 0;
+        });
+      }
+    });
   }
 
   int _initialSubIndex(String type) {
@@ -116,6 +132,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _channelCtrl.dispose();
     super.dispose();
   }
 
@@ -199,87 +216,114 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Widget _buildChannelOrders() {
     final orders = _channelOrders();
+    // 飞猪：固定 2 个订单下方追加「商品推荐」（同淘宝首页下方，素材库随机）
+    final showRec = _channel == 3 && orders.isNotEmpty;
     if (orders.isEmpty) return _empty();
-    return ListView.builder(
+    final recGoods = showRec ? _feizhuRecGoods(context) : null;
+    return ListView(
       padding: const EdgeInsets.only(top: 8, bottom: 24),
-      itemCount: orders.length,
-      itemBuilder: (_, i) {
-        final o = orders[i];
-        void remove() => setState(() => _removedChannelIds.add(o.id));
-        return o.kind == 0
-            ? ShangouOrderCard(order: o, onRemove: remove)
-            : FeizhuOrderCard(order: o, onRemove: remove);
-      },
+      children: [
+        for (final o in orders)
+          o.kind == 0
+              ? ShangouOrderCard(
+                  order: o,
+                  onRemove: () =>
+                      setState(() => _removedChannelIds.add(o.id)),
+                )
+              : FeizhuOrderCard(
+                  order: o,
+                  onRemove: () =>
+                      setState(() => _removedChannelIds.add(o.id)),
+                ),
+        if (recGoods != null) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 10, 12, 2),
+            child: Center(
+              child: Text('—— 商品推荐 ——',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF999999),
+                      fontWeight: FontWeight.w500)),
+            ),
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: recGoods.length,
+            itemBuilder: (_, i) => ProductCard(item: recGoods[i]),
+          ),
+        ],
+      ],
     );
   }
 
-  // ============ 频道滚动行（全部订单/购物/闪购/飞猪，可横滑） ============
+  /// 飞猪订单下方商品推荐：素材池随机（图+名对应），池空回退内置数据；会话内保持稳定
+  List<SearchResultItem>? _feizhuRecPicks;
+  String? _feizhuRecSig;
+
+  List<SearchResultItem> _feizhuRecGoods(BuildContext context) {
+    final pool = context.watch<MaterialPoolProvider>();
+    final sig =
+        '${pool.entries.length}/${pool.entries.where((e) => e.title.isNotEmpty).length}';
+    if (!pool.loading && (_feizhuRecPicks == null || _feizhuRecSig != sig)) {
+      _feizhuRecSig = sig;
+      _feizhuRecPicks = pool.recommendGoods(10);
+    }
+    return _feizhuRecPicks ??
+        ([...MockData.guessLikeGoods]..shuffle(Random()));
+  }
+
+  // ============ 频道栏（全部订单/购物/闪购/飞猪：撑满整宽，指示条随切换滑动） ============
   Widget _buildChannelBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.only(top: 2),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            for (var i = 0; i < _channels.length; i++)
-              GestureDetector(
-                onTap: () => setState(() {
-                  _channel = i;
-                  _subIndex = 0;
-                }),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        width: 2.5,
-                        color: _channel == i
-                            ? AppColors.primary
-                            : Colors.transparent,
+      child: TabBar(
+        controller: _channelCtrl,
+        isScrollable: false, // 4 个频道均分整宽（填充满）
+        labelColor: AppColors.primary,
+        unselectedLabelColor: Colors.black87,
+        labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        unselectedLabelStyle: const TextStyle(fontSize: 15),
+        indicatorColor: AppColors.primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorWeight: 2.5,
+        labelPadding: EdgeInsets.zero,
+        tabs: [
+          for (var i = 0; i < _channels.length; i++)
+            Tab(
+              height: 40,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_channels[i]),
+                  if (_channelBadges.containsKey(i)) ...[
+                    const SizedBox(width: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 3, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFff5000),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        _channelBadges[i]!,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 9),
                       ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _channels[i],
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: _channel == i
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: _channel == i
-                              ? AppColors.primary
-                              : Colors.black87,
-                        ),
-                      ),
-                      if (_channelBadges.containsKey(i)) ...[
-                        const SizedBox(width: 3),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 3, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFff5000),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            _channelBadges[i]!,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 9),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                  ],
+                ],
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
