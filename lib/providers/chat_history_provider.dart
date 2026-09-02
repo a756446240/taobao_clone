@@ -9,9 +9,33 @@ import '../models/models.dart';
 /// 图片消息约定：content 以 'img:' 开头，后面跟本地文件路径
 class ChatHistoryProvider extends ChangeNotifier {
   static const _key = 'chat_history_v1';
+  static const _settingsKey = 'chat_settings_v1';
   static const _maxPerConversation = 100;
 
   final Map<String, List<ChatMessage>> _data = {};
+
+  /// 会话设置：置顶 / 免打扰（按会话名持久化）
+  final Set<String> _pinned = {};
+  final Set<String> _muted = {};
+
+  bool isPinned(String conversationKey) => _pinned.contains(conversationKey);
+  bool isMuted(String conversationKey) => _muted.contains(conversationKey);
+
+  void togglePin(String conversationKey) {
+    _pinned.contains(conversationKey)
+        ? _pinned.remove(conversationKey)
+        : _pinned.add(conversationKey);
+    notifyListeners();
+    _saveSettings();
+  }
+
+  void toggleMute(String conversationKey) {
+    _muted.contains(conversationKey)
+        ? _muted.remove(conversationKey)
+        : _muted.add(conversationKey);
+    notifyListeners();
+    _saveSettings();
+  }
 
   /// 某会话的历史消息（时间正序）
   List<ChatMessage> historyFor(String conversationKey) =>
@@ -38,8 +62,24 @@ class ChatHistoryProvider extends ChangeNotifier {
 
   Future<void> load() async {
     final p = await SharedPreferences.getInstance();
+    // 会话设置（置顶/免打扰）
+    try {
+      final sraw = p.getString(_settingsKey);
+      if (sraw != null && sraw.isNotEmpty) {
+        final smap = Map<String, dynamic>.from(jsonDecode(sraw));
+        _pinned
+          ..clear()
+          ..addAll((smap['pinned'] as List? ?? []).map((e) => e.toString()));
+        _muted
+          ..clear()
+          ..addAll((smap['muted'] as List? ?? []).map((e) => e.toString()));
+      }
+    } catch (_) {}
     final raw = p.getString(_key);
-    if (raw == null || raw.isEmpty) return;
+    if (raw == null || raw.isEmpty) {
+      notifyListeners();
+      return;
+    }
     try {
       final map = Map<String, dynamic>.from(jsonDecode(raw));
       _data
@@ -56,6 +96,14 @@ class ChatHistoryProvider extends ChangeNotifier {
             )));
       notifyListeners();
     } catch (_) {}
+  }
+
+  Future<void> _saveSettings() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+        _settingsKey,
+        jsonEncode(
+            {'pinned': _pinned.toList(), 'muted': _muted.toList()}));
   }
 
   Future<void> _save() async {
