@@ -767,7 +767,7 @@ class _MineScreenState extends State<MineScreen> {
     ];
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -862,10 +862,13 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   // ============ 猜你喜欢（原"为你推荐"，商品推荐上提贴近栏目条） ============
+  /// 「换一批」计数：变一次就重新随机一批素材
+  int _recNonce = 0;
+
   Widget _buildGuessLike() {
     final pool = context.watch<MaterialPoolProvider>();
     final sig =
-        '${pool.entries.length}/${pool.entries.where((e) => e.title.isNotEmpty).length}';
+        '${pool.entries.length}/${pool.entries.where((e) => e.title.isNotEmpty).length}/$_recNonce';
     if (!pool.loading && (_recPicks == null || _recSig != sig)) {
       _recSig = sig;
       _recPicks = pool.recommendGoods(6 + Random().nextInt(3));
@@ -882,26 +885,61 @@ class _MineScreenState extends State<MineScreen> {
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              children: [
-                for (final w in left)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 10), child: w),
-              ],
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    for (final w in left)
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: w),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  children: [
+                    for (final w in right)
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: w),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              children: [
-                for (final w in right)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 10), child: w),
-              ],
+          // 「换一批」：单击重新随机一批素材池商品
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() {
+              _recNonce++;
+              _recPicks = null;
+            }),
+            child: Container(
+              margin: const EdgeInsets.only(top: 2, bottom: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: const Color(0xFFdddddd)),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh,
+                      size: 15, color: Color(0xFF666666)),
+                  SizedBox(width: 4),
+                  Text('换一批',
+                      style: TextStyle(
+                          fontSize: 13, color: Color(0xFF666666))),
+                ],
+              ),
             ),
           ),
         ],
@@ -967,22 +1005,43 @@ class _MineScreenState extends State<MineScreen> {
     return h;
   }
 
+  /// 收藏筛选行选中项（0有降价/1宝贝分类/2宝贝状态/3收藏时间）
+  int _favFilter = 0;
+
   Widget _buildFavoritesFeed() {
     final pool = context.watch<MaterialPoolProvider>();
     final titled =
         pool.entries.where((e) => e.title.isNotEmpty).toList(growable: false);
+    // 按选中的筛选项重排（确定性，同一份素材每次展示一致）
+    final sorted = [...titled];
+    switch (_favFilter) {
+      case 0: // 有降价：降价宝贝排前面
+        sorted.sort((a, b) =>
+            (_hashOf(a.title) % 3).compareTo(_hashOf(b.title) % 3));
+        break;
+      case 1: // 宝贝分类：按品牌归类
+        sorted.sort((a, b) => MaterialPoolProvider.brandOf(a.title)
+            .compareTo(MaterialPoolProvider.brandOf(b.title)));
+        break;
+      case 2: // 宝贝状态：收藏人数多的在前
+        sorted.sort((a, b) =>
+            (_hashOf(b.title) % 200).compareTo(_hashOf(a.title) % 200));
+        break;
+      case 3: // 收藏时间：最近收藏在前（倒序）
+        break; // 素材池本身即倒序，无需调整
+    }
     return Column(
       children: [
-        // 筛选行（有降价 / 宝贝分类 / 宝贝状态 / 收藏时间）
+        // 筛选行（可单击选中，选中橙色高亮并重排列表）
         Container(
           color: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _favFilterChip('有降价'),
-              _favFilterChip('宝贝分类', arrow: true),
-              _favFilterChip('宝贝状态', arrow: true),
-              _favFilterChip('收藏时间', arrow: true),
+              _favFilterChip(0, '有降价'),
+              _favFilterChip(1, '宝贝分类', arrow: true),
+              _favFilterChip(2, '宝贝状态', arrow: true),
+              _favFilterChip(3, '收藏时间', arrow: true),
             ],
           ),
         ),
@@ -996,23 +1055,36 @@ class _MineScreenState extends State<MineScreen> {
             ),
           )
         else
-          for (final e in titled.take(10)) _favoriteRow(e),
+          for (final e in sorted.take(10)) _favoriteRow(e),
       ],
     );
   }
 
-  Widget _favFilterChip(String label, {bool arrow = false}) {
-    return Container(
-      margin: const EdgeInsets.only(right: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 13, color: Colors.black87)),
-          if (arrow)
-            const Icon(Icons.keyboard_arrow_down,
-                size: 14, color: Color(0xFF999999)),
-        ],
+  Widget _favFilterChip(int index, String label, {bool arrow = false}) {
+    final selected = _favFilter == index;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _favFilter = index),
+      child: Container(
+        margin: const EdgeInsets.only(right: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: selected ? AppColors.primary : Colors.black87,
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
+                )),
+            if (arrow)
+              Icon(Icons.keyboard_arrow_down,
+                  size: 14,
+                  color: selected
+                      ? AppColors.primary
+                      : const Color(0xFF999999)),
+          ],
+        ),
       ),
     );
   }
