@@ -12,6 +12,7 @@ import '../../widgets/product_card.dart';
 import 'qa_screen.dart';
 import 'reviews_screen.dart';
 import 'shop_home_screen.dart';
+import '../message/chat_screen.dart';
 
 /// 商品详情页（1:1 对齐淘宝详情页结构）
 /// 图廊 → 价格横幅 → 标题 → 服务 → 规格 → 评价 → 店铺 → 看了又看
@@ -79,9 +80,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     _toast('链接已复制，快去分享吧');
                   }),
                   const SizedBox(width: 8),
-                  _circleBtn(Icons.more_horiz, () {
-                    _toast('更多功能即将上线');
-                  }),
+                  _circleBtn(Icons.more_horiz, _showMoreSheet),
                 ],
               ),
             ),
@@ -114,6 +113,101 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         content: Text(msg),
         duration: const Duration(milliseconds: 1200),
       ));
+  }
+
+  /// 顶部「更多」→ 真实功能菜单弹层
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 14),
+            const Text('更多',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _moreAction(ctx, Icons.share_outlined, '分享宝贝', () {
+              _toast('链接已复制，快去分享吧');
+            }),
+            _moreAction(ctx, Icons.star_border, '收藏宝贝', () {
+              setState(() => _collected = !_collected);
+              _toast(_collected ? '已加入收藏' : '已取消收藏');
+            }),
+            _moreAction(ctx, Icons.flag_outlined, '举报商品', () {
+              _toast('已收到举报，平台将尽快核实');
+            }),
+            _moreAction(ctx, Icons.home_outlined, '返回首页', () {
+              Navigator.of(context).popUntil((r) => r.isFirst);
+            }),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _moreAction(
+      BuildContext sheetCtx, IconData icon, String label, VoidCallback action) {
+    return ListTile(
+      leading: Icon(icon, size: 22, color: const Color(0xFF333333)),
+      title: Text(label, style: const TextStyle(fontSize: 14)),
+      onTap: () {
+        Navigator.of(sheetCtx).pop();
+        action();
+      },
+    );
+  }
+
+  /// 服务行 → 服务保障说明弹层
+  void _showServiceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Center(
+                child: Text('服务保障',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+              SizedBox(height: 14),
+              _ServiceItem(
+                icon: Icons.assignment_return_outlined,
+                title: '7天无理由退换',
+                desc: '签收后 7 天内，商品完好可申请无理由退换货',
+              ),
+              SizedBox(height: 12),
+              _ServiceItem(
+                icon: Icons.local_shipping_outlined,
+                title: '运费险',
+                desc: '退换货运费由保险公司赔付，上门取件自动抵扣',
+              ),
+              SizedBox(height: 12),
+              _ServiceItem(
+                icon: Icons.flash_on_outlined,
+                title: '极速退款',
+                desc: '信誉良好用户退货退款，平台先行垫付极速到账',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 进店逛逛 / 底部店铺图标 → 店铺主页
@@ -289,7 +383,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.small),
       ),
-      onTap: () => _toast('服务保障：7天无理由退换 · 运费险 · 极速退款'),
+      onTap: _showServiceSheet,
     );
   }
 
@@ -578,8 +672,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               _bottomIcon(Icons.storefront_outlined, '店铺',
                   () => _gotoShop(widget.item.shopName)),
-              _bottomIcon(Icons.headset_mic_outlined, '客服',
-                  () => _toast('客服小二马上来（演示）')),
+              _bottomIcon(Icons.headset_mic_outlined, '客服', () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      conversation: Conversation(
+                        avatar: '',
+                        title: widget.item.shopName,
+                        description: '店铺客服在线',
+                        createAt: '',
+                      ),
+                      accentColor: const Color(0xFFFF5000),
+                    ),
+                  ),
+                );
+              }),
               _bottomIcon(
                 _collected ? Icons.star : Icons.star_border,
                 '收藏',
@@ -946,5 +1053,41 @@ class _SkuSheetState extends State<_SkuSheet> {
             : '已加入购物车'),
         duration: const Duration(milliseconds: 1500),
       ));
+  }
+}
+
+/// 服务保障条目（弹层用）
+class _ServiceItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String desc;
+  const _ServiceItem(
+      {required this.icon, required this.title, required this.desc});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 22, color: const Color(0xFFFF5000)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A1A1A))),
+              const SizedBox(height: 2),
+              Text(desc,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF999999))),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
