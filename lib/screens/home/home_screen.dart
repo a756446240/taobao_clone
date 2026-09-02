@@ -602,9 +602,19 @@ class _HomeScreenState extends State<HomeScreen>
     return const _BannerCarousel();
   }
 
-  // ============ 红色"超级立减"横幅 ============
+  // ============ 红色"超级立减"横幅（点击进频道页） ============
   Widget _buildSuperCutBanner() {
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChannelScreen(
+              entry: HomeIconEntry('超级立减', '减', 0xFFff1e1e),
+            ),
+          ),
+        );
+      },
+      child: Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       height: 46,
       decoration: BoxDecoration(
@@ -655,6 +665,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ],
+      ),
       ),
     );
   }
