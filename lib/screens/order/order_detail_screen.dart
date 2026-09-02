@@ -16,6 +16,7 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
+import 'refund_detail_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
 class OrderDetailScreen extends StatefulWidget {
@@ -611,9 +612,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              _outlineBtn('加入购物车'),
+              _outlineBtn('加入购物车', onTap: _reAddToCart),
               const SizedBox(width: 8),
-              _orangeOutlineBtn('申请售后'),
+              _orangeOutlineBtn('申请售后', onTap: _gotoRefund),
             ],
           ),
           // 价格明细与上方商品处于同一栏目（无空白虚框分隔）
@@ -650,6 +651,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SnackBar(content: Text('图片选择失败')),
       );
     }
+  }
+
+  /// 把该订单商品重新加回购物车（再次购买）
+  void _reAddToCart() {
+    context.read<CartProvider>().addToCart(
+          shopName: _shop.shopName,
+          title: _item.title,
+          price: _item.price,
+          imageUrl: _item.imageUrl,
+          spec: _item.configuration,
+          quantity: _item.quantity,
+        );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已加入购物车'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// 申请售后：进入退款/售后详情页
+  void _gotoRefund() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RefundDetailScreen(shop: _shop, item: _item),
+      ),
+    );
   }
 
   Widget _redTag(String text) {
