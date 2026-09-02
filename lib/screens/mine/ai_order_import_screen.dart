@@ -36,10 +36,76 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
           _queue.add(parsed);
         }
       } catch (e) {
+        // 缺 API Key：页内直接弹配置框，保存后自动重试当前这张
+        if ('$e'.contains('配置豆包 API Key')) {
+          setState(() => _parsing = false);
+          final ok = await _configKeyDialog();
+          if (ok) {
+            setState(() => _parsing = true);
+            try {
+              final parsed = await _analyzeImage(File(x.path));
+              if (parsed != null) _queue.add(parsed);
+              continue;
+            } catch (e2) {
+              _toast('第 ${_queue.length + 1} 张识别失败：$e2');
+              continue;
+            }
+          }
+          setState(() => _parsing = true);
+        }
         _toast('第 ${_queue.length + 1} 张识别失败：$e');
       }
     }
     setState(() => _parsing = false);
+  }
+
+  /// 页内配置豆包 API Key（不用跳转素材库页），返回是否已保存
+  Future<bool> _configKeyDialog() async {
+    final keyCtl = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('配置豆包 API Key', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '首次使用需要配置一次 Key（保存后永久生效）：\n'
+              '火山引擎方舟 console.volcengine.com/ark → API Key 管理',
+              style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: keyCtl,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                hintText: '形如 xxxxxxxx-xxxx-xxxx...',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('保存并识别',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    );
+    if (saved == true && keyCtl.text.trim().isNotEmpty) {
+      await DoubaoService.saveApiKey(keyCtl.text);
+      _toast('Key 已保存，继续识别');
+      return true;
+    }
+    return false;
   }
 
   /// 调用豆包视觉模型解析订单截图，返回结构化字段
