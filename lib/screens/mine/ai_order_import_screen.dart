@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/doubao_service.dart';
 import '../../providers/cart_provider.dart';
 
 /// AI 订单截图解析页（双击"足迹"进入）
-/// 用户发截图 → SenseNova 视觉模型解析订单字段 → 预览 → 追加 preset_orders.json
+/// 用户发截图 → 豆包视觉模型解析订单字段 → 预览 → 追加 preset_orders.json
 class AiOrderImportScreen extends StatefulWidget {
   const AiOrderImportScreen({super.key});
 
@@ -17,11 +18,7 @@ class AiOrderImportScreen extends StatefulWidget {
 }
 
 class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
-  // SenseNova 接入配置（OpenAI 兼容协议）
-  // 注：6.7-flash-lite 路由已下线（model route not found），6.8-flash-lite 为当前可用视觉模型
-  static const _apiKey = 'sk-v2RICYtDbMvU7HTQ9tIOoBRFLr6WYLIh';
-  static const _baseUrl = 'https://token.sensenova.cn/v1';
-  static const _model = 'sensenova-6.8-flash-lite';
+  // 豆包（火山引擎·方舟）视觉解析，API Key 在素材库页配置（替代原 SenseNova）
 
   final List<_ParsedOrder> _queue = [];
   bool _parsing = false;
@@ -45,96 +42,22 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
     setState(() => _parsing = false);
   }
 
-  /// 调用 SenseNova 视觉模型解析订单截图，返回结构化字段
+  /// 调用豆包视觉模型解析订单截图，返回结构化字段
   Future<_ParsedOrder?> _analyzeImage(File file) async {
-    final bytes = await file.readAsBytes();
-    final b64 = base64Encode(bytes);
-
-    final uri = Uri.parse('$_baseUrl/chat/completions');
-    final body = jsonEncode({
-      'model': _model,
-      'messages': [
-        {
-          'role': 'user',
-          'content': [
-            {
-              'type': 'text',
-              'text': '这是一张淘宝订单截图。请提取订单信息，只输出 JSON，不要输出任何其他文字：\n'
-                  '{"shopName":"店铺名","productTitle":"商品标题","price":实付金额数字,'
-                  '"status":"订单状态(待付款/待发货/待收货/已完成/退款中之一)","confidence":0到1的置信度}\n'
-                  '如果图片不是订单截图，输出 {"error":"not_order"}'
-            },
-            {
-              'type': 'image_url',
-              'image_url': {'url': 'data:image/jpeg;base64,$b64'}
-            }
-          ]
-        }
-      ],
-      'max_tokens': 2048, // 6.8 带推理过程，token 给足避免正文被截空
-      'temperature': 0.1,
-    });
-
-    // 服务端繁忙（429）时自动重试，最多 3 次
-    Object? lastError;
-    for (var attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        await Future.delayed(Duration(seconds: 6 * attempt));
-      }
-      final client = HttpClient();
-      try {
-        final req = await client.postUrl(uri).timeout(
-            const Duration(seconds: 60));
-        req.headers.set('Authorization', 'Bearer $_apiKey');
-        req.headers.set('Content-Type', 'application/json');
-        req.write(body);
-        final resp = await req.close().timeout(const Duration(seconds: 90));
-        final respBody = await resp.transform(utf8.decoder).join();
-
-        if (resp.statusCode == 429) {
-          lastError = Exception('服务器繁忙，请稍后再试');
-          continue; // 429 重试
-        }
-        if (resp.statusCode != 200) {
-          throw Exception('HTTP ${resp.statusCode}');
-        }
-        final data = jsonDecode(respBody);
-        final content =
-            data['choices']?[0]?['message']?['content'] as String? ?? '';
-
-        // 从回复中提取 JSON（模型可能包一层 ```json）
-        final match =
-            RegExp(r'\{[\s\S]*\}').firstMatch(content);
-        if (match == null) {
-          throw Exception('AI 未返回有效 JSON');
-        }
-        final parsed = jsonDecode(match.group(0)!) as Map<String, dynamic>;
-        if (parsed.containsKey('error')) {
-          throw Exception('图片不是订单截图');
-        }
-
-        return _ParsedOrder(
-          imagePath: file.path,
-          shopName: (parsed['shopName'] ?? '未知店铺').toString(),
-          productTitle: (parsed['productTitle'] ?? '未识别标题').toString(),
-          price: (parsed['price'] is num)
-              ? (parsed['price'] as num).toDouble()
-              : double.tryParse('${parsed['price']}') ?? 0,
-          status: (parsed['status'] ?? '待发货').toString(),
-          confidence: (parsed['confidence'] is num)
-              ? (parsed['confidence'] as num).toDouble()
-              : 0.6,
-          rawJson: match.group(0)!,
-        );
-      } catch (e) {
-        lastError = e;
-        // 非 429 类错误（图片不是订单等）不重试，直接抛出
-        if (e is Exception && !e.toString().contains('服务器繁忙')) rethrow;
-      } finally {
-        client.close();
-      }
-    }
-    throw lastError ?? Exception('识别失败');
+    final parsed = await DoubaoService.analyzeOrderScreenshot(file.path);
+    return _ParsedOrder(
+      imagePath: file.path,
+      shopName: (parsed['shopName'] ?? '未知店铺').toString(),
+      productTitle: (parsed['productTitle'] ?? '未识别标题').toString(),
+      price: (parsed['price'] is num)
+          ? (parsed['price'] as num).toDouble()
+          : double.tryParse('${parsed['price']}') ?? 0,
+      status: (parsed['status'] ?? '待发货').toString(),
+      confidence: (parsed['confidence'] is num)
+          ? (parsed['confidence'] as num).toDouble()
+          : 0.6,
+      rawJson: jsonEncode(parsed),
+    );
   }
 
   Future<void> _appendToPresetOrders() async {
@@ -226,7 +149,7 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  '发订单截图给我，SenseNova 视觉模型自动提取：店铺名、商品标题、实付价、状态。\n'
+                  '发订单截图给我，豆包视觉模型自动提取：店铺名、商品标题、实付价、状态。\n'
                   '识别完成后一键追加到订单列表，立即生效并自动保存。',
                   style: TextStyle(fontSize: 12, color: Color(0xFF8B4513), height: 1.5),
                 ),
