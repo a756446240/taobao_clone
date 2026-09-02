@@ -7,6 +7,8 @@ import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/favorites_provider.dart';
+import '../../providers/footprints_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
@@ -28,7 +30,25 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _galleryIndex = 0;
-  bool _collected = false;
+
+  /// 收藏状态全局化：读 FavoritesProvider，收藏夹页同步生效
+  bool get _collected =>
+      context.watch<FavoritesProvider>().isFav(widget.item.title);
+
+  @override
+  void initState() {
+    super.initState();
+    // 进详情即记一条真实足迹（同标题去重提前，持久化）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<FootprintsProvider>().add(widget.item);
+      }
+    });
+  }
+
+  /// 切换收藏，返回切换后的状态（回调里用返回值，不能 watch）
+  bool _toggleCollect() =>
+      context.read<FavoritesProvider>().toggle(widget.item);
 
   /// 划线价：现价的 1.4 倍取整
   String get _originPrice {
@@ -143,8 +163,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               _toast('链接已复制，快去分享吧');
             }),
             _moreAction(ctx, Icons.star_border, '收藏宝贝', () {
-              setState(() => _collected = !_collected);
-              _toast(_collected ? '已加入收藏' : '已取消收藏');
+              final now = _toggleCollect();
+              _toast(now ? '已加入收藏' : '已取消收藏');
             }),
             _moreAction(ctx, Icons.flag_outlined, '举报商品', () {
               _toast('已收到举报，平台将尽快核实');
@@ -713,8 +733,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 _collected ? Icons.star : Icons.star_border,
                 '收藏',
                 () {
-                  setState(() => _collected = !_collected);
-                  _toast(_collected ? '已加入收藏' : '已取消收藏');
+                  final now = _toggleCollect();
+                  _toast(now ? '已加入收藏' : '已取消收藏');
                 },
                 active: _collected,
               ),
