@@ -23,7 +23,7 @@ class DoubaoService {
   /// 用户在素材库页手动配置的 Key 优先级更高（覆盖此默认值）。
   static const defaultApiKey = String.fromEnvironment(
     'DOUBAO_API_KEY',
-    defaultValue: 'ark-1e734c89-PLACEHOLDER',
+    defaultValue: 'ark-1e734c89-706d-4540-895b-145dd2cf8749-4aee0',
   );
 
   static const _endpoint =
