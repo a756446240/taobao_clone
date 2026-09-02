@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/footprints_provider.dart';
 import '../../widgets/app_image.dart';
+import '../product/product_detail_screen.dart';
 
-/// 淘宝式我的足迹页：按日期分组的浏览历史（三列网格）
+/// 淘宝式我的足迹页：真实浏览历史按日期分组（三列网格）
+/// 进商品详情页即记录（FootprintsProvider 持久化），可一键清空
 class FootprintsScreen extends StatefulWidget {
   const FootprintsScreen({super.key});
 
@@ -14,14 +17,34 @@ class FootprintsScreen extends StatefulWidget {
 }
 
 class _FootprintsScreenState extends State<FootprintsScreen> {
-  /// 演示数据：今天看过的（前 6 条）/ 昨天看过的（后 4 条）
-  late final List<SearchResultItem> _today =
-      MockData.guessLikeGoods.take(6).toList();
-  late final List<SearchResultItem> _yesterday =
-      MockData.guessLikeGoods.skip(6).take(4).toList();
+  /// 把记录按 今天/昨天/更早 分组（保持时间倒序）
+  Map<String, List<SearchResultItem>> _group(List<Footprint> records) {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+    final groups = <String, List<SearchResultItem>>{
+      '今天': [],
+      '昨天': [],
+      '更早': [],
+    };
+    for (final r in records) {
+      final t = DateTime.fromMillisecondsSinceEpoch(r.ts);
+      if (!t.isBefore(todayStart)) {
+        groups['今天']!.add(r.item);
+      } else if (!t.isBefore(yesterdayStart)) {
+        groups['昨天']!.add(r.item);
+      } else {
+        groups['更早']!.add(r.item);
+      }
+    }
+    groups.removeWhere((_, v) => v.isEmpty);
+    return groups;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<FootprintsProvider>();
+    final groups = _group(provider.records);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -34,14 +57,48 @@ class _FootprintsScreenState extends State<FootprintsScreen> {
                 color: Colors.black87,
                 fontSize: 16,
                 fontWeight: FontWeight.w600)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          _dateSection('今天', _today),
-          _dateSection('昨天', _yesterday),
+        actions: [
+          if (provider.records.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('清空足迹？',
+                        style: TextStyle(fontSize: 16)),
+                    content: const Text('将删除全部浏览记录，不可恢复'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: const Text('取消')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, true),
+                          child: const Text('清空',
+                              style:
+                                  TextStyle(color: Color(0xFFA32D2D)))),
+                    ],
+                  ),
+                );
+                if (ok == true) provider.clear();
+              },
+              child: const Text('清空',
+                  style: TextStyle(color: Color(0xFF999999), fontSize: 13)),
+            ),
         ],
       ),
+      body: groups.isEmpty
+          ? const Center(
+              child: Text('还没有浏览记录\n去首页逛逛吧',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF999999))),
+            )
+          : ListView(
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                for (final e in groups.entries)
+                  _dateSection(e.key, e.value),
+              ],
+            ),
     );
   }
 
@@ -91,7 +148,11 @@ class _FootprintsScreenState extends State<FootprintsScreen> {
   }
 
   Widget _goodsCell(SearchResultItem g) {
-    return Container(
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(item: g)),
+      ),
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -125,6 +186,7 @@ class _FootprintsScreenState extends State<FootprintsScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
