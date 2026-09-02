@@ -16,6 +16,7 @@ import 'channel_screen.dart';
 import 'live_list_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
+import '../mine/material_pool_screen.dart';
 
 /// 首页（搜索栏 + 图标两页滑动 + 直播四卡 + 超级立减横幅 + 吸顶 Tab + 猜你喜欢）
 class HomeScreen extends StatefulWidget {
@@ -560,7 +561,8 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
 }
 
-/// 大促 banner 轮播（AI 生图，自动播放 + 手势滑动 + 圆点指示器）
+/// 首购 banner 轮播（内置大促图 + 素材池素材，自动播放 + 手势滑动 + 圆点指示器）
+/// 双击进入素材池更换素材；素材池有素材时一并参与滚动轮播
 class _BannerCarousel extends StatefulWidget {
   const _BannerCarousel();
 
@@ -569,6 +571,7 @@ class _BannerCarousel extends StatefulWidget {
 }
 
 class _BannerCarouselState extends State<_BannerCarousel> {
+  /// 内置大促 banner（始终展示在前）
   static const _banners = [
     'assets/images/banner/banner_618.png',
     'assets/images/banner/banner_fashion.png',
@@ -586,11 +589,19 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || !_controller.hasClients) return;
-      final next = (_current + 1) % _banners.length;
+      final count = _pageCount;
+      if (count <= 0) return;
+      final next = (_current + 1) % count;
       _controller.animateToPage(next,
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeInOut);
     });
+  }
+
+  /// 当前轮播页数（内置 banner + 素材池素材）
+  int get _pageCount {
+    final pool = context.read<MaterialPoolProvider>();
+    return _banners.length + pool.entries.length;
   }
 
   @override
@@ -600,55 +611,65 @@ class _BannerCarouselState extends State<_BannerCarousel> {
     super.dispose();
   }
 
+  /// 双击进入素材池更换素材
+  void _openMaterialPool() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MaterialPoolScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      height: 100,
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: PageView.builder(
-              controller: _controller,
-              itemCount: _banners.length,
-              onPageChanged: (i) => setState(() => _current = i),
-              itemBuilder: (_, i) => Image.asset(
-                _banners[i],
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorBuilder: (_, __, ___) => Container(
-                  color: const Color(0xFFFFE0D6),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.image,
-                      color: Color(0xFFFF5000), size: 32),
+    final pool = context.watch<MaterialPoolProvider>();
+    final pages = [
+      ..._banners,
+      for (final e in pool.entries) e.imagePath,
+    ];
+    if (_current >= pages.length) _current = pages.length - 1;
+    return GestureDetector(
+      onDoubleTap: _openMaterialPool,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        height: 100,
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: pages.length,
+                onPageChanged: (i) => setState(() => _current = i),
+                itemBuilder: (_, i) => AppImage(
+                  url: pages[i],
+                  fit: BoxFit.cover,
+                  width: double.infinity,
                 ),
               ),
             ),
-          ),
-          // 圆点指示器
-          Positioned(
-            right: 10,
-            bottom: 8,
-            child: Row(
-              children: [
-                for (var i = 0; i < _banners.length; i++)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    margin: const EdgeInsets.only(left: 4),
-                    width: _current == i ? 12 : 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: _current == i
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(3),
+            // 圆点指示器
+            Positioned(
+              right: 10,
+              bottom: 8,
+              child: Row(
+                children: [
+                  for (var i = 0; i < pages.length; i++)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      margin: const EdgeInsets.only(left: 4),
+                      width: _current == i ? 12 : 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: _current == i
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
