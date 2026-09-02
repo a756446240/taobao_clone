@@ -878,7 +878,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 发货时间行：点击眼睛图标切换显示/隐藏（持久化到订单数据）
+  /// 发货时间行：点击"已隐藏/时间文本"或眼睛图标切换显示/隐藏（持久化到订单数据）
   Widget _shipTimeRow(CartProvider provider) {
     final visible = _item.showShipTime;
     return Padding(
@@ -903,40 +903,91 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const Spacer(),
-          Text(
-            visible ? _displayTime(_item.shipTime) : '已隐藏',
-            style: TextStyle(
-              fontSize: 13,
-              color: visible
-                  ? const Color(0xFF666666)
-                  : const Color(0xFFbbbbbb),
-            ),
-          ),
-          const SizedBox(width: 6),
+          // 右侧整块（文本 + 眼睛）都是切换显示/隐藏的热区，单击即生效
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () {
-              provider.updateOrderItem(_item, showShipTime: !visible);
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(
-                  content: Text(visible ? '发货时间已隐藏' : '发货时间已显示'),
-                  duration: const Duration(milliseconds: 900),
-                ));
-            },
+            onTap: () => _toggleShipTimeVisible(provider),
             child: Padding(
-              padding: const EdgeInsets.all(2),
-              child: Icon(
-                visible
-                    ? Icons.visibility_outlined
-                    : Icons.visibility_off_outlined,
-                size: 17,
-                color: const Color(0xFF999999),
+              padding: const EdgeInsets.fromLTRB(12, 6, 0, 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    visible ? _displayTime(_item.shipTime) : '已隐藏',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: visible
+                          ? const Color(0xFF666666)
+                          : const Color(0xFFbbbbbb),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      visible
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 18,
+                      color: const Color(0xFF999999),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// 切换发货时间显示/隐藏；切回显示时若时间为空自动补一个合理时间，
+  /// 保证用户一定能看到变化（之前空时间导致"点了没反应"）
+  void _toggleShipTimeVisible(CartProvider provider) {
+    final visible = _item.showShipTime;
+    if (visible) {
+      provider.updateOrderItem(_item, showShipTime: false);
+    } else {
+      var t = _item.shipTime;
+      if (t.trim().isEmpty) {
+        t = _defaultShipTime();
+        provider.updateOrderItem(_item, showShipTime: true, shipTime: t);
+      } else {
+        provider.updateOrderItem(_item, showShipTime: true);
+      }
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(visible ? '发货时间已隐藏' : '发货时间已显示'),
+        duration: const Duration(milliseconds: 900),
+      ));
+  }
+
+  /// 生成兜底发货时间：付款/创建时间 + 24 小时，格式与 _fmtTime 输出一致
+  String _defaultShipTime() {
+    final base = _parseTime(_item.payTime) ??
+        _parseTime(_item.createTime) ??
+        DateTime.now();
+    final t = base.add(const Duration(hours: 24));
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} '
+        '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+  }
+
+  /// 解析 yyyy-MM-dd HH:mm:ss（兼容 / 分隔），失败返回 null
+  DateTime? _parseTime(String raw) {
+    final m = RegExp(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T]'
+            r'(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?')
+        .firstMatch(raw);
+    if (m == null) return null;
+    return DateTime(
+      int.parse(m.group(1)!),
+      int.parse(m.group(2)!),
+      int.parse(m.group(3)!),
+      int.parse(m.group(4)!),
+      int.parse(m.group(5)!),
+      int.parse(m.group(6) ?? '0'),
     );
   }
 
