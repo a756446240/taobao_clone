@@ -511,7 +511,7 @@ class _MessageScreenState extends State<MessageScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8)),
               child: Icon(icon, color: color, size: 26),
             ),
@@ -543,7 +543,7 @@ class _MessageScreenState extends State<MessageScreen> {
   // ============ 历史消息项（右滑显示操作）============
   Widget _historyTile(_HistoryMsg m, {bool pinned = false}) {
     final muted = context
-        .read<ChatHistoryProvider>()
+        .watch<ChatHistoryProvider>()
         .isMuted(m.shopName);
     return Slidable(
       key: ValueKey(m.shopName + m.date),
@@ -624,6 +624,14 @@ class _MessageScreenState extends State<MessageScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.smallBold),
                         ),
+                        if (muted)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(
+                                Icons.notifications_off_outlined,
+                                size: 13,
+                                color: Color(0xFFBBBBBB)),
+                          ),
                         Text(m.date,
                             style: AppTextStyles.min
                                 .copyWith(color: const Color(0xFF999999))),
@@ -678,7 +686,7 @@ class _MessageScreenState extends State<MessageScreen> {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: m.color.withOpacity(0.15),
+        color: m.color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
