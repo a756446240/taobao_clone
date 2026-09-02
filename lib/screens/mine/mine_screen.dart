@@ -11,6 +11,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
+import '../../providers/price_alert_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/reviews_provider.dart';
@@ -1099,8 +1100,41 @@ class _MineScreenState extends State<MineScreen> {
       case 3: // 收藏时间：最近收藏在前（倒序）
         break; // 素材池本身即倒序，无需调整
     }
+    // 降价横幅：有已开启提醒且当前已降价的宝贝时展示
+    final alerts = context.watch<PriceAlertProvider>();
+    final droppedAlerts =
+        alerts.droppedAlertCount(titled.map((e) => e.title));
     return Column(
       children: [
+        if (droppedAlerts > 0)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _favFilter = 0),
+            child: Container(
+              width: double.infinity,
+              color: const Color(0xFFFFF3E8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications_active,
+                      size: 15, color: Color(0xFFff5000)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '你关注的 $droppedAlerts 件宝贝降价了，点这里只看降价',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFff5000)),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      size: 14, color: Color(0xFFff5000)),
+                ],
+              ),
+            ),
+          ),
         // 筛选行（可单击选中，选中橙色高亮并重排列表）
         Container(
           color: Colors.white,
@@ -1168,6 +1202,15 @@ class _MineScreenState extends State<MineScreen> {
     final coinBack = (h % 300) / 100 + 0.5;
     final shop =
         '${MaterialPoolProvider.brandOf(e.title)}海外旗舰店';
+    // 降价提醒：开启状态 + 确定性降价
+    final alerts = context.watch<PriceAlertProvider>();
+    final alertOn = alerts.isOn(e.title);
+    final dropped = PriceAlertProvider.hasDrop(e.title);
+    final nowPrice = PriceAlertProvider.droppedPrice(price, e.title);
+    final nowPriceText = nowPrice >= 100
+        ? nowPrice.toStringAsFixed(1)
+        : nowPrice.toStringAsFixed(2);
+    final savedText = (price - nowPrice).toStringAsFixed(2);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1216,11 +1259,48 @@ class _MineScreenState extends State<MineScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('¥$priceText',
-                              style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFff5000))),
+                          if (dropped) ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('¥$nowPriceText',
+                                    style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFff5000))),
+                                const SizedBox(width: 4),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(bottom: 1),
+                                  child: Text('¥$priceText',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF999999),
+                                          decoration: TextDecoration
+                                              .lineThrough)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFff5000),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text('已降 ¥$savedText',
+                                  style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white)),
+                            ),
+                          ] else
+                            Text('¥$priceText',
+                                style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFff5000))),
                           const SizedBox(height: 2),
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1240,15 +1320,24 @@ class _MineScreenState extends State<MineScreen> {
                         ],
                       ),
                     ),
-                    _favBtn('降价提醒', onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('已开启降价提醒，降价后将第一时间通知你'),
-                          duration: Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }),
+                    _favBtn(
+                      alertOn ? '提醒中' : '降价提醒',
+                      active: alertOn,
+                      onTap: () {
+                        final now = alerts.toggle(e.title);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(now
+                                ? (dropped
+                                    ? '已开启降价提醒，该宝贝当前已降 ¥$savedText'
+                                    : '已开启降价提醒，降价后将第一时间通知你')
+                                : '已关闭该宝贝的降价提醒'),
+                            duration: const Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(width: 6),
                     _favBtn('找相似', onTap: () {
                       // 找相似：取标题前 6 个字作关键词搜同款
@@ -1271,17 +1360,25 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _favBtn(String text, {VoidCallback? onTap}) {
+  Widget _favBtn(String text, {VoidCallback? onTap, bool active = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFdddddd)),
+          color: active ? const Color(0xFFFFF3E8) : Colors.transparent,
+          border: Border.all(
+              color: active
+                  ? const Color(0xFFff5000)
+                  : const Color(0xFFdddddd)),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Text(text,
-            style: const TextStyle(fontSize: 11, color: Colors.black87)),
+            style: TextStyle(
+                fontSize: 11,
+                color: active
+                    ? const Color(0xFFff5000)
+                    : Colors.black87)),
       ),
     );
   }
