@@ -6,6 +6,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/product_card.dart';
+import 'category_screen.dart';
 
 /// 频道页（首页金刚区入口）
 /// 频道色渐变头 + 运营标语 + 促销 chips + 商品双列网格（按频道名哈希稳定选品）
@@ -164,9 +165,21 @@ class ChannelScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                   ],
                   const Spacer(),
-                  const Text('更多 >',
-                      style: TextStyle(
-                          color: AppColors.subText, fontSize: 11)),
+                  // 单击「更多 >」→ 全部分类页
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CategoryScreen()),
+                    ),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Text('更多 >',
+                          style: TextStyle(
+                              color: AppColors.subText, fontSize: 11)),
+                    ),
+                  ),
                 ],
               ),
             ),
