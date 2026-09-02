@@ -120,7 +120,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: widget.version.isNotEmpty
                     ? 'v${widget.version}'
                     : null,
-                onTap: () => _toast('已是最新版本')),
+                onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            AboutScreen(version: widget.version)))),
             _arrowRow('意见反馈',
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
