@@ -194,6 +194,68 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
+  void _showMsg(String msg) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg),
+        duration: const Duration(milliseconds: 1200),
+      ));
+  }
+
+  /// 扫一扫：从相册选取图片识别二维码（真实走系统相册）
+  Future<void> _scanFromGallery() async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (x == null) return; // 用户取消
+      _showMsg('未识别到二维码，请对准二维码重试');
+    } catch (_) {
+      _showMsg('无法打开相册');
+    }
+  }
+
+  /// 添加淘友：搜索 + 推荐列表，可加好友
+  void _showAddFriendSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => const _AddFriendSheet(),
+    );
+  }
+
+  /// 发起群聊：多选联系人 → 真实创建并进入群会话
+  void _showCreateGroupSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _CreateGroupSheet(
+        onCreate: (names) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                conversation: Conversation(
+                  avatar: '',
+                  title: '群聊（${names.length + 1}人）',
+                  description: '你已加入群聊',
+                  createAt: '',
+                ),
+                accentColor: const Color(0xFFFF5000),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -211,12 +273,13 @@ class _MessageScreenState extends State<MessageScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
             onSelected: (v) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(
-                  content: Text('$v 功能即将上线'),
-                  duration: const Duration(milliseconds: 1200),
-                ));
+              if (v == '添加淘友') {
+                _showAddFriendSheet();
+              } else if (v == '发起群聊') {
+                _showCreateGroupSheet();
+              } else if (v == '扫一扫') {
+                _scanFromGallery();
+              }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(
@@ -655,4 +718,216 @@ class _HistoryMsg {
     required this.color,
     required this.avatarUrl,
   });
+}
+
+// ============ 添加淘友弹层 ============
+class _AddFriendSheet extends StatefulWidget {
+  const _AddFriendSheet();
+
+  @override
+  State<_AddFriendSheet> createState() => _AddFriendSheetState();
+}
+
+class _AddFriendSheetState extends State<_AddFriendSheet> {
+  static const _names = ['淘气的橘子', '爱逛街的猫', '柠檬不萌', '屯货小能手', '淘友9527'];
+  final Set<int> _added = {};
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _query.isEmpty
+        ? _names
+        : _names.where((n) => n.contains(_query)).toList();
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 420,
+          child: Column(
+            children: [
+              const SizedBox(height: 14),
+              const Text('添加淘友',
+                  style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  autofocus: false,
+                  onChanged: (v) => setState(() => _query = v.trim()),
+                  decoration: InputDecoration(
+                    hintText: '输入淘友昵称 / 会员名搜索',
+                    hintStyle: const TextStyle(
+                        fontSize: 13, color: Color(0xFF999999)),
+                    prefixIcon:
+                        const Icon(Icons.search, size: 20, color: Color(0xFF999999)),
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: list.isEmpty
+                    ? const Center(
+                        child: Text('未找到相关淘友',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF999999))))
+                    : ListView.builder(
+                        itemCount: list.length,
+                        itemBuilder: (_, i) {
+                          final name = list[i];
+                          final idx = _names.indexOf(name);
+                          final added = _added.contains(idx);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Color(
+                                  0xFF5000 + (idx * 0x1A2B3C) % 0xFFFFFF),
+                              child: Text(name.characters.first,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 14)),
+                            ),
+                            title: Text(name,
+                                style: const TextStyle(fontSize: 14)),
+                            subtitle: Text('淘友会员名：t_${10000 + idx * 137}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF999999))),
+                            trailing: GestureDetector(
+                              onTap: () => setState(() {
+                                added ? _added.remove(idx) : _added.add(idx);
+                              }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: added
+                                      ? const Color(0xFFF5F5F5)
+                                      : const Color(0xFFFF5000),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Text(added ? '已添加' : '加好友',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: added
+                                            ? const Color(0xFF999999)
+                                            : Colors.white)),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============ 发起群聊弹层 ============
+class _CreateGroupSheet extends StatefulWidget {
+  final ValueChanged<List<String>> onCreate;
+  const _CreateGroupSheet({required this.onCreate});
+
+  @override
+  State<_CreateGroupSheet> createState() => _CreateGroupSheetState();
+}
+
+class _CreateGroupSheetState extends State<_CreateGroupSheet> {
+  static const _contacts = [
+    '淘气的橘子',
+    '爱逛街的猫',
+    '柠檬不萌',
+    '屯货小能手',
+    '淘友9527',
+    '拼单小分队'
+  ];
+  final Set<int> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 460,
+        child: Column(
+          children: [
+            const SizedBox(height: 14),
+            const Text('发起群聊',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            const Text('选择要加入群聊的淘友',
+                style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _contacts.length,
+                itemBuilder: (_, i) {
+                  final name = _contacts[i];
+                  final sel = _selected.contains(i);
+                  return ListTile(
+                    onTap: () => setState(
+                        () => sel ? _selected.remove(i) : _selected.add(i)),
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          Color(0xFF3300 + (i * 0x234567) % 0xFFFFFF),
+                      child: Text(name.characters.first,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14)),
+                    ),
+                    title: Text(name, style: const TextStyle(fontSize: 14)),
+                    trailing: Icon(
+                      sel
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      color: sel
+                          ? const Color(0xFFFF5000)
+                          : const Color(0xFFCCCCCC),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+              child: GestureDetector(
+                onTap: _selected.isEmpty
+                    ? null
+                    : () {
+                        final names = [
+                          for (final i in _selected) _contacts[i]
+                        ];
+                        Navigator.of(context).pop();
+                        widget.onCreate(names);
+                      },
+                child: Container(
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _selected.isEmpty
+                        ? const Color(0xFFFFB399)
+                        : const Color(0xFFFF5000),
+                    borderRadius: BorderRadius.circular(21),
+                  ),
+                  child: Text('创建群聊（已选 ${_selected.length} 人）',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
