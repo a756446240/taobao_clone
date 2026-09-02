@@ -162,6 +162,123 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
     setState(() => _queue.clear());
   }
 
+  /// 可选订单状态（与订单列表的状态标签对齐）
+  static const _statusOptions = ['待付款', '待发货', '待收货', '已完成', '退款/售后'];
+
+  /// 编辑队列中某条的识别结果（识别不准时人工修正后再入库）
+  Future<void> _editItem(int idx) async {
+    final o = _queue[idx];
+    final titleCtl = TextEditingController(text: o.productTitle);
+    final shopCtl = TextEditingController(text: o.shopName);
+    final priceCtl =
+        TextEditingController(text: o.price.toStringAsFixed(2));
+    var status = _statusOptions.contains(o.status) ? o.status : '待发货';
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setD) => AlertDialog(
+          title: const Text('修正识别结果', style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                    labelText: '商品标题',
+                    isDense: true,
+                    border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: shopCtl,
+                decoration: const InputDecoration(
+                    labelText: '店铺名',
+                    isDense: true,
+                    border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: priceCtl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
+                              decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: '实付价',
+                          prefixText: '¥',
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: status,
+                      decoration: const InputDecoration(
+                          labelText: '状态',
+                          isDense: true,
+                          border: OutlineInputBorder()),
+                      items: [
+                        for (final s in _statusOptions)
+                          DropdownMenuItem(value: s, child: Text(s)),
+                      ],
+                      onChanged: (v) =>
+                          setD(() => status = v ?? status),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('保存',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
+        ),
+      ),
+    );
+    if (saved == true) {
+      setState(() {
+        o.productTitle =
+            titleCtl.text.trim().isEmpty ? o.productTitle : titleCtl.text.trim();
+        o.shopName =
+            shopCtl.text.trim().isEmpty ? o.shopName : shopCtl.text.trim();
+        o.price = double.tryParse(priceCtl.text.trim()) ?? o.price;
+        o.status = status;
+      });
+      _toast('已修正，追加时按新内容入库');
+    }
+  }
+
+  /// 单独重识别某一条（识别失败/不准时重试）
+  Future<void> _reanalyze(int idx) async {
+    final o = _queue[idx];
+    setState(() => _parsing = true);
+    try {
+      final parsed = await _analyzeImage(File(o.imagePath));
+      if (parsed != null) {
+        setState(() {
+          o.shopName = parsed.shopName;
+          o.productTitle = parsed.productTitle;
+          o.price = parsed.price;
+          o.status = parsed.status;
+        });
+        _toast('重新识别完成');
+      }
+    } catch (e) {
+      _toast('重新识别失败：$e');
+    }
+    setState(() => _parsing = false);
+  }
+
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
@@ -351,6 +468,24 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
                       ),
                     ),
                     const Spacer(),
+                    // 重新识别本条（识别不准时换张图再试/重试）
+                    GestureDetector(
+                      onTap: _parsing ? null : () => _reanalyze(idx),
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Icon(Icons.refresh,
+                            size: 16, color: Color(0xFF666666)),
+                      ),
+                    ),
+                    // 编辑本条识别结果
+                    GestureDetector(
+                      onTap: () => _editItem(idx),
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Icon(Icons.edit_outlined,
+                            size: 16, color: Color(0xFF666666)),
+                      ),
+                    ),
                     GestureDetector(
                       onTap: () => setState(() => _queue.removeAt(idx)),
                       child: const Icon(Icons.delete_outline,
@@ -369,10 +504,10 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
 
 class _ParsedOrder {
   final String imagePath;
-  final String shopName;
-  final String productTitle;
-  final double price;
-  final String status;
+  String shopName;
+  String productTitle;
+  double price;
+  String status;
   final double confidence;
   final String rawJson;
 
