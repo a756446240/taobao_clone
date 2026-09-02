@@ -18,9 +18,10 @@ class AiOrderImportScreen extends StatefulWidget {
 
 class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
   // SenseNova 接入配置（OpenAI 兼容协议）
+  // 注：6.7-flash-lite 路由已下线（model route not found），6.8-flash-lite 为当前可用视觉模型
   static const _apiKey = 'sk-v2RICYtDbMvU7HTQ9tIOoBRFLr6WYLIh';
   static const _baseUrl = 'https://token.sensenova.cn/v1';
-  static const _model = 'sensenova-6.7-flash-lite';
+  static const _model = 'sensenova-6.8-flash-lite';
 
   final List<_ParsedOrder> _queue = [];
   bool _parsing = false;
@@ -70,54 +71,70 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
           ]
         }
       ],
-      'max_tokens': 512,
+      'max_tokens': 2048, // 6.8 带推理过程，token 给足避免正文被截空
       'temperature': 0.1,
     });
 
-    final client = HttpClient();
-    try {
-      final req = await client.postUrl(uri).timeout(
-          const Duration(seconds: 60));
-      req.headers.set('Authorization', 'Bearer $_apiKey');
-      req.headers.set('Content-Type', 'application/json');
-      req.write(body);
-      final resp = await req.close().timeout(const Duration(seconds: 60));
-      final respBody = await resp.transform(utf8.decoder).join();
-
-      if (resp.statusCode != 200) {
-        throw Exception('HTTP ${resp.statusCode}');
+    // 服务端繁忙（429）时自动重试，最多 3 次
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future.delayed(Duration(seconds: 6 * attempt));
       }
-      final data = jsonDecode(respBody);
-      final content =
-          data['choices']?[0]?['message']?['content'] as String? ?? '';
+      final client = HttpClient();
+      try {
+        final req = await client.postUrl(uri).timeout(
+            const Duration(seconds: 60));
+        req.headers.set('Authorization', 'Bearer $_apiKey');
+        req.headers.set('Content-Type', 'application/json');
+        req.write(body);
+        final resp = await req.close().timeout(const Duration(seconds: 90));
+        final respBody = await resp.transform(utf8.decoder).join();
 
-      // 从回复中提取 JSON（模型可能包一层 ```json）
-      final match =
-          RegExp(r'\{[\s\S]*\}').firstMatch(content);
-      if (match == null) {
-        throw Exception('AI 未返回有效 JSON');
-      }
-      final parsed = jsonDecode(match.group(0)!) as Map<String, dynamic>;
-      if (parsed.containsKey('error')) {
-        throw Exception('图片不是订单截图');
-      }
+        if (resp.statusCode == 429) {
+          lastError = Exception('服务器繁忙，请稍后再试');
+          continue; // 429 重试
+        }
+        if (resp.statusCode != 200) {
+          throw Exception('HTTP ${resp.statusCode}');
+        }
+        final data = jsonDecode(respBody);
+        final content =
+            data['choices']?[0]?['message']?['content'] as String? ?? '';
 
-      return _ParsedOrder(
-        imagePath: file.path,
-        shopName: (parsed['shopName'] ?? '未知店铺').toString(),
-        productTitle: (parsed['productTitle'] ?? '未识别标题').toString(),
-        price: (parsed['price'] is num)
-            ? (parsed['price'] as num).toDouble()
-            : double.tryParse('${parsed['price']}') ?? 0,
-        status: (parsed['status'] ?? '待发货').toString(),
-        confidence: (parsed['confidence'] is num)
-            ? (parsed['confidence'] as num).toDouble()
-            : 0.6,
-        rawJson: match.group(0)!,
-      );
-    } finally {
-      client.close();
+        // 从回复中提取 JSON（模型可能包一层 ```json）
+        final match =
+            RegExp(r'\{[\s\S]*\}').firstMatch(content);
+        if (match == null) {
+          throw Exception('AI 未返回有效 JSON');
+        }
+        final parsed = jsonDecode(match.group(0)!) as Map<String, dynamic>;
+        if (parsed.containsKey('error')) {
+          throw Exception('图片不是订单截图');
+        }
+
+        return _ParsedOrder(
+          imagePath: file.path,
+          shopName: (parsed['shopName'] ?? '未知店铺').toString(),
+          productTitle: (parsed['productTitle'] ?? '未识别标题').toString(),
+          price: (parsed['price'] is num)
+              ? (parsed['price'] as num).toDouble()
+              : double.tryParse('${parsed['price']}') ?? 0,
+          status: (parsed['status'] ?? '待发货').toString(),
+          confidence: (parsed['confidence'] is num)
+              ? (parsed['confidence'] as num).toDouble()
+              : 0.6,
+          rawJson: match.group(0)!,
+        );
+      } catch (e) {
+        lastError = e;
+        // 非 429 类错误（图片不是订单等）不重试，直接抛出
+        if (e is Exception && !e.toString().contains('服务器繁忙')) rethrow;
+      } finally {
+        client.close();
+      }
     }
+    throw lastError ?? Exception('识别失败');
   }
 
   Future<void> _appendToPresetOrders() async {
