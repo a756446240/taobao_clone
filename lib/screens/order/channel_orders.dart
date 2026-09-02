@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../providers/cart_provider.dart';
 import '../../widgets/app_image.dart';
 
 /// 闪购(外卖)/飞猪(旅行)频道订单：确定性随机生成 + 卡片渲染
@@ -310,7 +312,18 @@ class ShangouOrderCard extends StatelessWidget {
               else if (order.status == '退款中')
                 _orangeBtn('查看详情', () => _toast(context, '退款审核中，预计 24 小时内原路退回'))
               else
-                _orangeBtn('再买一单', () => _toast(context, '已加入购物车（模拟）')),
+                _orangeBtn('再买一单', () {
+                  // 真实加入购物车（购物车 Tab 可见，不再是模拟提示）
+                  context.read<CartProvider>().addToCart(
+                        shopName: order.shopName,
+                        title: order.itemTitle,
+                        price: order.price,
+                        imageUrl: order.image,
+                        spec: order.spec,
+                        quantity: order.quantity,
+                      );
+                  _toast(context, '已加入购物车');
+                }),
             ],
           ),
         ],
