@@ -57,6 +57,149 @@ class _CartScreenState extends State<CartScreen> {
       ));
   }
 
+  /// 搜索购物车：底部弹层内输入关键词，实时过滤购物车内商品
+  void _showCartSearchSheet() {
+    final cart = context.read<CartProvider>();
+    final ctrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final q = ctrl.text.trim();
+            final matches = <({String shop, OrderItem item})>[
+              if (q.isNotEmpty)
+                for (final s in cart.shops)
+                  for (final it in s.items)
+                    if (it.title.contains(q)) (shop: s.shopName, item: it),
+            ];
+            return Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: SizedBox(
+                height: MediaQuery.of(ctx).size.height * 0.7,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(19),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search,
+                                size: 18, color: Color(0xFF999999)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: TextField(
+                                controller: ctrl,
+                                autofocus: true,
+                                onChanged: (_) => setSheet(() {}),
+                                decoration: const InputDecoration(
+                                  hintText: '搜索购物车里的商品',
+                                  hintStyle: TextStyle(
+                                      fontSize: 13, color: Color(0xFFBBBBBB)),
+                                  border: InputBorder.none,
+                                  isCollapsed: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: q.isEmpty
+                          ? const Center(
+                              child: Text('输入关键词，快速找到购物车里的商品',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF999999))))
+                          : matches.isEmpty
+                              ? const Center(
+                                  child: Text('购物车里没有相关商品',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF999999))))
+                              : ListView.separated(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  itemCount: matches.length,
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (_, i) {
+                                    final m = matches[i];
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      child: Row(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                            child: AppImage(
+                                                url: m.item.imageUrl,
+                                                width: 44,
+                                                height: 44),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(m.item.title,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                        fontSize: 13)),
+                                                const SizedBox(height: 2),
+                                                Text(m.shop,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: Color(
+                                                            0xFF999999))),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                              '¥${m.item.price.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Color(0xFFFF5000),
+                                                  fontWeight:
+                                                      FontWeight.bold)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
@@ -147,7 +290,7 @@ class _CartScreenState extends State<CartScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.search, size: 20, color: Colors.black87),
-                onPressed: () {},
+                onPressed: _showCartSearchSheet,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
