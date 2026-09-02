@@ -131,7 +131,7 @@ class _MineScreenState extends State<MineScreen> {
           ),
         ),
         Container(
-          color: hasBg ? Colors.black.withOpacity(0.15) : Colors.transparent,
+          color: hasBg ? Colors.black.withValues(alpha: 0.15) : Colors.transparent,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -310,7 +310,7 @@ class _MineScreenState extends State<MineScreen> {
         border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
