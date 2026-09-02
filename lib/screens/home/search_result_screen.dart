@@ -27,6 +27,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   int _priceRange = 0; // 0全部 1:0-50 2:50-200 3:200-500 4:500+
   bool _onlyTmall = false;
   bool _onlyFreeShip = false;
+  bool _onlyInsurance = false;
+  String _shipFrom = ''; // '' = 全部发货地
 
   /// 从 commentCount 文本估算销量（"已售1万+"→10000，"20万人付款"→200000）
   int _soldOf(SearchResultItem e) {
@@ -142,6 +144,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               _priceRange = 0;
               _onlyTmall = false;
               _onlyFreeShip = false;
+              _onlyInsurance = false;
+              _shipFrom = '';
             }),
             child: Container(
               padding: const EdgeInsets.symmetric(
@@ -270,9 +274,12 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     var range = _priceRange;
     var tmall = _onlyTmall;
     var freeShip = _onlyFreeShip;
+    var insurance = _onlyInsurance;
+    var shipFrom = _shipFrom;
     const ranges = ['全部', '0-50元', '50-200元', '200-500元', '500元以上'];
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
