@@ -15,6 +15,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/shop_type_badge.dart';
 import '../product/shop_home_screen.dart';
+import 'channel_orders.dart';
 import 'logistics_screen.dart';
 import 'order_detail_screen.dart';
 import 'rate_order_screen.dart';
@@ -65,8 +66,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }
   }
 
-  /// 闪购/飞猪频道暂无订单数据 → 显示空态
-  bool get _isEmptyChannel => _channel >= 2;
+  /// 闪购/飞猪频道订单（确定性随机生成，删除仅会话内生效）
+  late final List<ChannelOrder> _shangouOrders = buildShangouOrders();
+  late final List<ChannelOrder> _feizhuOrders = buildFeizhuOrders();
+  final Set<String> _removedChannelIds = {};
 
   String get _actionText {
     switch (_currentTab) {
@@ -119,7 +122,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   Widget build(BuildContext context) {
     final shops = context.watch<CartProvider>().shops;
-    final filtered = _isEmptyChannel ? <_ShopView>[] : _visibleShops(shops);
+    final isChannel = _channel >= 2;
+    final filtered = isChannel ? <_ShopView>[] : _visibleShops(shops);
 
     return Scaffold(
       backgroundColor: const Color(0xFFf5f5f5),
@@ -130,25 +134,82 @@ class _OrderListScreenState extends State<OrderListScreen> {
             _buildChannelBar(),
             _buildSubTabBar(),
             Expanded(
-              child: filtered.isEmpty
-                  ? _empty()
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(top: 8, bottom: 24),
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) => _OrderCard(
-                            shop: filtered[i].shop,
-                            items: filtered[i].items,
-                            actionText: _actionText,
-                            onEditItem: (item) =>
-                                _showEditMenu(filtered[i].shop, item),
-                            onDetail: (item) =>
-                                _gotoDetail(filtered[i].shop, item),
-                          ),
-                    ),
+              child: isChannel
+                  ? _buildChannelOrders()
+                  : filtered.isEmpty
+                      ? _empty()
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(top: 8, bottom: 24),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) => _OrderCard(
+                                shop: filtered[i].shop,
+                                items: filtered[i].items,
+                                actionText: _actionText,
+                                onEditItem: (item) =>
+                                    _showEditMenu(filtered[i].shop, item),
+                                onDetail: (item) =>
+                                    _gotoDetail(filtered[i].shop, item),
+                              ),
+                        ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ============ 闪购/飞猪频道订单（随机生成） ============
+  List<ChannelOrder> _channelOrders() {
+    final src = _channel == 2 ? _shangouOrders : _feizhuOrders;
+    final label = _tabs[_subIndex.clamp(0, _tabs.length - 1)];
+    final q = _query.trim().toLowerCase();
+    return src.where((o) {
+      if (_removedChannelIds.contains(o.id)) return false;
+      if (!_matchesChannelStatus(o, label)) return false;
+      if (q.isNotEmpty &&
+          !o.shopName.toLowerCase().contains(q) &&
+          !o.itemTitle.toLowerCase().contains(q)) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  /// 频道子 Tab 标签 → 频道订单状态匹配
+  bool _matchesChannelStatus(ChannelOrder o, String label) {
+    switch (label) {
+      case '全部':
+        return true;
+      case '待付款':
+        return o.status == '待付款';
+      case '待收货': // 闪购：配送中
+        return o.status == '配送中';
+      case '退款·售后':
+        return o.status.contains('退款');
+      case '待出行': // 飞猪
+        return o.status == '待出行';
+      case '待评价':
+        return o.status == '待评价';
+      case '已关闭':
+        return o.status == '交易关闭';
+      default:
+        return true;
+    }
+  }
+
+  Widget _buildChannelOrders() {
+    final orders = _channelOrders();
+    if (orders.isEmpty) return _empty();
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 24),
+      itemCount: orders.length,
+      itemBuilder: (_, i) {
+        final o = orders[i];
+        void remove() => setState(() => _removedChannelIds.add(o.id));
+        return o.kind == 0
+            ? ShangouOrderCard(order: o, onRemove: remove)
+            : FeizhuOrderCard(order: o, onRemove: remove);
+      },
     );
   }
 
@@ -496,13 +557,17 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Widget _empty() {
     final searching = _query.trim().isNotEmpty;
+    // 闪购/飞猪频道直接用子 Tab 标签（_currentTab 是为购物频道映射的）
+    final what = _channel >= 2
+        ? _tabs[_subIndex.clamp(0, _tabs.length - 1)]
+        : _currentTab;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.inbox_outlined, size: 80, color: Color(0xFFc4c4c4)),
           const SizedBox(height: 12),
-          Text(searching ? '未找到相关订单' : '暂无${_currentTab}订单',
+          Text(searching ? '未找到相关订单' : '暂无$what订单',
               style: AppTextStyles.middleSub),
           const SizedBox(height: 8),
           Text(searching ? '换个商品关键词或店铺名试试' : '（这是练习 App，未接真实数据）',
