@@ -63,6 +63,16 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     if (_onlyTmall) {
       list = list.where((e) => e.shopName.contains('旗舰')).toList();
     }
+    if (_onlyFreeShip) {
+      list = list.where(_freeShipOf).toList();
+    }
+    if (_onlyInsurance) {
+      list = list.where(_insuranceOf).toList();
+    }
+    if (_shipFrom.isNotEmpty) {
+      list =
+          list.where((e) => MockData.shipFromOf(e) == _shipFrom).toList();
+    }
     // 排序
     switch (_sortIndex) {
       case 1:
@@ -77,6 +87,16 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     }
     return list;
   }
+
+  /// 标题哈希（项目惯例：确定性假数据，同标题跨页面口径一致）
+  static int _hashOf(String s) =>
+      s.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+
+  /// 是否包邮：约 3/4 商品包邮（确定性）
+  static bool _freeShipOf(SearchResultItem e) => _hashOf(e.title) % 4 != 0;
+
+  /// 是否赠退货运费险：约 2/3 商品有（确定性）
+  static bool _insuranceOf(SearchResultItem e) => _hashOf(e.title) % 3 != 0;
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +262,11 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   Widget _filterTab() {
-    final hasFilter = _priceRange != 0 || _onlyTmall || _onlyFreeShip;
+    final hasFilter = _priceRange != 0 ||
+        _onlyTmall ||
+        _onlyFreeShip ||
+        _onlyInsurance ||
+        _shipFrom.isNotEmpty;
     return GestureDetector(
       onTap: _openFilterSheet,
       child: Padding(
@@ -352,6 +376,26 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                             () => setSheet(() => tmall = !tmall)),
                         chip('包邮', freeShip,
                             () => setSheet(() => freeShip = !freeShip)),
+                        chip(
+                            '退货运费险',
+                            insurance,
+                            () => setSheet(
+                                () => insurance = !insurance)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('发货地',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      children: [
+                        chip('全部', shipFrom.isEmpty,
+                            () => setSheet(() => shipFrom = '')),
+                        for (final city in MockData.shipFromPool)
+                          chip(city, shipFrom == city,
+                              () => setSheet(() => shipFrom = city)),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -364,6 +408,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                                 _priceRange = 0;
                                 _onlyTmall = false;
                                 _onlyFreeShip = false;
+                                _onlyInsurance = false;
+                                _shipFrom = '';
                               });
                               Navigator.pop(ctx);
                             },
@@ -381,6 +427,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                                 _priceRange = range;
                                 _onlyTmall = tmall;
                                 _onlyFreeShip = freeShip;
+                                _onlyInsurance = insurance;
+                                _shipFrom = shipFrom;
                               });
                               Navigator.pop(ctx);
                             },
