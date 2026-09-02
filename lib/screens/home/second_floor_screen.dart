@@ -143,11 +143,11 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                       borderRadius: BorderRadius.circular(12),
                       child: PageView.builder(
                         controller: _bannerCtrl,
-                        itemCount: _banners.length,
+                        itemCount: banners.length,
                         onPageChanged: (i) =>
                             setState(() => _bannerIndex = i),
                         itemBuilder: (_, i) => AppImage(
-                          url: _banners[i],
+                          url: banners[i],
                           fit: BoxFit.cover,
                           width: double.infinity,
                         ),
