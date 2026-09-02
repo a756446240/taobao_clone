@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/doubao_service.dart';
 import '../../models/models.dart';
+import '../../providers/chat_history_provider.dart';
 import '../../widgets/app_image.dart';
 
 /// 聊天页：点击进入实时聊天，发送后对方自动回复
@@ -52,14 +57,59 @@ class _ChatScreenState extends State<ChatScreen> {
     [RegExp(r'你好|在吗|hi|hello', caseSensitive: false), '亲，您好呀～很高兴为您服务'],
   ];
 
+  /// 会话唯一键（店铺/联系人名）
+  String get _convKey => widget.conversation.title;
+
   @override
   void initState() {
     super.initState();
-    // 以会话最后一条消息作为开场
-    final desc = widget.conversation.description;
-    if (desc.isNotEmpty) {
-      _messages.add(ChatMessage(content: desc, isMe: false));
+    // 优先恢复历史聊天记录；首次进入以会话最后一条消息作为开场
+    final hist = Provider.of<ChatHistoryProvider>(context, listen: false)
+        .historyFor(_convKey);
+    if (hist.isNotEmpty) {
+      _messages.addAll(hist);
+    } else {
+      final desc = widget.conversation.description;
+      if (desc.isNotEmpty) {
+        _messages.add(ChatMessage(content: desc, isMe: false));
+      }
     }
+  }
+
+  static String _nowTime() {
+    final n = DateTime.now();
+    return '${n.hour.toString().padLeft(2, '0')}:${n.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 写入本地消息列表 + 持久化
+  void _appendMessage(ChatMessage m) {
+    _messages.add(m);
+    Provider.of<ChatHistoryProvider>(context, listen: false)
+        .append(_convKey, m);
+  }
+
+  /// 发送图片消息：复制到文档目录防缓存清理
+  Future<void> _sendImage() async {
+    try {
+      final picked =
+          await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+      final dir = await getApplicationDocumentsDirectory();
+      final saveDir = Directory('${dir.path}/chat_images');
+      if (!saveDir.existsSync()) saveDir.createSync(recursive: true);
+      final ext = picked.path.contains('.')
+          ? picked.path.substring(picked.path.lastIndexOf('.'))
+          : '.jpg';
+      final name = 'chat_${DateTime.now().millisecondsSinceEpoch}$ext';
+      final saved = await File(picked.path).copy('${saveDir.path}/$name');
+      if (!mounted) return;
+      setState(() {
+        _appendMessage(
+            ChatMessage(content: 'img:${saved.path}', isMe: true, time: _nowTime()));
+      });
+      _scrollToBottom();
+      _scheduleReply('（发来一张图片）');
+    } catch (_) {}
   }
 
   @override
@@ -76,7 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     setState(() {
-      _messages.add(ChatMessage(content: text, isMe: true));
+      _appendMessage(ChatMessage(content: text, isMe: true, time: _nowTime()));
       _controller.clear();
     });
     _scrollToBottom();
@@ -343,6 +393,29 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// 图片消息点击放大预览
+  void _previewImage(String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.pop(ctx),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: InteractiveViewer(
+            child: Center(
+              child: Image.file(File(path),
+                  width: MediaQuery.of(ctx).size.width,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image_outlined,
+                          color: Colors.white54, size: 64)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 我方头像（橙色"我"字圆标）
   Widget _buildMyAvatar() {
     return const CircleAvatar(
@@ -429,6 +502,12 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           const Icon(AppIcons.emoji, color: Colors.black54, size: 24),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _sendImage,
+            child: const Icon(Icons.image_outlined,
+                color: Colors.black54, size: 24),
+          ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: _send,
