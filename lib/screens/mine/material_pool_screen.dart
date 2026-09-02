@@ -17,6 +17,16 @@ class MaterialPoolScreen extends StatefulWidget {
 }
 
 class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
+  /// 素材搜索关键词（按标题过滤）
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _import() async {
     final pool = context.read<MaterialPoolProvider>();
     final count = await pool.importFromGallery();
@@ -109,6 +119,112 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
         : '完成 $ok 张，失败 $fail 张${err.isNotEmpty ? "（$err）" : ""}');
   }
 
+  /// 单条素材重新 AI 命名（仅用户导入的本地图，内置 assets 不可）
+  Future<void> _aiNameOne(MaterialEntry e) async {
+    if (e.bundled || e.imagePath.startsWith('assets/')) {
+      _toast('内置素材不支持 AI 命名');
+      return;
+    }
+    if (!await DoubaoService.hasApiKey) {
+      _toast('请先配置豆包 API Key');
+      await _configDoubao();
+      if (!await DoubaoService.hasApiKey) return;
+    }
+    _toast('AI 识别中...');
+    try {
+      final title = await DoubaoService.recognizeProductName(e.imagePath);
+      if (!mounted) return;
+      await context.read<MaterialPoolProvider>().setTitle(e, title);
+      _toast('已命名：$title');
+    } catch (err) {
+      if (mounted) _toast('识别失败：$err');
+    }
+  }
+
+  /// 单击素材：大图预览 + 操作（改名/AI命名/删除）
+  void _preview(MaterialEntry e) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: AppImage(url: e.imagePath, fit: BoxFit.contain),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                e.title.isEmpty ? '未命名素材' : e.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: e.title.isEmpty
+                        ? const Color(0xFF999999)
+                        : Colors.black87),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _previewAction(Icons.edit_outlined, '修改名称', () {
+                    Navigator.pop(sheetCtx);
+                    _editTitle(e);
+                  }),
+                  if (!e.bundled) ...[
+                    _previewAction(Icons.auto_awesome, 'AI命名', () {
+                      Navigator.pop(sheetCtx);
+                      _aiNameOne(e);
+                    }),
+                    _previewAction(Icons.delete_outline, '删除', () {
+                      Navigator.pop(sheetCtx);
+                      context.read<MaterialPoolProvider>().remove(e);
+                      _toast('已删除素材');
+                    }, color: const Color(0xFFA32D2D)),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _previewAction(IconData icon, String label, VoidCallback onTap,
+      {Color color = const Color(0xFF333333)}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 24, color: color),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(fontSize: 11, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 手动修改某条素材名称
   Future<void> _editTitle(MaterialEntry e) async {
     final pool = context.read<MaterialPoolProvider>();
@@ -144,7 +260,10 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
   @override
   Widget build(BuildContext context) {
     final pool = context.watch<MaterialPoolProvider>();
-    final entries = pool.entries;
+    final all = pool.entries;
+    final entries = _query.isEmpty
+        ? all
+        : all.where((e) => e.title.contains(_query)).toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -163,7 +282,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
           ),
         ],
       ),
-      body: entries.isEmpty
+      body: all.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -184,6 +303,50 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
             )
           : Column(
               children: [
+                // 搜索框：素材多了按标题快速定位
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFEEEEEE)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search,
+                            size: 18, color: Color(0xFF999999)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchCtrl,
+                            onChanged: (v) =>
+                                setState(() => _query = v.trim()),
+                            style: const TextStyle(fontSize: 13),
+                            decoration: const InputDecoration(
+                              hintText: '搜索素材标题',
+                              hintStyle: TextStyle(
+                                  fontSize: 13, color: Color(0xFFBBBBBB)),
+                              border: InputBorder.none,
+                              isCollapsed: true,
+                            ),
+                          ),
+                        ),
+                        if (_query.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _searchCtrl.clear();
+                              _query = '';
+                            }),
+                            child: const Icon(Icons.cancel,
+                                size: 16, color: Color(0xFFBBBBBB)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
                 if (pool.aiProgress != null)
                   Container(
                     width: double.infinity,
@@ -203,7 +366,12 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                     ),
                   ),
                 Expanded(
-                  child: GridView.builder(
+                  child: entries.isEmpty
+                      ? const Center(
+                          child: Text('没有匹配的素材',
+                              style: TextStyle(
+                                  color: Color(0xFF999999), fontSize: 13)))
+                      : GridView.builder(
                     padding: const EdgeInsets.all(12),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -215,6 +383,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                     itemBuilder: (_, i) {
                       final e = entries[i];
                       return GestureDetector(
+                        onTap: () => _preview(e),
                         onDoubleTap: () => _editTitle(e),
                         child: Stack(
                           fit: StackFit.expand,
@@ -242,6 +411,23 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                           color: Colors.white, fontSize: 10)),
+                                ),
+                              )
+                            else
+                              // 未命名角标：引导去 AI 命名或手动命名
+                              Positioned(
+                                left: 2,
+                                top: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xCCFF8C00),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text('未命名',
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 9)),
                                 ),
                               ),
                             Positioned(
