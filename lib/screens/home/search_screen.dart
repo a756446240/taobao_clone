@@ -22,8 +22,16 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
 
   /// 热搜榜：从大词库随机抽 10 个，每次进搜索页都不一样
-  late final List<String> _hotWords =
+  late List<String> _hotWords =
       ([...MockData.searchHints]..shuffle(Random())).take(10).toList();
+
+  /// 换一批热搜词
+  void _reshuffleHot() {
+    setState(() {
+      _hotWords =
+          ([...MockData.searchHints]..shuffle(Random())).take(10).toList();
+    });
+  }
 
   @override
   void initState() {
@@ -151,6 +159,23 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: const Text('实时热点，每分钟更新',
                     style:
                         TextStyle(color: AppColors.primary, fontSize: 10)),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _reshuffleHot,
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, size: 14, color: Color(0xFF999999)),
+                      SizedBox(width: 2),
+                      Text('换一换',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF999999))),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
