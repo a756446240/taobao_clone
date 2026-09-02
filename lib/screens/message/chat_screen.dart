@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../data/doubao_service.dart';
 import '../../models/models.dart';
 import '../../widgets/app_image.dart';
 
@@ -82,20 +83,45 @@ class _ChatScreenState extends State<ChatScreen> {
     _scheduleReply(text);
   }
 
-  /// 模拟对方实时回复：先显示"正在输入"，1-2 秒后给出应答
+  /// 对方实时回复：先显示"正在输入"，优先豆包 AI 生成客服回复，
+  /// 无 API Key / 网络失败时回退本地关键词规则，保证永远有应答
   void _scheduleReply(String userText) {
     if (_typing) return;
     setState(() => _typing = true);
     _scrollToBottom();
-    final delay = Duration(milliseconds: 900 + _rand.nextInt(900));
-    _timers.add(Timer(delay, () {
-      if (!mounted) return;
-      setState(() {
-        _typing = false;
-        _messages.add(ChatMessage(content: _pickReply(userText), isMe: false));
-      });
-      _scrollToBottom();
-    }));
+    _replyWithAi(userText);
+  }
+
+  Future<void> _replyWithAi(String userText) async {
+    final started = DateTime.now();
+    String reply;
+    try {
+      // 取最近 6 条作为上下文（含刚发出的这条）
+      final recent = _messages.length <= 6
+          ? List<ChatMessage>.from(_messages)
+          : _messages.sublist(_messages.length - 6);
+      reply = await DoubaoService.generateShopReply(
+        shopName: widget.conversation.title,
+        history: recent
+            .map((m) => (isMe: m.isMe, text: m.content))
+            .toList(),
+      ).timeout(const Duration(seconds: 15));
+      if (reply.isEmpty) throw Exception('empty');
+    } catch (_) {
+      reply = _pickReply(userText);
+    }
+    // 至少保留一点"对方在打字"的真实感
+    final elapsed = DateTime.now().difference(started);
+    const minDelay = Duration(milliseconds: 900);
+    if (elapsed < minDelay) {
+      await Future.delayed(minDelay - elapsed);
+    }
+    if (!mounted) return;
+    setState(() {
+      _typing = false;
+      _messages.add(ChatMessage(content: reply, isMe: false));
+    });
+    _scrollToBottom();
   }
 
   String _pickReply(String userText) {
