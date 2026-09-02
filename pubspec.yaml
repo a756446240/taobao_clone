@@ -1,7 +1,7 @@
 name: taobao_clone
 description: 1:1 复刻淘宝 App 的全新架构 Flutter 项目（练习用）
 publish_to: "none"
-version: 1.9.12+56
+version: 1.9.13+57
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -42,6 +42,9 @@ flutter:
     - assets/images/mine_icons/
     - assets/images/icons/
     - assets/images/banner/
+    - assets/images/shangou/
+    - assets/images/feizhu/
+    - assets/images/reviews/
     - assets/videos/
     - assets/data/
     - assets/materials/
