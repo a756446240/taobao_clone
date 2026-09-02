@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 
-/// 设置页二级页：隐私设置 / 通用设置 / 意见反馈
+/// 设置页二级页：隐私设置 / 通用设置 / 意见反馈 / 关于淘宝
 
 // ============ 隐私设置 ============
 class PrivacyScreen extends StatefulWidget {
@@ -438,6 +438,92 @@ Widget _switchRow(
           activeTrackColor: AppColors.primary,
           onChanged: onChanged,
         ),
+      ],
+    ),
+  );
+}
+
+// ============ 关于淘宝 ============
+class AboutScreen extends StatelessWidget {
+  final String version;
+  const AboutScreen({super.key, this.version = ''});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: _appBar('关于淘宝'),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 32, bottom: 24),
+        children: [
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: const Text('淘',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+                version.isEmpty ? '手机淘宝' : '手机淘宝 v$version',
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 4),
+          const Center(
+            child: Text('太好逛了吧',
+                style: TextStyle(color: Color(0xFF999999), fontSize: 12)),
+          ),
+          const SizedBox(height: 24),
+          _group([
+            _infoRow('功能介绍', '新品首发、直播好货、闪购小时达'),
+            _infoRow('用户协议', '《淘宝平台服务协议》'),
+            _infoRow('隐私政策', '《淘宝隐私权政策》'),
+            _infoRow('开源组件声明', 'Flutter 及第三方开源组件'),
+          ]),
+          const SizedBox(height: 24),
+          const Center(
+            child: Text('阿里巴巴集团 版权所有',
+                style: TextStyle(color: Color(0xFF999999), fontSize: 11)),
+          ),
+          const Center(
+            child: Text('Copyright © 2003-2026 Taobao.com 版权所有',
+                style: TextStyle(color: Color(0xFF999999), fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _infoRow(String title, String subtitle) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: const TextStyle(
+                      color: Color(0xFF999999), fontSize: 11)),
+            ],
+          ),
+        ),
+        const Icon(Icons.chevron_right, size: 18, color: Color(0xFF999999)),
       ],
     ),
   );
