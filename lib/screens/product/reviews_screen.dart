@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
+import '../../providers/reviews_provider.dart';
 import '../../widgets/app_image.dart';
 
 /// 商品评价列表页（详情页评价区点击进入）
@@ -121,6 +125,14 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
+    // 用户自己发布的评价置顶展示（晒图标签下只显示带图的）
+    final userReviews = context
+        .watch<ReviewsProvider>()
+        .reviewsFor(widget.item.title)
+        .where((r) =>
+            _activeTag == '全部' ||
+            (_activeTag == '晒图' && r.photoPaths.isNotEmpty))
+        .toList();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -135,15 +147,123 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         children: [
           _buildSummary(),
           _buildTagChips(),
+          for (final r in userReviews) _buildUserReviewCard(r),
           for (var i = 0; i < filtered.length; i++)
             _buildReviewCard(filtered[i]),
-          if (filtered.isEmpty)
+          if (filtered.isEmpty && userReviews.isEmpty)
             const Padding(
               padding: EdgeInsets.all(32),
               child: Center(
                   child: Text('暂无该标签的评价', style: AppTextStyles.middleSub)),
             ),
         ],
+      ),
+    );
+  }
+
+  /// 用户自己发布的评价卡（真实晒图文件 + 我的评价标记）
+  Widget _buildUserReviewCard(UserReview r) {
+    final nick = r.anonymous ? '匿名用户' : '我';
+    return Container(
+      color: Colors.white,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: AppColors.primary,
+                child: Text(nick[0],
+                    style:
+                        const TextStyle(color: Colors.white, fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(nick, style: AppTextStyles.smallBold)),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1EC),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: AppColors.primary),
+                ),
+                child: const Text('我的评价',
+                    style:
+                        TextStyle(color: AppColors.primary, fontSize: 9)),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                children: List.generate(
+                    5,
+                    (i) => Icon(Icons.star_rounded,
+                        size: 14,
+                        color: i < r.stars
+                            ? const Color(0xFFFFB400)
+                            : const Color(0xFFE0E0E0))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(r.content, style: AppTextStyles.small.copyWith(height: 1.5)),
+          const SizedBox(height: 6),
+          Text('刚刚 · ${r.spec.isNotEmpty ? r.spec : '默认款'}',
+              style:
+                  AppTextStyles.min.copyWith(color: AppColors.subText)),
+          if (r.photoPaths.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final p in r.photoPaths)
+                  GestureDetector(
+                    onTap: () => _previewFile(p),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.file(
+                        File(p),
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 72,
+                          height: 72,
+                          color: const Color(0xFFF0F0F0),
+                          child: const Icon(Icons.broken_image_outlined,
+                              color: Color(0xFFCCCCCC)),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _previewFile(String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.pop(ctx),
+        child: Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: InteractiveViewer(
+            child: Center(
+              child: Image.file(File(path),
+                  width: MediaQuery.of(ctx).size.width,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image_outlined,
+                          color: Colors.white54, size: 64)),
+            ),
+          ),
+        ),
       ),
     );
   }
