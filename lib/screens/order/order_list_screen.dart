@@ -77,6 +77,9 @@ class _OrderListScreenState extends State<OrderListScreen>
   late final List<ChannelOrder> _feizhuOrders = buildFeizhuOrders();
   final Set<String> _removedChannelIds = {};
 
+  /// 频道订单支付后的状态覆盖（订单 id → 新状态，仅会话内生效）
+  final Map<String, String> _statusOverrides = {};
+
   String get _actionText {
     switch (_currentTab) {
       case '待付款':
@@ -180,7 +183,11 @@ class _OrderListScreenState extends State<OrderListScreen>
     final src = _channel == 2 ? _shangouOrders : _feizhuOrders;
     final label = _tabs[_subIndex.clamp(0, _tabs.length - 1)];
     final q = _query.trim().toLowerCase();
-    return src.where((o) {
+    return src.map((o) {
+      // 支付后的状态流转（去支付 → 配送中/待出行）
+      final st = _statusOverrides[o.id];
+      return st == null ? o : o.copyWithStatus(st);
+    }).where((o) {
       if (_removedChannelIds.contains(o.id)) return false;
       if (!_matchesChannelStatus(o, label)) return false;
       if (q.isNotEmpty &&
@@ -229,11 +236,15 @@ class _OrderListScreenState extends State<OrderListScreen>
                   order: o,
                   onRemove: () =>
                       setState(() => _removedChannelIds.add(o.id)),
+                  onPay: () => setState(
+                      () => _statusOverrides[o.id] = '配送中'),
                 )
               : FeizhuOrderCard(
                   order: o,
                   onRemove: () =>
                       setState(() => _removedChannelIds.add(o.id)),
+                  onPay: () => setState(
+                      () => _statusOverrides[o.id] = '待出行'),
                 ),
         if (recGoods != null) ...[
           const Padding(
