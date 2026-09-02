@@ -366,7 +366,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: const Text('大促价保',
@@ -530,7 +530,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     CircleAvatar(
                       radius: 12,
                       backgroundColor:
-                          AppColors.primary.withOpacity(0.12),
+                          AppColors.primary.withValues(alpha: 0.12),
                       child: Text(r.$1[0],
                           style: const TextStyle(
                               color: AppColors.primary, fontSize: 10)),
