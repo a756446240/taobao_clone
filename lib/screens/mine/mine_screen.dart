@@ -1268,7 +1268,9 @@ class _MineScreenState extends State<MineScreen> {
   Widget _reviewCard(
       ({String image, String text, String product, String user, String likes})
           r) {
-    return Container(
+    return GestureDetector(
+      onTap: () => _previewImage(r.image),
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -1325,6 +1327,26 @@ class _MineScreenState extends State<MineScreen> {
             ),
           ),
         ],
+      ),
+      ),
+    );
+  }
+
+  /// 评价图全屏预览（双指缩放，点击任意处关闭）
+  void _previewImage(String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dCtx) => GestureDetector(
+        onTap: () => Navigator.pop(dCtx),
+        child: Container(
+          color: Colors.black,
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Center(child: AppImage(url: url)),
+          ),
+        ),
       ),
     );
   }
