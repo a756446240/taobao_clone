@@ -20,14 +20,13 @@ class MockData {
     'lg4k显示器',
   ];
 
-  /// 首页图标区 第 1 页（单行 5 个 + 第 6 个半露"红包签到"）
+  /// 首页图标区 第 1 页（单行 5 个均分整宽，图标下不显示文字；原半露的"红包签到"已删除）
   static const List<HomeIconEntry> homeIconPage1 = [
     HomeIconEntry('天猫超市', '超市', 0xFF22c55e, 'assets/images/icons/chaoshi.png'),
     HomeIconEntry('淘宝秒杀', '秒', 0xFFff2d2d, 'assets/images/icons/miaosha.png'),
     HomeIconEntry('领淘金币', '币', 0xFFf7b500, 'assets/images/icons/coin.png'),
     HomeIconEntry('88VIP', '88', 0xFF2b2b2b, 'assets/images/icons/vip88.png'),
     HomeIconEntry('芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png'),
-    HomeIconEntry('红包签到', '¥', 0xFFff3b30, 'assets/images/icons/redpacket.png'),
   ];
 
   /// 首页图标区 第 2 页（3 行 × 5 = 15 个，全部唯一不重复）
