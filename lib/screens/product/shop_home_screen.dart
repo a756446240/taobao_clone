@@ -263,11 +263,11 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
                     ],
                     currentValue: '',
                   );
-                  if (reason != null && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('已提交「$reason」投诉，平台将在 24 小时内处理'),
-                        duration: const Duration(seconds: 2)));
-                  }
+                  if (reason == null) return;
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('已提交「$reason」投诉，平台将在 24 小时内处理'),
+                      duration: const Duration(seconds: 2)));
                 },
               ),
               const SizedBox(height: 8),
