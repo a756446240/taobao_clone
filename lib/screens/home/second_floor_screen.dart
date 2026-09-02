@@ -1,8 +1,10 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../data/mock_data.dart';
+import '../../providers/banner_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
 
@@ -49,6 +51,11 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // banner 与首页轮播同池：用户素材优先，池空回退内置 5 图
+    final pool = context.watch<BannerPoolProvider>();
+    final banners =
+        pool.entries.isNotEmpty ? pool.entries : _banners;
+    if (_bannerIndex >= banners.length) _bannerIndex = 0;
     return Scaffold(
       backgroundColor: const Color(0xFF1A0533),
       body: SafeArea(
@@ -111,7 +118,7 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                           color: Colors.black38,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text('${_bannerIndex + 1}/${_banners.length}',
+                        child: Text('${_bannerIndex + 1}/${banners.length}',
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 11)),
                       ),
