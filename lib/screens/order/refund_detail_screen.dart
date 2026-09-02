@@ -35,6 +35,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   late OrderItem _item;
   late ShoppingCartShop _shop;
   Timer? _timer;
+  final Set<String> _helpSelected = {}; // 已选中的反馈问题
 
   @override
   void initState() {
@@ -965,24 +966,64 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               _helpChip('催促商家处理'),
             ],
           ),
+          if (_helpSelected.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF5000),
+                    padding: const EdgeInsets.symmetric(vertical: 10)),
+                onPressed: () {
+                  setState(() {
+                    _helpSelected.clear();
+                    _item.showHelpSection = false;
+                  });
+                  context.read<CartProvider>().updateOrderItem(_item);
+                  _toast('反馈已提交，我们会尽快改进');
+                },
+                child: const Text('提交反馈',
+                    style: TextStyle(fontSize: 13)),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _helpChip(String label) {
+    final selected = _helpSelected.contains(label);
     return GestureDetector(
-      onTap: () => _toast('已记录：$label'),
+      onTap: () => setState(() {
+        selected ? _helpSelected.remove(label) : _helpSelected.add(label);
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: selected ? const Color(0xFFFFF3EC) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E5E5)),
+          border: Border.all(
+              color: selected
+                  ? const Color(0xFFFF5000)
+                  : const Color(0xFFE5E5E5)),
         ),
-        child: Text(label,
-            style:
-                const TextStyle(fontSize: 12, color: Color(0xFF333333))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(Icons.check,
+                  size: 13, color: Color(0xFFFF5000)),
+              const SizedBox(width: 3),
+            ],
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: selected
+                        ? const Color(0xFFFF5000)
+                        : const Color(0xFF333333))),
+          ],
+        ),
       ),
     );
   }
