@@ -34,6 +34,13 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
   final PageController _bannerCtrl = PageController();
   int _bannerIndex = 0;
 
+  /// 页面滚动控制（zone 卡点击可滚动定位到秒杀区）
+  final ScrollController _scrollCtrl = ScrollController();
+  final GlobalKey _seckillKey = GlobalKey();
+
+  /// 已设置开抢提醒的场次（小时），会话内有效
+  final Set<int> _remindedSessions = {};
+
   /// 精选商品：内置池确定性抽 6 个
   late final _goods = ([...MockData.guessLikeGoods]..shuffle(Random(20260902)))
       .take(6)
@@ -76,6 +83,7 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
   void dispose() {
     _seckillTimer?.cancel();
     _bannerCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -96,6 +104,7 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
       backgroundColor: const Color(0xFF1A0533),
       body: SafeArea(
         child: CustomScrollView(
+          controller: _scrollCtrl,
           slivers: [
             // 顶部栏
             SliverToBoxAdapter(
@@ -191,7 +200,15 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                         Icons.verified, keyword: '品牌'),
                     const SizedBox(width: 8),
                     _zoneCard('限时秒杀', '距开抢 $_seckillClock',
-                        const Color(0xFFFF8C00), Icons.bolt),
+                        const Color(0xFFFF8C00), Icons.bolt,
+                        onTap: () {
+                      final ctx = _seckillKey.currentContext;
+                      if (ctx != null) {
+                        Scrollable.ensureVisible(ctx,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOut);
+                      }
+                    }),
                   ],
                 ),
               ),
@@ -282,9 +299,20 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
   }
 
   // ============ 整点秒杀 ============
+  /// 今日秒杀场次：10/14/20 点，每场持续 2 小时
+  static const _sessions = [10, 14, 20];
+
+  /// 场次状态：0=已结束 1=抢购中 2=即将开抢
+  int _sessionState(int h) {
+    if (_now.hour >= h + 2) return 0;
+    if (_now.hour >= h) return 1;
+    return 2;
+  }
+
   Widget _buildSeckill() {
     final nextHour = (_now.hour + 1) % 24;
     return Container(
+      key: _seckillKey,
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -322,11 +350,16 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
                   style: const TextStyle(
                       color: Color(0xFFFFB300), fontSize: 12)),
               const Spacer(),
-              GestureDetector(
-                onTap: () => _toast('更多秒杀场次：每天 10/14/20 点整'),
-                child: const Text('全部场次 >',
-                    style: TextStyle(color: Colors.white54, fontSize: 11)),
-              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 今日场次状态条：已结束灰 / 抢购中红 / 即将开抢可设提醒
+          Row(
+            children: [
+              for (final h in _sessions) ...[
+                if (h != _sessions.first) const SizedBox(width: 6),
+                _sessionChip(h),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -340,6 +373,53 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 单个场次 chip：状态着色 + 即将开抢场可点设提醒
+  Widget _sessionChip(int h) {
+    final state = _sessionState(h);
+    final reminded = _remindedSessions.contains(h);
+    final (Color bg, Color fg, String label) = switch (state) {
+      0 => (const Color(0x33FFFFFF), Colors.white38, '已结束'),
+      1 => (const Color(0xFFFF2E4D), Colors.white, '抢购中'),
+      _ => (const Color(0x33FF8C00), const Color(0xFFFFB300),
+          reminded ? '已设提醒' : '提醒我'),
+    };
+    return Expanded(
+      child: GestureDetector(
+        onTap: state == 2
+            ? () {
+                setState(() {
+                  reminded
+                      ? _remindedSessions.remove(h)
+                      : _remindedSessions.add(h);
+                });
+                _toast(reminded
+                    ? '已取消 $h:00 场开抢提醒'
+                    : '已设置 $h:00 场开抢提醒');
+              }
+            : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('$h:00',
+                  style: TextStyle(
+                      color: fg,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(color: fg, fontSize: 10)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -432,20 +512,21 @@ class _SecondFloorScreenState extends State<SecondFloorScreen> {
   }
 
   Widget _zoneCard(String title, String sub, Color color, IconData icon,
-      {String? keyword}) {
+      {String? keyword, VoidCallback? onTap}) {
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          if (keyword != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => SearchResultScreen(keyword: keyword)),
-            );
-          } else {
-            _toast('$title 会场：$sub');
-          }
-        },
+        onTap: onTap ??
+            () {
+              if (keyword != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => SearchResultScreen(keyword: keyword)),
+                );
+              } else {
+                _toast('$title 会场：$sub');
+              }
+            },
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
