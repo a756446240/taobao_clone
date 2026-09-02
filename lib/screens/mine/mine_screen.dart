@@ -13,6 +13,7 @@ import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/reviews_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
@@ -850,6 +851,8 @@ class _MineScreenState extends State<MineScreen> {
   String? _recSig;
 
   Widget _buildFeedSection() {
+    // 我发布的评价数（角标实时联动）
+    final publishedCount = context.watch<ReviewsProvider>().all.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -861,7 +864,7 @@ class _MineScreenState extends State<MineScreen> {
             children: [
               _feedTabItem(0, '猜你喜欢'),
               _feedTabItem(1, '我的收藏'),
-              _feedTabItem(2, '我的评价', badge: 1),
+              _feedTabItem(2, '我的评价', badge: publishedCount),
             ],
           ),
         ),
@@ -1316,12 +1319,17 @@ class _MineScreenState extends State<MineScreen> {
   ];
 
   Widget _buildMyReviews() {
+    // 我发布的评价排在最前（真实发布联动），其后是 4 条固定素材
+    final published = context.watch<ReviewsProvider>().all;
+    final cards = <Widget>[
+      for (final r in published) _userReviewCard(r),
+      for (final r in _myReviews) _reviewCard(r),
+    ];
     // 双列瀑布流（左右列高度自然错开）
     final left = <Widget>[];
     final right = <Widget>[];
-    for (var i = 0; i < _myReviews.length; i++) {
-      final card = _reviewCard(_myReviews[i]);
-      (i.isEven ? left : right).add(card);
+    for (var i = 0; i < cards.length; i++) {
+      (i.isEven ? left : right).add(cards[i]);
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1348,6 +1356,90 @@ class _MineScreenState extends State<MineScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 我发布的评价卡（ReviewsProvider 真实数据：星级 + 正文 + 晒图 + 商品名）
+  Widget _userReviewCard(UserReview r) {
+    final hasPhoto = r.photoPaths.isNotEmpty;
+    return GestureDetector(
+      onTap: hasPhoto ? () => _previewImage(r.photoPaths.first) : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (hasPhoto)
+              AppImage(url: r.photoPaths.first, width: double.infinity),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 星级
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 1; i <= 5; i++)
+                        Icon(
+                          i <= r.stars ? Icons.star : Icons.star_border,
+                          color: AppColors.primary,
+                          size: 14,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(r.content,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.black87)),
+                  const SizedBox(height: 4),
+                  Text(r.productTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF999999))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 9,
+                        backgroundColor: Color(0xFFffd180),
+                        child: Icon(Icons.person,
+                            size: 12, color: Colors.white),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(r.anonymous ? '匿名用户' : '我',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF999999))),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: const Text('我的发布',
+                            style: TextStyle(
+                                fontSize: 9, color: AppColors.primary)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
