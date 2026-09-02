@@ -52,6 +52,11 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _tabController =
         TabController(length: MockData.homeTabs.length, vsync: this);
+    // 切换 Tab 时刷新商品流（不同 Tab 过滤不同商品）
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      setState(() {});
+    });
     _iconPageController.addListener(() {
       final p = _iconPageController.page ?? 0;
       if ((p - _iconPage).abs() > 0.001) {
@@ -167,8 +172,10 @@ class _HomeScreenState extends State<HomeScreen>
       _feedSig = sig;
       _feedGoods = pool.recommendGoods(10);
     }
-    final feedGoods = _feedGoods ??
+    final allGoods = _feedGoods ??
         ([...MockData.guessLikeGoods]..shuffle(Random()));
+    // 按当前 Tab 过滤商品流：猜你喜欢=全部 / 直播 / 便宜好货=低价 / 品牌闪购=品牌店
+    final feedGoods = _filterFeedByTab(allGoods, _tabController.index);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -652,6 +659,48 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  /// 字符串确定性哈希（与项目其它处一致的 31 倍哈希）
+  static int _hashOf(String s) {
+    var h = 0;
+    for (final c in s.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return h;
+  }
+
+  /// 按 Tab 过滤商品流（确定性过滤，避免每次构建结果抖动）
+  List<SearchResultItem> _filterFeedByTab(
+      List<SearchResultItem> all, int tab) {
+    List<SearchResultItem> list;
+    switch (tab) {
+      case 1: // 直播：直播带货商品子集
+        list = all.where((e) => _hashOf(e.title) % 3 == 0).toList();
+        break;
+      case 2: // 便宜好货：低价商品
+        list = all
+            .where((e) => (double.tryParse(e.price) ?? 999) < 60)
+            .toList();
+        break;
+      case 3: // 品牌闪购：品牌店铺商品
+        list = all
+            .where((e) =>
+                e.shopName.contains('旗舰店') ||
+                e.shopName.contains('官方') ||
+                e.shopName.contains('专营'))
+            .toList();
+        break;
+      default: // 猜你喜欢：全部
+        return all;
+    }
+    // 兜底：过滤结果过少时补一部分哈希子集，保证网格不空
+    if (list.length < 4) {
+      final extra = all.where((e) => _hashOf(e.title) % 2 == 0).toList();
+      final seen = list.map((e) => e.title).toSet();
+      list = [...list, ...extra.where((e) => !seen.contains(e.title))];
+    }
+    return list;
+  }
+
   // ============ TabBar ============
   Widget _buildTabBar() {
     return Container(
@@ -686,7 +735,15 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       final x = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (x == null) return; // 用户取消
-      _toast('未识别到二维码，请对准二维码重试');
+      // 确定性模拟识别：按文件路径哈希决定识别结果
+      final h = _hashOf(x.path);
+      if (h % 4 == 0) {
+        _toast('未识别到二维码，请对准二维码重试');
+        return;
+      }
+      const goods = ['连衣裙', '小白鞋', '保温杯', '双肩包', '耳机'];
+      _toast('识别成功，为你找到相关宝贝');
+      _gotoResult(goods[h % goods.length]);
     } catch (_) {
       _toast('无法打开相册');
     }
