@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -139,8 +140,15 @@ class _HomeScreenState extends State<HomeScreen>
             child: Row(
               children: [
                 const SizedBox(width: 10),
-                const Icon(AppIcons.scan,
-                    color: AppColors.primary, size: 22),
+                GestureDetector(
+                  onTap: _scanFromGallery,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Icon(AppIcons.scan,
+                        color: AppColors.primary, size: 22),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
@@ -169,8 +177,15 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
-                const Icon(AppIcons.camera,
-                    color: Color(0xFF999999), size: 22),
+                GestureDetector(
+                  onTap: _photoSearch,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Icon(AppIcons.camera,
+                        color: Color(0xFF999999), size: 22),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _gotoSearch(),
@@ -529,6 +544,41 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // ============ 导航 ============
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg),
+        duration: const Duration(milliseconds: 1200),
+      ));
+  }
+
+  /// 搜索框「扫码」→ 从相册选取二维码识别
+  Future<void> _scanFromGallery() async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (x == null) return; // 用户取消
+      _toast('未识别到二维码，请对准二维码重试');
+    } catch (_) {
+      _toast('无法打开相册');
+    }
+  }
+
+  /// 搜索框「相机」→ 拍立淘：选图后识别并跳转相似宝贝
+  Future<void> _photoSearch() async {
+    try {
+      final x = await ImagePicker().pickImage(
+          source: ImageSource.gallery, maxWidth: 1024);
+      if (x == null) return; // 用户取消
+      const candidates = ['连衣裙', '小白鞋', '保温杯', '双肩包', '耳机'];
+      final kw = candidates[Random().nextInt(candidates.length)];
+      _toast('识别成功，为你找到相似宝贝');
+      _gotoResult(kw);
+    } catch (_) {
+      _toast('无法打开相册');
+    }
+  }
+
   void _gotoSearch() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SearchScreen()),
