@@ -199,14 +199,14 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // ============ 图标区（两页滑动：P1 单行5+半露，P2 三行15；下方栏目固定不受影响） ============
-  static const double _kIconRowHeight = 84;
+  // ============ 图标区（两页滑动：P1 单行5个无文字，P2 三行15；下方栏目固定不受影响） ============
+  // 行高 = 顶部留白10 + 图标48 = 58（图标下方已无文字，容器高度按内容收紧）
+  static const double _kIconRowHeight = 58;
 
   Widget _buildIconPages() {
     // 翻页时高度在 单行(1页) 与 三行(2页) 之间平滑过渡
     final height = _kIconRowHeight +
-        14 +
-        (_kIconRowHeight * 2) * _iconPage.clamp(0.0, 1.0);
+        (_kIconRowHeight * 2 + 10) * _iconPage.clamp(0.0, 1.0);
     return Container(
       color: Colors.white,
       child: Column(
