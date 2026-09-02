@@ -38,7 +38,8 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   List<SearchResultItem> get _results {
-    var list = List<SearchResultItem>.of(MockData.guessLikeGoods);
+    // 关键词相关结果：真实池匹配优先 + 关键词确定性生成补足（替换原固定商品池）
+    var list = MockData.searchGoods(widget.keyword);
     // 筛选：价格区间
     bool inRange(SearchResultItem e) {
       final p = double.tryParse(e.price) ?? 0;
