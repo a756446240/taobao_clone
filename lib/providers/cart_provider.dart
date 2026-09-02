@@ -360,6 +360,64 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 购物车结算：把勾选商品从原店铺取出，按店铺名归并到"待付款"状态，
+  /// 与商品详情页「立即购买」走同一套待付款订单模式（出现在订单页待付款 Tab）。
+  /// 返回结算的商品件数；无勾选时返回 0 且不做任何改动。
+  int checkoutSelected() {
+    // 1. 收集勾选商品（保持店铺分组）
+    final picked = <String, List<OrderItem>>{};
+    var count = 0;
+    for (final shop in _shops) {
+      for (final item in shop.items) {
+        if (!item.isSelected) continue;
+        picked.putIfAbsent(shop.shopName, () => []).add(item);
+        count += item.quantity;
+      }
+    }
+    if (picked.isEmpty) return 0;
+
+    // 2. 从原店铺移除
+    for (final shop in _shops) {
+      shop.items.removeWhere((item) => item.isSelected);
+    }
+    _shops.removeWhere((shop) => shop.items.isEmpty);
+
+    // 3. 逐店铺塞入已有同名"待付款"店铺，否则新建（同 addToCart 逻辑）
+    for (final entry in picked.entries) {
+      final items = entry.value;
+      for (final item in items) {
+        item.isSelected = false;
+        item.statusTitle = '待付款';
+      }
+      ShoppingCartShop? target;
+      for (final s in _shops) {
+        if (s.shopName == entry.key && s.orderSubStatus == '待付款') {
+          target = s;
+          break;
+        }
+      }
+      final qty = items.fold<int>(0, (sum, it) => sum + it.quantity);
+      if (target != null) {
+        target.items.insertAll(0, items);
+      } else {
+        _shops.insert(
+          0,
+          ShoppingCartShop(
+            shopName: entry.key,
+            shopType: ShopType.taoBao,
+            items: items,
+            orderStatus: '待付款',
+            orderSubStatus: '待付款',
+            orderTotalTip: '共$qty件商品 合计：',
+          ),
+        );
+      }
+    }
+    _persist();
+    notifyListeners();
+    return count;
+  }
+
   void _syncShopSelection() {
     for (final shop in _shops) {
       shop.isSelected = shop.items.every((item) => item.isSelected);
