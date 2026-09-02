@@ -169,15 +169,17 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted) return;
     setState(() {
       _typing = false;
-      _messages.add(ChatMessage(content: reply, isMe: false));
+      _appendMessage(ChatMessage(content: reply, isMe: false, time: _nowTime()));
     });
     _scrollToBottom();
   }
 
-  /// 聊天设置：置顶 / 免打扰 / 清空聊天记录 / 投诉
+  /// 聊天设置：置顶 / 免打扰（真实生效并持久化）/ 清空聊天记录 / 投诉
   void _showChatSettingsSheet() {
-    var pinned = false;
-    var muted = false;
+    final prov =
+        Provider.of<ChatHistoryProvider>(context, listen: false);
+    var pinned = prov.isPinned(_convKey);
+    var muted = prov.isMuted(_convKey);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -197,14 +199,20 @@ class _ChatScreenState extends State<ChatScreen> {
                         const Text('置顶聊天', style: TextStyle(fontSize: 14)),
                     value: pinned,
                     activeColor: const Color(0xFFFF5000),
-                    onChanged: (v) => setSheet(() => pinned = v),
+                    onChanged: (v) => setSheet(() {
+                      pinned = v;
+                      prov.togglePin(_convKey);
+                    }),
                   ),
                   SwitchListTile(
                     title: const Text('消息免打扰',
                         style: TextStyle(fontSize: 14)),
                     value: muted,
                     activeColor: const Color(0xFFFF5000),
-                    onChanged: (v) => setSheet(() => muted = v),
+                    onChanged: (v) => setSheet(() {
+                      muted = v;
+                      prov.toggleMute(_convKey);
+                    }),
                   ),
                   ListTile(
                     title: const Text('清空聊天记录',
