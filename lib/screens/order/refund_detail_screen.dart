@@ -12,6 +12,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import 'refund_reason_picker.dart';
+import '../message/chat_screen.dart';
 
 /// 退款详情页 v3.5 整改版
 /// 新增：未发货秒退横幅、运费保障、可折叠协商历史、寄件详情、
@@ -999,24 +1000,27 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _bottomIcon(Icons.support_agent, '客服'),
-              _bottomIcon(Icons.help_outline, '帮助中心'),
+              _bottomIcon(Icons.support_agent, '客服',
+                  onTap: _gotoServiceChat),
+              _bottomIcon(Icons.help_outline, '帮助中心',
+                  onTap: _showHelpSheet),
               const Spacer(),
               if (_isPending) ...[
-                _smallBtn('寄件详情'),
+                _smallBtn('寄件详情', onTap: _showShipDetailSheet),
                 const SizedBox(width: 8),
-                _smallBtn('平台介入'),
+                _smallBtn('平台介入', onTap: _showInterveneSheet),
                 const SizedBox(width: 8),
-                _bigBtn('催处理'),
+                _bigBtn('催处理',
+                    onTap: () => _toast('已提醒商家尽快处理，请耐心等待')),
               ] else ...[
                 // 寄件详情（参考图 9 红框）
                 if (_item.showShipDetailBtn) ...[
-                  _smallBtn('寄件详情', onTap: () => _toast('查看寄件详情')),
+                  _smallBtn('寄件详情', onTap: _showShipDetailSheet),
                   const SizedBox(width: 8),
                 ],
                 _smallBtn('删除记录', onTap: _confirmDelete),
                 const SizedBox(width: 8),
-                _bigBtn('钱款去向'),
+                _bigBtn('钱款去向', onTap: _showMoneyFlowSheet),
               ],
             ],
           ),
@@ -1025,18 +1029,21 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _bottomIcon(IconData ic, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(ic, size: 20, color: const Color(0xFF666666)),
-          const SizedBox(height: 2),
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 10, color: Color(0xFF666666))),
-        ],
+  Widget _bottomIcon(IconData ic, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(ic, size: 20, color: const Color(0xFF666666)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 10, color: Color(0xFF666666))),
+          ],
+        ),
       ),
     );
   }
@@ -1057,16 +1064,232 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _bigBtn(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFFFF5000), Color(0xFFFF2E00)]),
-        borderRadius: BorderRadius.circular(16),
+  Widget _bigBtn(String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFFFF5000), Color(0xFFFF2E00)]),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(label,
+            style: const TextStyle(fontSize: 12, color: Colors.white)),
       ),
-      child: Text(label,
-          style: const TextStyle(fontSize: 12, color: Colors.white)),
+    );
+  }
+
+  /// 底部「客服」→ 真实进入店铺客服会话
+  void _gotoServiceChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: Conversation(
+            avatar: '',
+            title: _shop.shopName,
+            description: '退款售后咨询',
+            createAt: '',
+          ),
+          accentColor: const Color(0xFFFF5000),
+        ),
+      ),
+    );
+  }
+
+  /// 寄件详情弹层
+  void _showShipDetailSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Text('寄件详情',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 14),
+              _shipRow('物流信息', _item.refundLogistics),
+              _shipRow('寄件人', '张* 138****8888'),
+              _shipRow('寄件地址', '江苏省南京市江宁区诚信大道 88 号'),
+              _shipRow('收件人', '${_shop.shopName}（退货仓）'),
+              _shipRow('申请时间', _item.refundApplyTime),
+              const SizedBox(height: 6),
+              const Text('退货请在商家同意后 7 天内寄出，逾期退款通道将关闭。',
+                  style: TextStyle(
+                      color: Color(0xFF999999), fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _shipRow(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(k,
+                style: const TextStyle(
+                    color: Color(0xFF999999), fontSize: 13)),
+          ),
+          Expanded(
+              child: Text(v, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  /// 平台介入弹层：说明 + 真实提交
+  void _showInterveneSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('申请平台介入',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              const Text(
+                  '商家超过处理时效或您与商家协商不一致时，可申请淘宝客服介入。介入后平台将在 48 小时内根据双方凭证做出判定。',
+                  style: TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 12,
+                      height: 1.6)),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF5000)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _toast('平台介入申请已提交，客服将在 48 小时内处理');
+                  },
+                  child: const Text('提交申请'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 钱款去向弹层
+  void _showMoneyFlowSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Text('钱款去向',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 14),
+              _shipRow('退款金额',
+                  '¥${_item.refundAmount.toStringAsFixed(2)}'),
+              _shipRow('退回方式', _item.refundMethod),
+              _shipRow('到账时间', _item.refundDoneTime),
+              _shipRow('退款编号', _item.refundNumber),
+              const SizedBox(height: 6),
+              const Text('退款已原路退回，银行处理可能存在 1-3 个工作日延迟。',
+                  style: TextStyle(
+                      color: Color(0xFF999999), fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 帮助中心弹层：常见问题
+  void _showHelpSheet() {
+    const faqs = <(String, String)>[
+      ('退款多久到账？', '商家同意退款后，款项原路退回，余额实时到账，银行卡 1-3 个工作日。'),
+      ('运费险怎么赔？', '退货完成后 72 小时内自动赔付至您的账户，上门取件可直接抵扣。'),
+      ('商家拒绝退款怎么办？', '您可以在退款详情页申请平台介入，客服将依据双方凭证判定。'),
+      ('如何修改退款金额？', '退款未完结前，可与商家协商后撤销申请，重新发起退款。'),
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 420,
+          child: Column(
+            children: [
+              const SizedBox(height: 14),
+              const Text('帮助中心',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: faqs.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1),
+                  itemBuilder: (_, i) => ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(faqs[i].$1,
+                        style: const TextStyle(fontSize: 13)),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(faqs[i].$2,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF666666),
+                                height: 1.6)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
