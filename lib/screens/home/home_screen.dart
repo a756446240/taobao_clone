@@ -19,6 +19,7 @@ import 'channel_screen.dart';
 import 'live_list_screen.dart';
 import 'search_screen.dart';
 import 'search_result_screen.dart';
+import 'second_floor_screen.dart';
 
 /// 首页（搜索栏 + 图标两页滑动 + 直播四卡 + 超级立减横幅 + 吸顶 Tab + 猜你喜欢）
 class HomeScreen extends StatefulWidget {
@@ -40,6 +41,11 @@ class _HomeScreenState extends State<HomeScreen>
   // 推荐流无限滚动
   final ScrollController _scrollCtrl = ScrollController();
   bool _loadingMore = false;
+
+  // 下拉二楼：顶部继续下拉的距离累积，超阈值松手进入二楼
+  double _pullDown = 0;
+  bool _enteringSecondFloor = false;
+  static const _secondFloorThreshold = 110.0;
 
   @override
   void initState() {
@@ -79,6 +85,70 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  /// 顶部 overscroll 监听：累积下拉距离，松手超阈值进二楼
+  bool _onScrollNotification(ScrollNotification n) {
+    if (n is ScrollUpdateNotification) {
+      final p = n.metrics.pixels;
+      if (p < 0) {
+        final d = (-p).clamp(0.0, 160.0);
+        if (d != _pullDown) setState(() => _pullDown = d);
+      } else if (_pullDown != 0) {
+        setState(() => _pullDown = 0);
+      }
+    } else if (n is ScrollEndNotification) {
+      if (_pullDown >= _secondFloorThreshold && !_enteringSecondFloor) {
+        _enteringSecondFloor = true;
+        Navigator.of(context)
+            .push(MaterialPageRoute(
+                builder: (_) => const SecondFloorScreen()))
+            .then((_) => _enteringSecondFloor = false);
+      }
+      if (_pullDown != 0) setState(() => _pullDown = 0);
+    }
+    return false;
+  }
+
+  /// 下拉提示条：随下拉距离展开，超阈值变"松开进入二楼"
+  Widget _buildPullHint() {
+    if (_pullDown <= 0) return const SizedBox.shrink();
+    final ready = _pullDown >= _secondFloorThreshold;
+    final h = _pullDown.clamp(0.0, 72.0);
+    return Container(
+      height: h,
+      color: AppColors.background,
+      child: Center(
+        child: Opacity(
+          opacity: (h / 48).clamp(0.0, 1.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedRotation(
+                turns: ready ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(Icons.arrow_downward,
+                    size: 16,
+                    color: ready
+                        ? AppColors.primary
+                        : const Color(0xFF999999)),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                ready ? '松开进入二楼' : '继续下拉进入二楼',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ready
+                      ? AppColors.primary
+                      : const Color(0xFF999999),
+                  fontWeight: ready ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -104,9 +174,12 @@ class _HomeScreenState extends State<HomeScreen>
       body: Column(
         children: [
           _buildSearchBar(),
+          _buildPullHint(),
           Expanded(
-            child: CustomScrollView(
-              controller: _scrollCtrl,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onScrollNotification,
+              child: CustomScrollView(
+                controller: _scrollCtrl,
               slivers: [
                 // 折叠区内容
                 SliverToBoxAdapter(
@@ -168,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen>
                       : const SizedBox(height: 16),
                 ),
               ],
+              ),
             ),
           ),
         ],
