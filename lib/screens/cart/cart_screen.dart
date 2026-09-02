@@ -10,9 +10,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/favorites_provider.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
+import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
 
 /// 购物车页（1:1 复刻 3.4 新版）
@@ -1216,6 +1218,20 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _moveSelectedToFavorites(BuildContext context, CartProvider cart) {
+    // 真收藏：先把选中项写入收藏夹 Provider，再从购物车移除
+    final favs = context.read<FavoritesProvider>();
+    for (final shop in cart.shops) {
+      for (final item in shop.items) {
+        if (item.isSelected && !favs.isFav(item.title)) {
+          favs.toggle(SearchResultItem(
+            imageUrl: item.imageUrl,
+            title: item.title,
+            shopName: shop.shopName,
+            price: item.price.toStringAsFixed(2),
+          ));
+        }
+      }
+    }
     final count = cart.selectedItemCount;
     cart.removeSelected();
     ScaffoldMessenger.of(context).showSnackBar(
