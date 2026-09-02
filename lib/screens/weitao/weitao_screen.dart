@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -171,6 +172,7 @@ class _VideoPageState extends State<_VideoPage> {
   // 互动状态（本地）
   bool _liked = false;
   bool _faved = false;
+  bool _shared = false;
   bool _followed = false;
 
   @override
@@ -480,8 +482,13 @@ class _VideoPageState extends State<_VideoPage> {
         _railItem(
           icon: Icons.share,
           color: Colors.white,
-          label: _fmtCount(v.shares),
-          onTap: () => _toast('链接已复制，快去分享吧'),
+          label: _fmtCount(v.shares + (_shared ? 1 : 0)),
+          onTap: () {
+            Clipboard.setData(const ClipboardData(
+                text: '【淘宝】https://m.tb.cn/h.weT88 这条微淘太有趣了，快来看看吧'));
+            setState(() => _shared = true);
+            _toast('链接已复制，快去分享吧');
+          },
         ),
       ],
     );
