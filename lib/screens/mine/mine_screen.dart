@@ -777,8 +777,7 @@ class _MineScreenState extends State<MineScreen> {
           child: Column(
             children: [
               Image.asset(a['asset']!, width: 48, height: 48),
-              const SizedBox(height: 6),
-              Text(a['label']!, style: AppTextStyles.min),
+              // 图标下方文字已按需求删除
             ],
           ),
         )).toList(),
@@ -809,8 +808,7 @@ class _MineScreenState extends State<MineScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        // 内容区（直接贴近栏目条，不再留大段空白）
+        // 内容区（直接贴近栏目条，无间隔）
         if (_feedTab == 0) _buildGuessLike(),
         if (_feedTab == 1) _buildFavoritesFeed(),
         if (_feedTab == 2) _buildMyReviews(),
@@ -876,19 +874,37 @@ class _MineScreenState extends State<MineScreen> {
         (([...MockData.guessLikeGoods]..shuffle(Random()))
             .take(6)
             .toList());
+    // 双列瀑布流（左右列各自撑内容高度，卡片底部不留白）
+    final left = <Widget>[];
+    final right = <Widget>[];
+    for (var i = 0; i < picks.length; i++) {
+      (i.isEven ? left : right).add(_recommendCard(picks[i]));
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 0.58,
-        ),
-        itemCount: picks.length,
-        itemBuilder: (_, i) => _recommendCard(picks[i]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                for (final w in left)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10), child: w),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              children: [
+                for (final w in right)
+                  Padding(
+                      padding: const EdgeInsets.only(bottom: 10), child: w),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1118,11 +1134,11 @@ class _MineScreenState extends State<MineScreen> {
       likes: '1',
     ),
     (
-      image: 'assets/images/reviews/return_question.jpg',
-      text: '这年头为什么卖家能拉黑买家，不科学啊',
+      image: 'assets/images/reviews/return_rate.jpg',
+      text: '纯好奇！但是经常退货也不能完全怪买家吧',
       product: '',
-      user: '什么都好奇只会害了你',
-      likes: '456',
+      user: '小葵爸比',
+      likes: '403',
     ),
     (
       image: 'assets/images/reviews/kid_probiotics.jpg',
