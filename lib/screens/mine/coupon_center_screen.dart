@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../providers/coupons_provider.dart';
+import '../home/search_result_screen.dart';
 
 /// 优惠券条目
 class _Coupon {
@@ -22,6 +25,17 @@ class _Coupon {
     required this.bg,
     required this.fg,
   });
+
+  /// 从全局卡券包的领取记录构造（用于「已领取」Tab 展示）
+  factory _Coupon.fromClaimed(ClaimedCoupon c) => _Coupon(
+        value: c.value,
+        name: c.name,
+        condition: c.condition,
+        scope: c.scope,
+        expiry: c.expiry,
+        bg: Color(c.bg),
+        fg: Color(c.fg),
+      )..claimed = true;
 }
 
 /// 淘宝式领券中心完整页：精选好券 / 已领取 双 Tab
@@ -86,10 +100,32 @@ class _CouponCenterScreenState extends State<CouponCenterScreen> {
         fg: const Color(0xFF0E8A9E)),
   ];
 
-  List<_Coupon> get _available => _coupons.where((c) => !c.claimed).toList();
-  List<_Coupon> get _claimed => _coupons.where((c) => c.claimed).toList();
+  /// 可领取：预置券中未被领取过的（领取状态以全局卡券包为准，重启不丢）
+  List<_Coupon> _available(BuildContext context) {
+    final cp = context.watch<CouponsProvider>();
+    return _coupons
+        .where((c) => !cp.isClaimed(c.name, c.value))
+        .toList();
+  }
+
+  /// 已领取：全局卡券包真实记录（含二楼等其他入口领的券）
+  List<_Coupon> _claimedList(BuildContext context) {
+    final cp = context.watch<CouponsProvider>();
+    return cp.claimed.map((c) => _Coupon.fromClaimed(c)).toList();
+  }
 
   void _claim(_Coupon c) {
+    final ok = context.read<CouponsProvider>().claim(ClaimedCoupon(
+          value: c.value,
+          name: c.name,
+          condition: c.condition,
+          scope: c.scope,
+          expiry: c.expiry,
+          bg: c.bg.toARGB32(),
+          fg: c.fg.toARGB32(),
+          claimedAt: DateTime.now().millisecondsSinceEpoch,
+        ));
+    if (!ok) return;
     setState(() => c.claimed = true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -100,9 +136,28 @@ class _CouponCenterScreenState extends State<CouponCenterScreen> {
     );
   }
 
+  /// 去使用：按券的类目跳到对应商品搜索结果
+  void _useCoupon(_Coupon c) {
+    const map = {
+      '超市': '超市',
+      '珠宝': '珠宝',
+      '玩具': '玩具',
+      '服饰': '服饰',
+      '数码': '数码',
+    };
+    var kw = '大促';
+    map.forEach((k, v) {
+      if (c.name.contains(k) || c.scope.contains(k)) kw = v;
+    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SearchResultScreen(keyword: kw)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final list = _tab == 0 ? _available : _claimed;
+    final list = _tab == 0 ? _available(context) : _claimedList(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -140,9 +195,9 @@ class _CouponCenterScreenState extends State<CouponCenterScreen> {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       child: Row(
         children: [
-          _tabCapsule('精选好券', 0, count: _available.length),
+          _tabCapsule('精选好券', 0, count: _available(context).length),
           const SizedBox(width: 8),
-          _tabCapsule('已领取', 1, count: _claimed.length),
+          _tabCapsule('已领取', 1, count: _claimedList(context).length),
         ],
       ),
     );
@@ -241,15 +296,18 @@ class _CouponCenterScreenState extends State<CouponCenterScreen> {
               padding: const EdgeInsets.only(right: 12),
               child: Center(
                 child: c.claimed
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: c.bg,
-                          borderRadius: BorderRadius.circular(15),
+                    ? GestureDetector(
+                        onTap: () => _useCoupon(c),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: c.bg,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text('去使用',
+                              style: TextStyle(color: c.fg, fontSize: 12)),
                         ),
-                        child: Text('去使用',
-                            style: TextStyle(color: c.fg, fontSize: 12)),
                       )
                     : GestureDetector(
                         onTap: () => _claim(c),
