@@ -580,10 +580,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                       color: Color(0xFF1A1A1A))),
               const Spacer(),
               GestureDetector(
-                onTap: () {
-                  // 查看完整协商历史弹窗（略，可扩展）
-                  _toast('查看完整协商历史');
-                },
+                onTap: _showNegotiationSheet,
                 child: const Text('查看',
                     style:
                         TextStyle(fontSize: 12, color: Color(0xFF999999))),
@@ -641,6 +638,105 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  /// 完整协商历史弹层（基于真实退款字段构建时间线）
+  void _showNegotiationSheet() {
+    final steps = <(String, String, String, int)>[
+      // (标题, 描述, 时间, 状态) 状态: 0=已发生 1=当前 2=未发生
+      (
+        '买家申请退款',
+        '退款原因：${_item.refundReason.isEmpty ? '未填写' : _item.refundReason} · 申请金额 ¥${_item.refundAmount.toStringAsFixed(2)}',
+        _item.refundApplyTime,
+        0,
+      ),
+      if (_isPending)
+        ('商家处理中', '等待商家处理，逾期未处理将自动同意', '', 1)
+      else ...[
+        ('商家同意退款', '商家同意了本次退款申请', '', 0),
+        ('退款完结', '退款已原路退回至${_item.refundMethod}', _item.refundDoneTime, 1),
+      ],
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(
+                child: Text('协商历史',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 14),
+              for (var i = 0; i < steps.length; i++) ...[
+                _negoStep(steps[i], isFirst: i == steps.length - 1),
+                if (i != steps.length - 1)
+                  Container(
+                    margin: const EdgeInsets.only(left: 6),
+                    width: 2,
+                    height: 26,
+                    color: const Color(0xFFE5E5E5),
+                  ),
+              ],
+              const SizedBox(height: 10),
+              Text('退款编号：${_item.refundNumber}',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF999999))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _negoStep((String, String, String, int) s, {bool isFirst = false}) {
+    final color = s.$4 == 1
+        ? const Color(0xFFFF5000)
+        : const Color(0xFF2A9655);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          s.$4 == 1 ? Icons.schedule : Icons.check_circle,
+          size: 14,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(s.$1,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isFirst ? FontWeight.w600 : FontWeight.w400,
+                      color: const Color(0xFF1A1A1A))),
+              if (s.$2.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(s.$2,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF999999))),
+              ],
+              if (s.$3.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(s.$3,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFFBBBBBB))),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
