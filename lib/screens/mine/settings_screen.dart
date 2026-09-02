@@ -38,6 +38,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _toast('缓存已清除');
   }
 
+  /// 退出登录：确认弹窗 → 返回首页
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('退出后接收不到消息提醒，确定要退出登录吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('退出登录',
+                  style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      _toast('已退出登录');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: GestureDetector(
-              onTap: () => _toast('已退出登录（演示）'),
+              onTap: _confirmLogout,
               child: Container(
                 height: 44,
                 alignment: Alignment.center,
