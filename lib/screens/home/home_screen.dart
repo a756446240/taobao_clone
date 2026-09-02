@@ -37,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen>
   // 猜你喜欢：素材池加载完成后随机抽取一次（图+名对应）；池空时回退内置数据
   List<SearchResultItem>? _feedGoods;
   String? _feedSig;
+  // 推荐流无限滚动
+  final ScrollController _scrollCtrl = ScrollController();
+  bool _loadingMore = false;
 
   @override
   void initState() {
@@ -49,12 +52,38 @@ class _HomeScreenState extends State<HomeScreen>
         setState(() => _iconPage = p);
       }
     });
+    _scrollCtrl.addListener(_maybeLoadMore);
+  }
+
+  /// 滚动接近底部时自动加载下一批推荐
+  void _maybeLoadMore() {
+    if (!_scrollCtrl.hasClients || _loadingMore) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels > pos.maxScrollExtent - 300) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore) return;
+    setState(() => _loadingMore = true);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    final pool = context.read<MaterialPoolProvider>();
+    final more = pool.loading
+        ? ([...MockData.guessLikeGoods]..shuffle(Random())).take(10).toList()
+        : pool.recommendGoods(10);
+    setState(() {
+      _feedGoods = [...?_feedGoods, ...more];
+      _loadingMore = false;
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _iconPageController.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -77,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen>
           _buildSearchBar(),
           Expanded(
             child: CustomScrollView(
+              controller: _scrollCtrl,
               slivers: [
                 // 折叠区内容
                 SliverToBoxAdapter(
@@ -112,7 +142,31 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                // 底部加载指示
+                SliverToBoxAdapter(
+                  child: _loadingMore
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary),
+                              ),
+                              SizedBox(width: 8),
+                              Text('正在加载更多…',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF999999))),
+                            ],
+                          ),
+                        )
+                      : const SizedBox(height: 16),
+                ),
               ],
             ),
           ),
