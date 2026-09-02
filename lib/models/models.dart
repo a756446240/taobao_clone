@@ -98,6 +98,9 @@ class SearchResultItem {
   final String coupon;
   final String discount;
 
+  /// 发货地（空串时不展示；搜索结果由 MockData.searchGoods 填充）
+  final String shipFrom;
+
   const SearchResultItem({
     required this.imageUrl,
     required this.title,
@@ -107,7 +110,21 @@ class SearchResultItem {
     this.goodRate = '',
     this.coupon = '',
     this.discount = '',
+    this.shipFrom = '',
   });
+
+  /// 复制并替换发货地（其余字段保持不变）
+  SearchResultItem withShipFrom(String from) => SearchResultItem(
+        imageUrl: imageUrl,
+        title: title,
+        shopName: shopName,
+        price: price,
+        commentCount: commentCount,
+        goodRate: goodRate,
+        coupon: coupon,
+        discount: discount,
+        shipFrom: from,
+      );
 }
 
 // ============================= 购物车 =============================
