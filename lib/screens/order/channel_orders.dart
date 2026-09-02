@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/cart_provider.dart';
 import '../../widgets/app_image.dart';
+import 'channel_order_sheets.dart';
 
 /// 闪购(外卖)/飞猪(旅行)频道订单：确定性随机生成 + 卡片渲染
 /// 数据按固定种子生成，每次进入一致；删除仅会话内生效
@@ -321,7 +322,7 @@ class ShangouOrderCard extends StatelessWidget {
               _greyBtn('删除订单', onRemove),
               if (order.status == '已完成') ...[
                 const SizedBox(width: 8),
-                _greyBtn('评价', () => _toast(context, '已跳转发表评价（闪购暂不支持晒单）')),
+                _greyBtn('评价', () => showChannelRateSheet(context, order)),
               ],
               const SizedBox(width: 8),
               if (order.status == '待付款')
@@ -330,9 +331,9 @@ class ShangouOrderCard extends StatelessWidget {
                   _toast(context, '支付成功，商家正在备餐');
                 })
               else if (order.status == '配送中')
-                _orangeBtn('查看进度', () => _toast(context, '骑手距您约 1.2km，预计 15 分钟送达'))
+                _orangeBtn('查看进度', () => showDeliveryProgressSheet(context, order))
               else if (order.status == '退款中')
-                _orangeBtn('查看详情', () => _toast(context, '退款审核中，预计 24 小时内原路退回'))
+                _orangeBtn('查看详情', () => showChannelOrderDetailSheet(context, order))
               else
                 _orangeBtn('再买一单', () {
                   // 真实加入购物车（购物车 Tab 可见，不再是模拟提示）
@@ -489,11 +490,11 @@ class FeizhuOrderCard extends StatelessWidget {
                   _toast(context, '支付成功，行程已确认');
                 })
               else if (order.status == '待出行')
-                _orangeBtn('查看行程', () => _toast(context, '行程单已发送至您的淘宝消息'))
+                _orangeBtn('查看行程', () => showTripSheet(context, order))
               else if (order.status == '待评价')
-                _orangeBtn('评价', () => _toast(context, '已跳转发表评价（飞猪暂不支持晒单）'))
+                _orangeBtn('评价', () => showChannelRateSheet(context, order))
               else
-                _orangeBtn('查看详情', () => _toast(context, '订单详情（模拟）')),
+                _orangeBtn('查看详情', () => showChannelOrderDetailSheet(context, order)),
             ],
           ),
         ],
