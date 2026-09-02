@@ -235,13 +235,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: PageView.builder(
               itemCount: 3,
               onPageChanged: (i) => setState(() => _galleryIndex = i),
-              itemBuilder: (_, __) => imageUrl.isEmpty
-                  ? Container(
-                      color: const Color(0xFFF5F5F5),
-                      child: const Icon(Icons.image,
-                          size: 80, color: Color(0xFFDDDDDD)),
-                    )
-                  : AppImage(url: imageUrl, fit: BoxFit.cover),
+              itemBuilder: (_, page) => GestureDetector(
+                onTap: () => _openGalleryViewer(imageUrl, page),
+                child: imageUrl.isEmpty
+                    ? Container(
+                        color: const Color(0xFFF5F5F5),
+                        child: const Icon(Icons.image,
+                            size: 80, color: Color(0xFFDDDDDD)),
+                      )
+                    : AppImage(url: imageUrl, fit: BoxFit.cover),
+              ),
             ),
           ),
           Positioned(
@@ -260,6 +263,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 点击图廊 → 全屏大图查看器（双指缩放 + 左右翻页）
+  void _openGalleryViewer(String imageUrl, int initialPage) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (_, __, ___) => _GalleryViewer(
+            imageUrl: imageUrl, initialPage: initialPage),
       ),
     );
   }
@@ -1095,6 +1110,101 @@ class _ServiceItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 全屏大图查看器：双指缩放（0.5x-4x）+ 左右翻页 + 点击关闭
+class _GalleryViewer extends StatefulWidget {
+  final String imageUrl;
+  final int initialPage;
+  const _GalleryViewer({required this.imageUrl, required this.initialPage});
+
+  @override
+  State<_GalleryViewer> createState() => _GalleryViewerState();
+}
+
+class _GalleryViewerState extends State<_GalleryViewer> {
+  late final PageController _ctrl;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialPage;
+    _ctrl = PageController(initialPage: widget.initialPage);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _ctrl,
+            itemCount: 3,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (_, __) => GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Center(
+                  child: widget.imageUrl.isEmpty
+                      ? const Icon(Icons.image,
+                          size: 120, color: Color(0xFF666666))
+                      : AppImage(
+                          url: widget.imageUrl, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+          ),
+          // 页码指示
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 32,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('${_index + 1}/3',
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 12)),
+              ),
+            ),
+          ),
+          // 关闭按钮
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close,
+                    color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
