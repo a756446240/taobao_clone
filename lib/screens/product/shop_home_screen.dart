@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/follow_shops_provider.dart';
 import '../../widgets/app_image.dart';
 
 /// 淘宝式店铺主页：头部信息卡 + 关注切换 + 精选/上新/热销 Tab + 商品网格
@@ -24,7 +26,14 @@ class ShopHomeScreen extends StatefulWidget {
 class _ShopHomeScreenState extends State<ShopHomeScreen> {
   static const _tabs = ['精选', '上新', '热销'];
   int _tab = 0;
-  bool _following = false;
+
+  /// 关注状态全局化：读 FollowShopsProvider，关注列表页/直播间同步生效
+  bool get _following =>
+      context.watch<FollowShopsProvider>().isFollowed(widget.shopName);
+
+  /// 切换关注，返回切换后的状态（回调里用返回值，不能 watch）
+  bool _toggleFollow() =>
+      context.read<FollowShopsProvider>().toggle(widget.shopName);
 
   List<SearchResultItem> get _goods {
     final all = MockData.guessLikeGoods;
@@ -205,7 +214,7 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
                     style: const TextStyle(fontSize: 14)),
                 onTap: () {
                   Navigator.pop(sheetCtx);
-                  setState(() => _following = !_following);
+                  _toggleFollow();
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content:
                           Text(_following ? '已关注店铺' : '已取消关注'),
@@ -364,7 +373,7 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
             ),
           ),
           GestureDetector(
-            onTap: () => setState(() => _following = !_following),
+            onTap: _toggleFollow,
             child: Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
