@@ -203,6 +203,14 @@ class _MessageScreenState extends State<MessageScreen> {
       ));
   }
 
+  /// 下拉刷新消息列表（模拟向服务端拉取最新会话）
+  Future<void> _onRefresh() async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    setState(() {});
+    _showMsg('消息已刷新');
+  }
+
   /// 扫一扫：从相册选取图片识别二维码（真实走系统相册）
   Future<void> _scanFromGallery() async {
     try {
@@ -317,8 +325,12 @@ class _MessageScreenState extends State<MessageScreen> {
           _buildQuickEntries(),
           _buildSearchBar(),
           Expanded(
-            child: ListView(
-              children: [
+            child: RefreshIndicator(
+              color: const Color(0xFFFF5000),
+              onRefresh: _onRefresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
                 if (_query.isNotEmpty) ...[
                   // 搜索模式：只显示命中的会话
                   ..._history
@@ -352,8 +364,9 @@ class _MessageScreenState extends State<MessageScreen> {
                   ),
                   ..._history.map((m) => _historyTile(m)),
                 ],
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ],
