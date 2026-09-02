@@ -1206,18 +1206,18 @@ class _MineScreenState extends State<MineScreen> {
       likes: '1',
     ),
     (
+      image: 'assets/images/reviews/return_question.jpg',
+      text: '退货退款到底谁出运费？看完这篇就明白了',
+      product: '',
+      user: '爱买买买的喵',
+      likes: '56',
+    ),
+    (
       image: 'assets/images/reviews/return_rate.jpg',
       text: '纯好奇！但是经常退货也不能完全怪买家吧',
       product: '',
       user: '小葵爸比',
       likes: '403',
-    ),
-    (
-      image: 'assets/images/reviews/kid_probiotics.jpg',
-      text: '一到换季孩子就容易拉肚子，今年提前用这款益生菌滴剂调理',
-      product: '婴幼儿益生菌滴剂',
-      user: '匿名买家',
-      likes: '',
     ),
     (
       image: 'assets/images/reviews/smart_socket.jpg',
