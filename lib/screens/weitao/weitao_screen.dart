@@ -378,7 +378,7 @@ class _VideoPageState extends State<_VideoPage> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.16),
+                                  color: Colors.white.withValues(alpha: 0.16),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(widget.video.shop,
@@ -601,7 +601,7 @@ class _CommentSheetState extends State<_CommentSheet> {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: color.withOpacity(0.15),
+                          backgroundColor: color.withValues(alpha: 0.15),
                           child: Text(nick[0],
                               style: TextStyle(
                                   color: color,
