@@ -262,11 +262,11 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 第 1 页：单行 5 个，第 6 个"红包签到"右缘半露（不可独立滚动，横向手势交给翻页）
+  /// 第 1 页：单行 5 个均分整宽（图标下方不显示文字，半露的第 6 个已按需求删除）
   Widget _buildIconPage1() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final itemWidth = (constraints.maxWidth - 20) / 5.4;
+        final itemWidth = (constraints.maxWidth - 20) / 5;
         return Container(
           clipBehavior: Clip.hardEdge,
           decoration: const BoxDecoration(),
@@ -277,7 +277,8 @@ class _HomeScreenState extends State<HomeScreen>
               const SizedBox(width: 10),
               ...MockData.homeIconPage1.map(
                 (e) => SizedBox(
-                    width: itemWidth, child: _buildIconEntry(e)),
+                    width: itemWidth,
+                    child: _buildIconEntry(e, showLabel: false)),
               ),
             ],
           ),
