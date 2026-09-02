@@ -21,6 +21,7 @@ import '../home/search_result_screen.dart';
 import '../message/chat_screen.dart';
 import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
+import '../product/product_detail_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
 import 'benefits_screen.dart';
@@ -1008,7 +1009,15 @@ class _MineScreenState extends State<MineScreen> {
     final overrideUrl =
         context.watch<ProductImageProvider>().imageFor(item.title);
     final imageUrl = overrideUrl ?? item.imageUrl;
-    return Container(
+    // 单击整卡进商品详情（与首页/搜索页口径一致），双击图片换图
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => ProductDetailScreen(item: item)),
+        );
+      },
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -1046,6 +1055,7 @@ class _MineScreenState extends State<MineScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
