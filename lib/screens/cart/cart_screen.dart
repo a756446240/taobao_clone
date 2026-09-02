@@ -460,65 +460,195 @@ class _CartScreenState extends State<CartScreen> {
         '记得先去领券中心领取消费券再结算',
       ];
     }
+    // 凑单推荐：价格升序取 6 件（优先不贵于缺口的）
+    final pool = [...MockData.guessLikeGoods]
+      ..sort((a, b) => (double.tryParse(a.price) ?? 999)
+          .compareTo(double.tryParse(b.price) ?? 999));
+    final added = <String>{}; // 本次弹层内已加购的商品标题
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetCtx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Center(
-                child: Text('AI 省钱助手',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 12),
-              for (final tip in tips)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.auto_awesome,
-                          size: 16, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(tip,
-                            style: const TextStyle(
-                                fontSize: 13, height: 1.4)),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) {
+          // 每次重建都重新读取最新勾选金额（加购后缺口实时缩小）
+          final curTotal = context.read<CartProvider>().totalPrice;
+          final curGap = couponThreshold - curTotal;
+          final List<String> liveTips;
+          if (cart.selectedItemCount == 0) {
+            liveTips = tips;
+          } else if (curGap > 0) {
+            liveTips = [
+              '当前勾选 ¥${curTotal.toStringAsFixed(2)}，再凑 ¥${curGap.toStringAsFixed(2)} 即可用 61 元消费券（满 599 可用）',
+              '点击下方「+」一键凑单，凑满自动停',
+            ];
+          } else {
+            liveTips = [
+              '当前勾选 ¥${curTotal.toStringAsFixed(2)}，已满足 61 元消费券使用门槛，结算立减 ¥${couponValue.toStringAsFixed(0)}',
+              '记得先去领券中心领取消费券再结算',
+            ];
+          }
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text('AI 省钱助手',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final tip in liveTips)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.auto_awesome,
+                              size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(tip,
+                                style: const TextStyle(
+                                    fontSize: 13, height: 1.4)),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  // 凑单推荐（有缺口时展示）
+                  if (cart.selectedItemCount > 0 && curGap > 0) ...[
+                    const SizedBox(height: 4),
+                    const Text('为你凑单',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 148,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: pool.length < 6 ? pool.length : 6,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(width: 8),
+                        itemBuilder: (_, i) {
+                          final g = pool[i];
+                          final isAdded = added.contains(g.title);
+                          return Container(
+                            width: 104,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                AppImage(
+                                    url: g.imageUrl,
+                                    width: 104,
+                                    height: 78,
+                                    fit: BoxFit.cover),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(6, 4, 6, 0),
+                                  child: Text(g.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 10, height: 1.2)),
+                                ),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(6, 2, 6, 4),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text('¥${g.price}',
+                                            maxLines: 1,
+                                            overflow:
+                                                TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: AppColors.primary,
+                                                fontSize: 12,
+                                                fontWeight:
+                                                    FontWeight.bold)),
+                                      ),
+                                      GestureDetector(
+                                        onTap: isAdded
+                                            ? null
+                                            : () {
+                                                cart.addToCart(
+                                                  shopName: g.shopName,
+                                                  title: g.title,
+                                                  price: double.tryParse(
+                                                          g.price) ??
+                                                      0,
+                                                  imageUrl: g.imageUrl,
+                                                  spec: '默认规格',
+                                                  quantity: 1,
+                                                );
+                                                setSheet(() =>
+                                                    added.add(g.title));
+                                              },
+                                        child: Container(
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: isAdded
+                                                ? const Color(0xFFDDDDDD)
+                                                : AppColors.primary,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: Text(
+                                              isAdded ? '已加' : '+ 凑单',
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const CouponCenterScreen()),
+                        );
+                      },
+                      child: const Text('去领券中心看看'),
+                    ),
                   ),
-                ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                  ),
-                  onPressed: () {
-                    Navigator.pop(sheetCtx);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const CouponCenterScreen()),
-                    );
-                  },
-                  child: const Text('去领券中心看看'),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
