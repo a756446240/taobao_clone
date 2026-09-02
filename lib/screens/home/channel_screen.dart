@@ -7,6 +7,7 @@ import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../widgets/product_card.dart';
 import 'category_screen.dart';
+import 'search_result_screen.dart';
 
 /// 频道页（首页金刚区入口）
 /// 频道色渐变头 + 运营标语 + 促销 chips + 商品双列网格（按频道名哈希稳定选品）
@@ -151,16 +152,24 @@ class ChannelScreen extends StatelessWidget {
               child: Row(
                 children: [
                   for (final c in chips) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1EC),
-                        borderRadius: BorderRadius.circular(12),
+                    // 促销 chip：点击按关键词搜索相关商品
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SearchResultScreen(keyword: c),
+                        ),
                       ),
-                      child: Text(c,
-                          style: const TextStyle(
-                              color: AppColors.primary, fontSize: 11)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1EC),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(c,
+                            style: const TextStyle(
+                                color: AppColors.primary, fontSize: 11)),
+                      ),
                     ),
                     const SizedBox(width: 8),
                   ],
