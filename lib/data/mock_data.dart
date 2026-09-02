@@ -240,6 +240,117 @@ class MockData {
         goodRate: '97%好评'),
   ];
 
+  // ============================= 搜索 =============================
+
+  /// 关键词搜索结果：真实素材池中匹配的商品排前面，
+  /// 再按关键词确定性生成一批标题含关键词的商品补足一屏（哈希假数据，
+  /// 同一关键词每次结果一致）。
+  static List<SearchResultItem> searchGoods(String keyword) {
+    final kw = keyword.trim();
+    if (kw.isEmpty) return List.of(guessLikeGoods);
+
+    // 1) 真实池匹配：整词命中优先，其次按字符覆盖率
+    int scoreOf(String title) {
+      if (title.contains(kw)) return 100;
+      if (kw.length < 2) return title.contains(kw) ? 100 : 0;
+      var hit = 0;
+      for (final ch in kw.split('')) {
+        if (title.contains(ch)) hit++;
+      }
+      final ratio = hit / kw.length;
+      return ratio >= 0.5 ? (ratio * 60).round() : 0;
+    }
+
+    final matched = guessLikeGoods
+        .where((e) => scoreOf(e.title) > 0)
+        .toList()
+      ..sort((a, b) => scoreOf(b.title).compareTo(scoreOf(a.title)));
+
+    // 2) 关键词确定性生成（保证一屏 20+ 条且标题都含关键词）
+    int hash(String s) {
+      var h = 0;
+      for (final c in s.codeUnits) {
+        h = (h * 31 + c) & 0x7fffffff;
+      }
+      return h;
+    }
+
+    const titleTemplates = [
+      '{kw} 官方旗舰店正品包邮',
+      '{kw} 热卖爆款 当季新款',
+      '进口{kw} 免税仓直邮',
+      '{kw} 大促特价 假一赔十',
+      '{kw} 家庭装实惠装',
+      '【品牌直营】{kw} 专柜同款',
+      '{kw} 升级版 买二送一',
+      '{kw} 网红同款 抖音热推',
+      '{kw} 礼盒装 送礼佳品',
+      '{kw} 工厂直供 一件代发',
+      '新款{kw} 48小时发货',
+      '{kw} 测评推荐 万人回购',
+      '{kw} 清仓特价 库存有限',
+      '{kw} 高端定制 品质保证',
+      '{kw} 学生党平价好物',
+      '{kw} 套装组合更划算',
+      '正品{kw} 支持验货',
+      '{kw} 限时秒杀 今日特价',
+      '{kw} 加量不加价',
+      '{kw} 老客专享复购装',
+    ];
+    const shopSuffixes = ['旗舰店', '专营店', '海外旗舰店', '官方自营店', '品牌直销店'];
+    // 店名取关键词前 2~4 个字做"品牌"，避免全叫一个名
+    final brand = kw.length <= 4 ? kw : kw.substring(0, 4);
+
+    final generated = <SearchResultItem>[];
+    for (var i = 0; i < titleTemplates.length; i++) {
+      final h = hash('$kw#$i');
+      final title = titleTemplates[i].replaceAll('{kw}', kw);
+      final shop = '$brand${shopSuffixes[h % shopSuffixes.length]}';
+      final price = (9 + h % 990) + (h % 100) / 100;
+      final sold = h % 90000 + 1000;
+      final soldText = sold >= 10000
+          ? '已售${(sold / 10000).toStringAsFixed(1)}万+'
+          : '已售$sold+';
+      generated.add(SearchResultItem(
+        imageUrl:
+            'assets/materials/mat${(h % 17 + 1).toString().padLeft(2, '0')}.jpg',
+        title: title,
+        shopName: shop,
+        price: price.toStringAsFixed(2),
+        commentCount: soldText,
+        goodRate: '${95 + h % 5}%好评',
+      ));
+    }
+
+    // 去重（真实池与生成池标题相同的情况）后合并
+    final seen = <String>{};
+    return [
+      for (final e in [...matched, ...generated])
+        if (seen.add(e.title)) e,
+    ];
+  }
+
+  /// 搜索联想词：热搜词库 + 真实商品标题中匹配输入的词，去重后返回
+  static List<String> searchSuggestions(String input) {
+    final kw = input.trim();
+    if (kw.isEmpty) return const [];
+    final out = <String>[];
+    final seen = <String>{};
+    void add(String s) {
+      if (seen.add(s)) out.add(s);
+    }
+
+    for (final h in searchHints) {
+      if (h.contains(kw)) add(h);
+    }
+    for (final g in guessLikeGoods) {
+      if (g.title.contains(kw)) add(g.title);
+    }
+    // 输入本身不在词库时也兜底给出，保证一定能搜
+    add(kw);
+    return out.take(10).toList();
+  }
+
   // ============================= 购物车 =============================
 
   static List<ShoppingCartShop> get shoppingCartShops => [
