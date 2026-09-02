@@ -493,10 +493,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await context
           .read<ProductImageProvider>()
           .setOverride('shop_avatar:${_shop.shopName}', saved.path);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片选择失败')),
       );
@@ -642,11 +644,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await context
           .read<ProductImageProvider>()
           .setOverride(_item.title, saved.path);
+      if (!mounted) return;
       context.read<CartProvider>().updateOrderItem(_item, imageUrl: saved.path);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片选择失败')),
       );
@@ -948,6 +952,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       options: CartProvider.orderStatusOptions,
       currentValue: _item.statusTitle,
     ).then((v) {
+      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderStatus(_shop, _item, v);
       }
@@ -961,6 +966,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       title: '修改倒计时',
       initial: _item.countDown.isEmpty ? '还剩3天21小时自动确认' : _item.countDown,
     ).then((v) {
+      if (!mounted) return;
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, countDown: v);
       }
