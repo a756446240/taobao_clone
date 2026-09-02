@@ -33,103 +33,107 @@ class ChannelOrder {
   });
 }
 
-// ============ 确定性随机数据生成 ============
+// ============ 固定数据（用户提供的外卖/旅行素材图，订单可重复使用同一素材） ============
 
-const _imgs = [
-  'assets/images/remote/r0038.jpg',
-  'assets/images/remote/r0039.jpg',
-  'assets/images/remote/r0040.jpg',
-  'assets/images/remote/r0041.jpg',
-  'assets/images/remote/r0042.jpg',
-  'assets/images/remote/r0043.jpg',
-  'assets/images/remote/r0047.jpg',
-  'assets/images/remote/r0048.jpg',
-  'assets/images/remote/r0049.jpg',
-  'assets/images/remote/r0050.jpg',
-  'assets/images/remote/r0051.jpg',
-  'assets/images/remote/r0052.jpg',
-  'assets/images/remote/r0053.jpg',
-  'assets/images/remote/r0054.jpg',
-];
-
-const _shangouShops = [
-  ['沪上阿姨·精选', '淄博步行街店'],
-  ['蜜雪冰城', '张店美食街店'],
-  ['瑞幸咖啡', '淄博王府井店'],
-  ['肯德基', '人民路餐厅'],
-  ['星巴克', '万象汇店'],
-  ['麦当劳', '共青团路餐厅'],
-  ['古茗', '淄博银座店'],
-  ['华莱士', '联通路店'],
-];
-
-const _shangouItems = <(String, double)>[
-  ('好大一桶冰蓝海盐冰奶（1L）大桶', 7.1),
-  ('珍珠奶茶大杯＋芋圆双拼', 13.5),
-  ('美式咖啡双杯套餐', 19.9),
-  ('香辣鸡腿堡单人餐', 25.5),
-  ('拿铁（大杯）＋可颂', 32.0),
-  ('麦辣鸡翅四块＋中薯', 21.5),
-  ('杨枝甘露轻盈版（大杯）', 16.0),
-  ('脆皮全鸡一只', 29.9),
-];
-
-const _shangouStatus = ['已完成', '已完成', '已完成', '待付款', '配送中', '已完成', '退款中', '已完成'];
-
-const _feizhuShops = [
-  '飞猪旅行小铺旗舰店',
-  '飞猪会员旗舰店',
-  '杭州西湖希尔顿酒店旗舰店',
-  '上海迪士尼度假区旗舰店',
-  '携程机票旗舰店',
-  '乌镇旅游官方旗舰店',
-];
-
-const _feizhuItems = <(String, double)>[
-  ('0.01元抢飞猪春节豪华酒店红包', 0.01),
-  ('亲子暑期超值大礼包-含猫超卡亲子', 0.1),
-  ('杭州西湖希尔顿酒店豪华房1晚含双早', 688.0),
-  ('上海迪士尼乐园双人一日票', 998.0),
-  ('北京-三亚往返机票经济舱含税', 1580.0),
-  ('乌镇西栅景区门票＋摇橹船票双人', 260.0),
-];
-
-const _feizhuStatus = ['交易关闭', '交易成功', '待出行', '待评价', '待付款', '交易成功'];
-
-const _promoTags = ['满128减35', '满60减12', '新客立减5元', ''];
-
-/// 生成闪购订单（确定性，与索引绑定）
+/// 生成闪购订单（固定列表，素材来自用户提供的外卖图，可重复）
 List<ChannelOrder> buildShangouOrders() {
-  return [
-    for (var i = 0; i < _shangouShops.length; i++)
-      ChannelOrder(
-        id: 'sg_$i',
-        kind: 0,
-        shopName: _shangouShops[i][0],
-        location: _shangouShops[i][1],
-        status: _shangouStatus[i],
-        itemTitle: _shangouItems[i].$1,
-        price: _shangouItems[i].$2,
-        image: _imgs[(i * 5 + 2) % _imgs.length],
-        promoTag: _promoTags[(i * 3 + 1) % _promoTags.length],
-      ),
+  const auntJenny = 'assets/images/shangou/auntjenny.jpg';
+  return const [
+    ChannelOrder(
+      id: 'sg_0', kind: 0,
+      shopName: '沪上阿姨·精选', location: '淄博步行街店',
+      status: '已完成',
+      itemTitle: '好大一桶冰蓝海盐冰奶（1L）大桶',
+      price: 7.1, image: auntJenny, promoTag: '满128减35',
+    ),
+    ChannelOrder(
+      id: 'sg_1', kind: 0,
+      shopName: '沪上阿姨·精选', location: '张店美食街店',
+      status: '已完成',
+      itemTitle: '好大一桶冰蓝海盐冰奶（1L）大桶',
+      price: 7.1, image: auntJenny, promoTag: '满60减12',
+    ),
+    ChannelOrder(
+      id: 'sg_2', kind: 0,
+      shopName: '杭景元麻辣烫&炸串', location: '万象汇店',
+      status: '已完成',
+      itemTitle: '东北老式黏糊麻辣烫（单人豪华份）',
+      price: 18.8, image: 'assets/images/shangou/malatang.jpg',
+      promoTag: '新客立减5元',
+    ),
+    ChannelOrder(
+      id: 'sg_3', kind: 0,
+      shopName: '临榆炸鸡腿', location: '人民路店',
+      status: '已完成',
+      itemTitle: '招牌炸鸡腿3只装 大口吃肉',
+      price: 15.9, image: 'assets/images/shangou/chicken.jpg',
+    ),
+    ChannelOrder(
+      id: 'sg_4', kind: 0,
+      shopName: '茶百道', location: '淄博银座店',
+      status: '已完成',
+      itemTitle: '西瓜啵啵（大杯/不含茶）',
+      price: 14.0, image: 'assets/images/shangou/chapanda_watermelon.jpg',
+    ),
+    ChannelOrder(
+      id: 'sg_5', kind: 0,
+      shopName: '茶百道', location: '联通路店',
+      status: '已完成',
+      itemTitle: '酸甜青梅（限时特价 清爽解腻）',
+      price: 12.0, image: 'assets/images/shangou/chapanda_plum.jpg',
+      promoTag: '限时特价',
+    ),
+    ChannelOrder(
+      id: 'sg_6', kind: 0,
+      shopName: '肯德基', location: '人民路餐厅',
+      status: '配送中',
+      itemTitle: '藤椒风味鸡腿堡单人餐（微辣）',
+      price: 25.5, image: 'assets/images/shangou/kfc.jpg',
+    ),
+    ChannelOrder(
+      id: 'sg_7', kind: 0,
+      shopName: '蒙自源过桥米线', location: '王府井店',
+      status: '待付款',
+      itemTitle: '番茄肥牛米线＋小酥肉',
+      price: 22.9, image: 'assets/images/shangou/mixian.jpg',
+    ),
+    ChannelOrder(
+      id: 'sg_8', kind: 0,
+      shopName: '沪上阿姨·精选', location: '淄博王府井店',
+      status: '退款中',
+      itemTitle: '好大一桶冰蓝海盐冰奶（1L）大桶',
+      price: 7.1, image: auntJenny,
+    ),
+    ChannelOrder(
+      id: 'sg_9', kind: 0,
+      shopName: '肯德基', location: '共青团路餐厅',
+      status: '已完成',
+      itemTitle: '藤椒风味鸡腿堡＋冰可乐',
+      price: 19.9, image: 'assets/images/shangou/kfc.jpg',
+      promoTag: '满60减12',
+    ),
   ];
 }
 
-/// 生成飞猪订单（确定性，与索引绑定）
+/// 生成飞猪订单（固定 2 单，素材来自用户提供的飞猪活动图）
 List<ChannelOrder> buildFeizhuOrders() {
-  return [
-    for (var i = 0; i < _feizhuShops.length; i++)
-      ChannelOrder(
-        id: 'fz_$i',
-        kind: 1,
-        shopName: _feizhuShops[i],
-        status: _feizhuStatus[i],
-        itemTitle: _feizhuItems[i].$1,
-        spec: '×1',
-        price: _feizhuItems[i].$2,
-        image: _imgs[(i * 7 + 5) % _imgs.length],
-      ),
+  return const [
+    ChannelOrder(
+      id: 'fz_0', kind: 1,
+      shopName: '飞猪旅行小铺旗舰店',
+      status: '交易关闭',
+      itemTitle: '0.01元抢飞猪春节豪华酒店红包 最高省235元',
+      spec: '×1',
+      price: 0.01, image: 'assets/images/feizhu/hotel_redpack.jpg',
+    ),
+    ChannelOrder(
+      id: 'fz_1', kind: 1,
+      shopName: '飞猪会员旗舰店',
+      status: '交易成功',
+      itemTitle: '亲子暑期超值大礼包-含猫超卡亲子',
+      spec: '×1',
+      price: 0.1, image: 'assets/images/feizhu/kids_giftpack.jpg',
+    ),
   ];
 }
 
