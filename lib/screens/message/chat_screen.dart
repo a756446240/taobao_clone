@@ -332,7 +332,7 @@ class _ChatScreenState extends State<ChatScreen> {
         : '客';
     return CircleAvatar(
       radius: 16,
-      backgroundColor: color.withOpacity(0.15),
+      backgroundColor: color.withValues(alpha: 0.15),
       child: Text(initial,
           style: TextStyle(
               color: color, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -363,9 +363,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildBubble(ChatMessage message) {
     final isMe = message.isMe;
+    // 图片消息：content 形如 img:<本地路径>，渲染缩略图，点击放大预览
+    final isImg = message.content.startsWith('img:');
+    final imgPath = isImg ? message.content.substring(4) : '';
     final bubble = Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: isImg
+          ? const EdgeInsets.all(4)
+          : const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.65,
       ),
@@ -378,13 +383,32 @@ class _ChatScreenState extends State<ChatScreen> {
           bottomRight: Radius.circular(isMe ? 2 : 12),
         ),
       ),
-      child: Text(
-        message.content,
-        style: TextStyle(
-          color: isMe ? Colors.white : Colors.black87,
-          fontSize: 15,
-        ),
-      ),
+      child: isImg
+          ? GestureDetector(
+              onTap: () => _previewImage(imgPath),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(imgPath),
+                  width: 160,
+                  height: 160,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    width: 160,
+                    height: 160,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.black38, size: 40),
+                  ),
+                ),
+              ),
+            )
+          : Text(
+              message.content,
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black87,
+                fontSize: 15,
+              ),
+            ),
     );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
