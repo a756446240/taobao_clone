@@ -486,10 +486,10 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _group([
-            _infoRow('功能介绍', '新品首发、直播好货、闪购小时达'),
-            _infoRow('用户协议', '《淘宝平台服务协议》'),
-            _infoRow('隐私政策', '《淘宝隐私权政策》'),
-            _infoRow('开源组件声明', 'Flutter 及第三方开源组件'),
+            _infoRow(context, '功能介绍', '新品首发、直播好货、闪购小时达'),
+            _infoRow(context, '用户协议', '《淘宝平台服务协议》'),
+            _infoRow(context, '隐私政策', '《淘宝隐私权政策》'),
+            _infoRow(context, '开源组件声明', 'Flutter 及第三方开源组件'),
           ]),
           const SizedBox(height: 24),
           const Center(
@@ -506,25 +506,60 @@ class AboutScreen extends StatelessWidget {
   }
 }
 
-Widget _infoRow(String title, String subtitle) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 2),
-              Text(subtitle,
-                  style: const TextStyle(
-                      color: Color(0xFF999999), fontSize: 11)),
-            ],
+Widget _infoRow(BuildContext context, String title, String subtitle) {
+  /// 各行对应的完整说明文本
+  String detailOf() {
+    switch (title) {
+      case '功能介绍':
+        return '新品首发：每日上新，抢先体验。\n\n直播好货：主播实拍讲解，边看边买。\n\n闪购小时达：附近门店发货，最快一小时送达。';
+      case '用户协议':
+        return '《淘宝平台服务协议》\n\n欢迎使用淘宝平台服务。为保障您的权益，请在使用本平台服务前仔细阅读并理解本协议全部内容。您使用本平台服务即视为已阅读并同意接受本协议的全部约定。\n\n（演示文本，非真实协议）';
+      case '隐私政策':
+        return '《淘宝隐私权政策》\n\n我们非常重视您的个人信息与隐私保护。本政策说明我们如何收集、使用、存储和保护您的个人信息，以及您享有的相关权利。\n\n（演示文本，非真实政策）';
+      default:
+        return '本应用基于 Flutter 构建，使用了 image_picker、provider、shared_preferences、path_provider 等开源组件，遵循各自的开源许可协议。';
+    }
+  }
+
+  return GestureDetector(
+    onTap: () {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title, style: const TextStyle(fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Text(detailOf(),
+                style: const TextStyle(fontSize: 13, height: 1.6)),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('知道了'),
+            ),
+          ],
         ),
-        const Icon(Icons.chevron_right, size: 18, color: Color(0xFF999999)),
-      ],
+      );
+    },
+    behavior: HitTestBehavior.opaque,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: Color(0xFF999999), fontSize: 11)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, size: 18, color: Color(0xFF999999)),
+        ],
+      ),
     ),
   );
 }
