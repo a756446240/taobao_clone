@@ -61,7 +61,6 @@ class LogisticsScreen extends StatelessWidget {
   }
 
   /// 顶部横幅状态文案
-  String get _bannerStatus => const ['等待付款', '等待发货', '运输中', '已签收'][_stage];
 
   /// 根据订单时间线动态生成物流跟踪（每单不同，且与订单状态一致）
   List<_TraceNode> _buildTraces() {
