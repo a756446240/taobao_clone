@@ -735,6 +735,7 @@ class _OrderCard extends StatelessWidget {
       currentValue: ShopTypeBadge.resolve(shop).text,
     ).then((v) {
       if (v == null) return;
+      if (!context.mounted) return;
       context.read<CartProvider>().updateShop(
             shop,
             shopBadge: v,
@@ -970,11 +971,13 @@ class _OrderItemTile extends StatelessWidget {
       await context
           .read<ProductImageProvider>()
           .setOverride(item.title, saved.path);
+      if (!context.mounted) return;
       context.read<CartProvider>().updateOrderItem(item, imageUrl: saved.path);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片选择失败')),
       );
