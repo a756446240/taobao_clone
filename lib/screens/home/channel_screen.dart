@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -98,10 +99,13 @@ class ChannelScreen extends StatelessWidget {
                           icon: const Icon(Icons.share_outlined,
                               color: Colors.white, size: 20),
                           onPressed: () {
+                            Clipboard.setData(const ClipboardData(
+                                text:
+                                    '【淘宝】https://m.tb.cn/h.chX19 这个频道太好逛了，快来看看吧'));
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()
                               ..showSnackBar(const SnackBar(
-                                content: Text('分享链接已复制（演示）'),
+                                content: Text('分享链接已复制，快去分享吧'),
                                 duration: Duration(seconds: 1),
                               ));
                           },
