@@ -1346,6 +1346,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改大标题', initial: _item.refundTitle)
         .then((v) {
+      if (!mounted) return;
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, refundTitle: v);
         setState(() {});
@@ -1358,6 +1359,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改副标题（留空=自动生成）', initial: _item.refundSubtitle)
         .then((v) {
+      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderItem(_item, refundSubtitle: v);
         setState(() {});
@@ -1371,6 +1373,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             title: '修改退款金额',
             initial: _item.refundAmount.toStringAsFixed(2))
         .then((v) {
+      if (!mounted) return;
       final n = double.tryParse(v ?? '');
       if (n != null && n > 0) {
         context
@@ -1389,6 +1392,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       options: const ['支付宝', '银行卡', '微信支付', '花呗'],
       currentValue: _item.refundMethod,
     ).then((v) {
+      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderItem(_item, refundMethod: v);
         setState(() {});
@@ -1401,6 +1405,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改退款物流（留空=不显示）', initial: _item.refundLogistics)
         .then((v) {
+      if (!mounted) return;
       if (v != null) {
         context
             .read<CartProvider>()
@@ -1415,6 +1420,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   void _pickRefundReason() {
     showRefundReasonPicker(context, currentReason: _item.refundReason)
         .then((v) {
+      if (!mounted) return;
       if (v != null) {
         setState(() {
           _item.refundReason = v;
@@ -1563,6 +1569,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改退款编号（留空=重新生成）', initial: _item.refundNumber)
         .then((v) {
+      if (!mounted) return;
       if (v != null) {
         setState(() {
           _item.refundNumber = v.isEmpty ? _genRefundNumber() : v;
@@ -1583,10 +1590,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           : _item.refundStatus,
     ).then((v) {
       if (v == null) return;
+      if (!mounted) return;
       final provider = context.read<CartProvider>();
       provider.updateOrderStatus(_shop, _item, v);
       final isRefund = CartProvider.statusCategory(v) == '退款/售后';
-      if (!mounted) return;
       if (isRefund) {
         setState(() {});
         _startTimerIfPending();
