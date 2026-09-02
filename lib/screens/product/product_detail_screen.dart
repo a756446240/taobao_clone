@@ -11,6 +11,7 @@ import '../../providers/favorites_provider.dart';
 import '../../providers/footprints_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
+import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import 'qa_screen.dart';
 import 'reviews_screen.dart';
@@ -166,8 +167,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               final now = _toggleCollect();
               _toast(now ? '已加入收藏' : '已取消收藏');
             }),
-            _moreAction(ctx, Icons.flag_outlined, '举报商品', () {
-              _toast('已收到举报，平台将尽快核实');
+            _moreAction(ctx, Icons.flag_outlined, '举报商品', () async {
+              final reason = await DialogHelpers.showOptionPicker(
+                context,
+                title: '选择举报原因',
+                options: const [
+                  '假冒伪劣',
+                  '虚假宣传',
+                  '价格欺诈',
+                  '违禁商品',
+                  '侵犯知识产权',
+                  '其他问题',
+                ],
+                currentValue: '',
+              );
+              if (reason != null) {
+                _toast('已提交「$reason」举报，平台将尽快核实');
+              }
             }),
             _moreAction(ctx, Icons.home_outlined, '返回首页', () {
               Navigator.of(context).popUntil((r) => r.isFirst);
