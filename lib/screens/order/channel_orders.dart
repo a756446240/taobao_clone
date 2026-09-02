@@ -33,6 +33,23 @@ class ChannelOrder {
     required this.image,
     this.promoTag = '',
   });
+
+  /// 支付后的状态流转副本（闪购→配送中，飞猪→待出行；仅会话内生效）
+  ChannelOrder copyWithStatus(String newStatus) {
+    return ChannelOrder(
+      id: id,
+      kind: kind,
+      shopName: shopName,
+      location: location,
+      status: newStatus,
+      itemTitle: itemTitle,
+      spec: spec,
+      price: price,
+      quantity: quantity,
+      image: image,
+      promoTag: promoTag,
+    );
+  }
 }
 
 // ============ 固定数据（用户提供的外卖/旅行素材图，订单可重复使用同一素材） ============
@@ -145,11 +162,13 @@ List<ChannelOrder> buildFeizhuOrders() {
 class ShangouOrderCard extends StatelessWidget {
   final ChannelOrder order;
   final VoidCallback onRemove;
+  final VoidCallback? onPay; // 去支付：真实状态流转（待付款→配送中）
 
   const ShangouOrderCard({
     super.key,
     required this.order,
     required this.onRemove,
+    this.onPay,
   });
 
   String get _priceText {
@@ -306,7 +325,10 @@ class ShangouOrderCard extends StatelessWidget {
               ],
               const SizedBox(width: 8),
               if (order.status == '待付款')
-                _orangeBtn('去支付', () => _toast(context, '已完成支付（模拟）'))
+                _orangeBtn('去支付', () {
+                  onPay?.call(); // 状态真实流转到「待收货（配送中）」
+                  _toast(context, '支付成功，商家正在备餐');
+                })
               else if (order.status == '配送中')
                 _orangeBtn('查看进度', () => _toast(context, '骑手距您约 1.2km，预计 15 分钟送达'))
               else if (order.status == '退款中')
@@ -336,11 +358,13 @@ class ShangouOrderCard extends StatelessWidget {
 class FeizhuOrderCard extends StatelessWidget {
   final ChannelOrder order;
   final VoidCallback onRemove;
+  final VoidCallback? onPay; // 去支付：真实状态流转（待付款→待出行）
 
   const FeizhuOrderCard({
     super.key,
     required this.order,
     required this.onRemove,
+    this.onPay,
   });
 
   String get _priceText {
@@ -460,7 +484,10 @@ class FeizhuOrderCard extends StatelessWidget {
               _greyBtn('删除订单', onRemove),
               const SizedBox(width: 8),
               if (order.status == '待付款')
-                _orangeBtn('去支付', () => _toast(context, '已完成支付（模拟）'))
+                _orangeBtn('去支付', () {
+                  onPay?.call(); // 状态真实流转到「待出行」
+                  _toast(context, '支付成功，行程已确认');
+                })
               else if (order.status == '待出行')
                 _orangeBtn('查看行程', () => _toast(context, '行程单已发送至您的淘宝消息'))
               else if (order.status == '待评价')
