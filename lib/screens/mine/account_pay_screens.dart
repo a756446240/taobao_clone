@@ -15,6 +15,8 @@ class AccountSecurityScreen extends StatefulWidget {
 
 class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
   String _phone = '13812348888';
+  bool _faceVerified = false; // 人脸认证状态
+  int _devices = 2; // 登录设备数
 
   /// 手机号脱敏
   String get _maskedPhone => _phone.length == 11
@@ -34,9 +36,11 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
             _arrowRow('手机号', trailing: _maskedPhone,
                 onTap: _changePhone),
             _arrowRow('登录密码', trailing: '已设置',
-                onTap: () => _toast('修改登录密码（演示）')),
+                onTap: () => showChangePwdSheet(context, '登录密码',
+                    isPay: false)),
             _arrowRow('支付密码', trailing: '已设置',
-                onTap: () => _toast('修改支付密码（演示）')),
+                onTap: () => showChangePwdSheet(context, '支付密码',
+                    isPay: true)),
           ]),
           _group([
             _arrowRow('实名认证',
@@ -51,11 +55,12 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                       style: TextStyle(
                           color: Color(0xFF2E7D32), fontSize: 11)),
                 ),
-                onTap: () => _toast('已完成实名认证')),
-            _arrowRow('人脸认证', trailing: '未认证',
-                onTap: () => _toast('人脸认证（演示）')),
-            _arrowRow('登录设备管理', trailing: '2 台设备',
-                onTap: () => _toast('登录设备管理（演示）')),
+                onTap: _showRealNameInfo),
+            _arrowRow('人脸认证',
+                trailing: _faceVerified ? '已认证' : '未认证',
+                onTap: _faceVerified ? _showFaceInfo : _faceVerifySheet),
+            _arrowRow('登录设备管理', trailing: '$_devices 台设备',
+                onTap: _devicesSheet),
           ]),
           _group([
             _arrowRow('账号注销',
@@ -158,8 +163,181 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       ),
     );
     if (confirmed == true) {
-      _toast('注销申请已提交，7 天内生效（演示）');
+      _toast('注销申请已提交，7 天内生效');
     }
+  }
+
+  /// 实名认证信息页（已认证 → 展示脱敏信息）
+  void _showRealNameInfo() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('实名认证信息',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 14),
+              _kvRow('姓名', '张*'),
+              _kvRow('证件类型', '居民身份证'),
+              _kvRow('证件号码', '3201**********1234'),
+              _kvRow('认证时间', '2024-03-18 10:26'),
+              const SizedBox(height: 8),
+              const Text('实名信息仅用于账号安全校验，平台将严格保密。',
+                  style: TextStyle(
+                      color: Color(0xFF999999), fontSize: 11)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 已完成人脸认证 → 展示认证信息
+  void _showFaceInfo() {
+    _toast('已完成人脸认证');
+  }
+
+  /// 人脸认证：真实流程弹层（确认 → 模拟采集 → 认证成功并更新状态）
+  void _faceVerifySheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('人脸认证',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              const Icon(Icons.face_retouching_natural,
+                  size: 56, color: AppColors.primary),
+              const SizedBox(height: 8),
+              const Text('请正对手机，确保光线充足\n认证过程不会保存您的人脸照片',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Color(0xFF666666),
+                      fontSize: 12,
+                      height: 1.5)),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    setState(() => _faceVerified = true);
+                    _toast('人脸认证成功');
+                  },
+                  child: const Text('开始认证'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 登录设备管理：真实列表 + 可下线其他设备
+  void _devicesSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('登录设备管理',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                const ListTile(
+                  dense: true,
+                  leading: Icon(Icons.phone_iphone,
+                      color: AppColors.primary),
+                  title: Text('iPhone 15 Pro（本机）',
+                      style: TextStyle(fontSize: 14)),
+                  subtitle: Text('当前在线 · 最近登录：刚刚',
+                      style: TextStyle(fontSize: 11)),
+                  trailing: Text('本机',
+                      style: TextStyle(
+                          color: AppColors.primary, fontSize: 12)),
+                ),
+                if (_devices > 1)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.tablet_mac,
+                        color: Color(0xFF666666)),
+                    title: const Text('iPad Air',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('最近登录：2026-08-28 21:14',
+                        style: TextStyle(fontSize: 11)),
+                    trailing: TextButton(
+                      onPressed: () {
+                        setState(() => _devices = 1);
+                        setSheet(() {});
+                        _toast('已下线该设备');
+                      },
+                      child: const Text('下线',
+                          style: TextStyle(
+                              color: Colors.red, fontSize: 12)),
+                    ),
+                  ),
+                if (_devices <= 1)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Text('暂无其他登录设备',
+                        style: TextStyle(
+                            color: Color(0xFF999999), fontSize: 12)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _kvRow(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(k,
+                style: const TextStyle(
+                    color: Color(0xFF999999), fontSize: 13)),
+          ),
+          Expanded(
+              child: Text(v, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
   }
 
   void _toast(String msg) {
@@ -183,6 +361,7 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
   bool _freePay = true; // 小额免密
   bool _fingerprint = true;
   bool _face = false;
+  int _renewCount = 1; // 自动续费项目数
 
   /// 扣款顺序（可在抽屉里调整）
   final List<String> _payOrder = ['余额', '余额宝', '储蓄卡(尾号8888)', '花呗'];
@@ -208,9 +387,10 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                 trailing: _payOrder.first,
                 onTap: _openPayOrderSheet),
             _arrowRow('支付密码', trailing: '已设置',
-                onTap: () => _toast('修改支付密码（演示）')),
-            _arrowRow('自动续费管理', trailing: '1 项',
-                onTap: () => _toast('88VIP 自动续费管理中（演示）')),
+                onTap: () => showChangePwdSheet(context, '支付密码',
+                    isPay: true)),
+            _arrowRow('自动续费管理', trailing: '$_renewCount 项',
+                onTap: _autoRenewSheet),
           ]),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -279,6 +459,62 @@ class _PaySettingsScreenState extends State<PaySettingsScreen> {
                 ),
               const SizedBox(height: 10),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 自动续费管理：真实列表 + 可关闭续费
+  void _autoRenewSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('自动续费管理',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                if (_renewCount > 0)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.card_membership,
+                        color: AppColors.primary),
+                    title: const Text('88VIP 连续包年',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: const Text(
+                        '下次扣费：2027-05-20 · ¥88.00/年',
+                        style: TextStyle(fontSize: 11)),
+                    trailing: TextButton(
+                      onPressed: () {
+                        setState(() => _renewCount = 0);
+                        setSheet(() {});
+                        _toast('已关闭 88VIP 自动续费');
+                      },
+                      child: const Text('关闭续费',
+                          style: TextStyle(
+                              color: Colors.red, fontSize: 12)),
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Text('暂无生效中的自动续费项目',
+                        style: TextStyle(
+                            color: Color(0xFF999999), fontSize: 12)),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -405,6 +641,115 @@ Widget _switchRow(
           onChanged: onChanged,
         ),
       ],
+    ),
+  );
+}
+
+// ============ 修改密码弹层（登录密码 / 支付密码共用） ============
+void showChangePwdSheet(BuildContext context, String title,
+    {required bool isPay}) {
+  final oldCtrl = TextEditingController();
+  final newCtrl = TextEditingController();
+  final confirmCtrl = TextEditingController();
+
+  void msg(String m) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+          SnackBar(content: Text(m), duration: const Duration(seconds: 1)));
+  }
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        left: 16,
+        right: 16,
+        top: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('修改$title',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(isPay ? '支付密码为 6 位数字' : '登录密码需 6-20 位，含字母和数字',
+              style: const TextStyle(
+                  color: Color(0xFF999999), fontSize: 11)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: oldCtrl,
+            obscureText: true,
+            keyboardType:
+                isPay ? TextInputType.number : TextInputType.text,
+            maxLength: isPay ? 6 : 20,
+            decoration: InputDecoration(
+                labelText: '原$title', counterText: ''),
+          ),
+          TextField(
+            controller: newCtrl,
+            obscureText: true,
+            keyboardType:
+                isPay ? TextInputType.number : TextInputType.text,
+            maxLength: isPay ? 6 : 20,
+            decoration: InputDecoration(
+                labelText: '新$title', counterText: ''),
+          ),
+          TextField(
+            controller: confirmCtrl,
+            obscureText: true,
+            keyboardType:
+                isPay ? TextInputType.number : TextInputType.text,
+            maxLength: isPay ? 6 : 20,
+            decoration: InputDecoration(
+                labelText: '确认新$title', counterText: ''),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary),
+              onPressed: () {
+                final oldV = oldCtrl.text.trim();
+                final newV = newCtrl.text.trim();
+                final confirmV = confirmCtrl.text.trim();
+                if (oldV.isEmpty) {
+                  msg('请输入原$title');
+                  return;
+                }
+                final ok = isPay
+                    ? RegExp(r'^\d{6}$').hasMatch(newV)
+                    : newV.length >= 6 &&
+                        newV.length <= 20 &&
+                        RegExp(r'[a-zA-Z]').hasMatch(newV) &&
+                        RegExp(r'\d').hasMatch(newV);
+                if (!ok) {
+                  msg(isPay
+                      ? '新支付密码需为 6 位数字'
+                      : '新登录密码需 6-20 位且含字母和数字');
+                  return;
+                }
+                if (newV != confirmV) {
+                  msg('两次输入的新密码不一致');
+                  return;
+                }
+                Navigator.pop(ctx);
+                msg('$title已修改');
+              },
+              child: const Text('确认修改'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     ),
   );
 }
