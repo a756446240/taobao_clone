@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/follow_shops_provider.dart';
 import '../../widgets/app_image.dart';
 import 'live_list_screen.dart';
 
@@ -17,7 +18,6 @@ class LiveRoomScreen extends StatefulWidget {
 }
 
 class _LiveRoomScreenState extends State<LiveRoomScreen> {
-  bool _followed = false;
   int _likes = 0;
   final _commentCtrl = TextEditingController();
 
@@ -39,6 +39,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
+    // 关注状态全局化：读写 FollowShopsProvider，与店铺主页/关注列表同步
+    final followed =
+        context.watch<FollowShopsProvider>().isFollowed(room.anchor);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -111,15 +114,16 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => setState(
-                                  () => _followed = !_followed),
+                              onTap: () => context
+                                  .read<FollowShopsProvider>()
+                                  .toggle(room.anchor),
                               child: Container(
                                 padding:
                                     const EdgeInsets.symmetric(
                                         horizontal: 10,
                                         vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _followed
+                                  color: followed
                                       ? Colors.white
                                           .withValues(alpha: 0.25)
                                       : AppColors.primary,
@@ -127,7 +131,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen> {
                                       BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                    _followed ? '已关注' : '+关注',
+                                    followed ? '已关注' : '+关注',
                                     style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 11,
