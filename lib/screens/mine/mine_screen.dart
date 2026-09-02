@@ -67,6 +67,7 @@ class _MineScreenState extends State<MineScreen> {
 
   Future<void> _pickAvatar() async {
     final path = await _pickImageToLocal('profile_avatars');
+    if (!mounted) return;
     if (path != null) {
       await context.read<ProfileProvider>().updateAvatar(path);
     }
@@ -74,6 +75,7 @@ class _MineScreenState extends State<MineScreen> {
 
   Future<void> _pickHeaderBg() async {
     final path = await _pickImageToLocal('profile_headers');
+    if (!mounted) return;
     if (path != null) {
       await context.read<ProfileProvider>().updateHeaderBg(path);
     }
