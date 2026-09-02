@@ -17,6 +17,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import '../home/channel_screen.dart';
+import '../home/search_result_screen.dart';
 import '../message/chat_screen.dart';
 import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
@@ -1226,9 +1227,27 @@ class _MineScreenState extends State<MineScreen> {
                         ],
                       ),
                     ),
-                    _favBtn('降价提醒'),
+                    _favBtn('降价提醒', onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('已开启降价提醒，降价后将第一时间通知你'),
+                          duration: Duration(seconds: 1),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }),
                     const SizedBox(width: 6),
-                    _favBtn('找相似'),
+                    _favBtn('找相似', onTap: () {
+                      // 找相似：取标题前 6 个字作关键词搜同款
+                      final kw = e.title.length <= 6
+                          ? e.title
+                          : e.title.substring(0, 6);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SearchResultScreen(keyword: kw),
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ],
@@ -1239,15 +1258,18 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _favBtn(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFdddddd)),
-        borderRadius: BorderRadius.circular(14),
+  Widget _favBtn(String text, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFdddddd)),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(text,
+            style: const TextStyle(fontSize: 11, color: Colors.black87)),
       ),
-      child:
-          Text(text, style: const TextStyle(fontSize: 11, color: Colors.black87)),
     );
   }
 
