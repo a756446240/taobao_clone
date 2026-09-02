@@ -328,45 +328,61 @@ class _OrderListScreenState extends State<OrderListScreen>
     );
   }
 
-  // ============ 子 Tab 行（选中橙底白字胶囊） ============
+  // ============ 子 Tab 行（撑满整宽可滑动，选中橙底白字胶囊；照搬购物频道样式） ============
   Widget _buildSubTabBar() {
     return Container(
       color: Colors.white,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          children: [
-            for (var i = 0; i < _tabs.length; i++)
-              GestureDetector(
-                onTap: () => setState(() => _subIndex = i),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _subIndex == i
-                        ? AppColors.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    _tabs[i],
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: _subIndex == i
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: _subIndex == i
-                          ? Colors.white
-                          : Colors.black87,
-                    ),
-                  ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: ConstrainedBox(
+              // tab 少时均分撑满整宽，tab 多时按内容宽度可左右滑动
+              constraints:
+                  BoxConstraints(minWidth: constraints.maxWidth - 20),
+              child: IntrinsicWidth(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _subIndex = i),
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            margin:
+                                const EdgeInsets.symmetric(horizontal: 3),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _subIndex == i
+                                  ? AppColors.primary
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Text(
+                              _tabs[i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: _subIndex == i
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: _subIndex == i
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-          ],
-        ),
+            ),
+          );
+        },
       ),
     );
   }
