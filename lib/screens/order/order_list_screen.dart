@@ -139,6 +139,24 @@ class _OrderListScreenState extends State<OrderListScreen>
     super.dispose();
   }
 
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg),
+        duration: const Duration(seconds: 1),
+      ));
+  }
+
+  /// 下拉刷新：重新拉取订单状态（购物/闪购/飞猪三个频道通用）
+  Future<void> _onRefresh() async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted) return;
+    setState(() {});
+    _toast(_channel >= 2 ? '订单状态已更新' : '已为你刷新订单');
+  }
+
   @override
   Widget build(BuildContext context) {
     final shops = context.watch<CartProvider>().shops;
@@ -155,21 +173,34 @@ class _OrderListScreenState extends State<OrderListScreen>
             _buildSubTabBar(),
             Expanded(
               child: isChannel
-                  ? _buildChannelOrders()
+                  ? RefreshIndicator(
+                      onRefresh: _onRefresh,
+                      color: const Color(0xFFFF5000),
+                      child: _buildChannelOrders(),
+                    )
                   : filtered.isEmpty
-                      ? _empty()
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(top: 8, bottom: 24),
-                          itemCount: filtered.length,
-                          itemBuilder: (_, i) => _OrderCard(
-                                shop: filtered[i].shop,
-                                items: filtered[i].items,
-                                actionText: _actionText,
-                                onEditItem: (item) =>
-                                    _showEditMenu(filtered[i].shop, item),
-                                onDetail: (item) =>
-                                    _gotoDetail(filtered[i].shop, item),
-                              ),
+                      ? RefreshIndicator(
+                          onRefresh: _onRefresh,
+                          color: const Color(0xFFFF5000),
+                          child: _empty(),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _onRefresh,
+                          color: const Color(0xFFFF5000),
+                          child: ListView.builder(
+                            padding:
+                                const EdgeInsets.only(top: 8, bottom: 24),
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) => _OrderCard(
+                                  shop: filtered[i].shop,
+                                  items: filtered[i].items,
+                                  actionText: _actionText,
+                                  onEditItem: (item) =>
+                                      _showEditMenu(filtered[i].shop, item),
+                                  onDetail: (item) =>
+                                      _gotoDetail(filtered[i].shop, item),
+                                ),
+                          ),
                         ),
             ),
           ],
@@ -632,18 +663,28 @@ class _OrderListScreenState extends State<OrderListScreen>
     final what = _channel >= 2
         ? _tabs[_subIndex.clamp(0, _tabs.length - 1)]
         : _currentTab;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.inbox_outlined, size: 80, color: Color(0xFFc4c4c4)),
-          const SizedBox(height: 12),
-          Text(searching ? '未找到相关订单' : '暂无$what订单',
-              style: AppTextStyles.middleSub),
-          const SizedBox(height: 8),
-          Text(searching ? '换个商品关键词或店铺名试试' : '（这是练习 App，未接真实数据）',
-              style: AppTextStyles.min),
-        ],
+    return LayoutBuilder(
+      builder: (_, constraints) => SingleChildScrollView(
+        // 空态也可下拉刷新
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.inbox_outlined,
+                  size: 80, color: Color(0xFFc4c4c4)),
+              const SizedBox(height: 12),
+              Text(searching ? '未找到相关订单' : '暂无$what订单',
+                  style: AppTextStyles.middleSub),
+              if (searching) ...[
+                const SizedBox(height: 8),
+                const Text('换个商品关键词或店铺名试试',
+                    style: AppTextStyles.min),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
