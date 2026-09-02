@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_text_styles.dart';
+import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../providers/product_image_provider.dart';
 import '../screens/product/product_detail_screen.dart';
@@ -150,6 +151,37 @@ class ProductRow extends StatelessWidget {
 
   const ProductRow({super.key, required this.item});
 
+  /// 服务标签小 chips：包邮（橙框）/ 退货运费险（蓝框），与筛选条件同源
+  Widget _serviceTags(SearchResultItem e) {
+    final tags = <Widget>[
+      if (MockData.isFreeShip(e))
+        _tag('包邮', const Color(0xFFFF5000)),
+      if (MockData.hasFreightInsurance(e))
+        _tag('退货运费险', const Color(0xFF1976D2)),
+    ];
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(children: [
+        for (var i = 0; i < tags.length; i++) ...[
+          if (i > 0) const SizedBox(width: 4),
+          tags[i],
+        ],
+      ]),
+    );
+  }
+
+  Widget _tag(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      decoration: BoxDecoration(
+        border: Border.all(color: color, width: 0.6),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 9)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final overrideUrl =
@@ -186,7 +218,8 @@ class ProductRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.small,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
+                _serviceTags(item),
                 Row(
                   children: [
                     Text('¥', style: AppTextStyles.price.copyWith(fontSize: 13)),
