@@ -14,6 +14,7 @@ import 'providers/footprints_provider.dart';
 import 'providers/material_pool_provider.dart';
 import 'providers/product_image_provider.dart';
 import 'providers/profile_provider.dart';
+import 'providers/reviews_provider.dart';
 import 'providers/search_provider.dart';
 
 void main() {
@@ -48,6 +49,7 @@ class TaobaoCloneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => FollowShopsProvider()..load()),
         ChangeNotifierProvider(create: (_) => CouponsProvider()..load()),
+        ChangeNotifierProvider(create: (_) => ReviewsProvider()..load()),
       ],
       child: const AppRoot(),
     );
