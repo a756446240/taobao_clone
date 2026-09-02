@@ -16,6 +16,8 @@ import '../../providers/profile_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
+import '../home/channel_screen.dart';
+import '../message/chat_screen.dart';
 import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
@@ -138,6 +140,7 @@ class _MineScreenState extends State<MineScreen> {
             child: Row(
               children: [
                 GestureDetector(
+                  onTap: _gotoEdit, // 单击进资料编辑
                   onDoubleTap: _pickAvatar, // 头像双击从相册选
                   child: ClipOval(
                     child: Container(
@@ -157,7 +160,7 @@ class _MineScreenState extends State<MineScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       GestureDetector(
-                        onDoubleTap: _gotoEdit,
+                        onTap: _gotoEdit, // 单击进资料编辑
                         child: Text(profile.nickname,
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
@@ -171,7 +174,7 @@ class _MineScreenState extends State<MineScreen> {
                           _levelTag(profile.level),
                           const SizedBox(width: 6),
                           GestureDetector(
-                            onDoubleTap: _gotoEdit,
+                            onTap: _gotoEdit, // 单击进资料编辑
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -191,13 +194,16 @@ class _MineScreenState extends State<MineScreen> {
                     ],
                   ),
                 ),
-                // 素材库：UI 伪装成"地址"，双击进入（编辑入口双击规则）
+                // 素材库：UI 伪装成"地址"，单击进入
                 GestureDetector(
-                  onDoubleTap: _gotoMaterialPool,
+                  onTap: _gotoMaterialPool,
                   child: _headerIcon(Icons.location_on_outlined, '地址'),
                 ),
                 const SizedBox(width: 16),
-                _headerIcon(Icons.headset_mic_outlined, '官方客服'),
+                GestureDetector(
+                  onTap: _openOfficialService,
+                  child: _headerIcon(Icons.headset_mic_outlined, '官方客服'),
+                ),
                 const SizedBox(width: 16),
                 GestureDetector(
                   onTap: _openSettings,
@@ -228,7 +234,7 @@ class _MineScreenState extends State<MineScreen> {
     // 避免和 88VIP 重复显示
     final display = level == '88VIP' ? '钻石会员' : level;
     return GestureDetector(
-      onDoubleTap: _pickLevel,
+      onTap: _pickLevel, // 单击切换会员等级
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
         decoration: BoxDecoration(
@@ -339,32 +345,50 @@ class _MineScreenState extends State<MineScreen> {
             ]),
           ),
           const SizedBox(width: 16),
-          // 会员中心
-          Expanded(child: _memberColumn('会员中心', '免费权益天天领')),
-          // 88VIP
-          _memberColumn('88VIP', '积分兑换'),
-          const SizedBox(width: 10),
-          // 1元可兑
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8C37E),
-              borderRadius: BorderRadius.circular(6),
+          // 会员中心（单击 → 权益钱包页）
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+              ),
+              child: _memberColumn('会员中心', '免费权益天天领'),
             ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('1元',
-                    style: TextStyle(
-                        color: Color(0xFF2A1E0C),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-                Text('可兑',
-                    style: TextStyle(
-                        color: Color(0xFF2A1E0C),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-              ],
+          ),
+          // 88VIP（单击 → 权益钱包页）
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+            ),
+            child: _memberColumn('88VIP', '积分兑换'),
+          ),
+          const SizedBox(width: 10),
+          // 1元可兑（单击 → 领券中心）
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _openCouponCenter,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8C37E),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('1元',
+                      style: TextStyle(
+                          color: Color(0xFF2A1E0C),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                  Text('可兑',
+                      style: TextStyle(
+                          color: Color(0xFF2A1E0C),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ),
         ],
@@ -643,7 +667,24 @@ class _MineScreenState extends State<MineScreen> {
   /// 单击"设置" → 设置页（双击仍是编辑资料）
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.8.7')),
+      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.44')),
+    );
+  }
+
+  /// 单击"官方客服" → 平台客服会话
+  void _openOfficialService() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const ChatScreen(
+          conversation: Conversation(
+            avatar: '',
+            title: '淘宝官方客服',
+            description: '官方客服在线，有问题随时问',
+            createAt: '',
+          ),
+          accentColor: Color(0xFFFF5000),
+        ),
+      ),
     );
   }
 
@@ -757,13 +798,19 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   // ============ App 圆圈入口（真实淘宝图标，素材库 icons/） ============
+  // 单击进入对应频道落地页（复用首页金刚区的 ChannelScreen）
   Widget _buildAppGrid() {
     final apps = [
-      {'label': '芭芭农场', 'asset': 'assets/images/icons/farm.png'},
-      {'label': '领淘金币', 'asset': 'assets/images/icons/coin.png'},
-      {'label': '红包签到', 'asset': 'assets/images/icons/redpacket.png'},
-      {'label': '游戏中心', 'asset': 'assets/images/icons/game.png'},
-      {'label': '连连消', 'asset': 'assets/images/icons/lianlian.png'},
+      const HomeIconEntry(
+          '芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png'),
+      const HomeIconEntry(
+          '领淘金币', '币', 0xFFf7b500, 'assets/images/icons/coin.png'),
+      const HomeIconEntry(
+          '红包签到', '签', 0xFFff2d2d, 'assets/images/icons/redpacket.png'),
+      const HomeIconEntry(
+          '游戏中心', '游', 0xFFf97316, 'assets/images/icons/game.png'),
+      const HomeIconEntry(
+          '连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png'),
     ];
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -774,11 +821,17 @@ class _MineScreenState extends State<MineScreen> {
       ),
       child: Row(
         children: apps.map((a) => Expanded(
-          child: Column(
-            children: [
-              Image.asset(a['asset']!, width: 48, height: 48),
-              // 图标下方文字已按需求删除
-            ],
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ChannelScreen(entry: a)),
+            ),
+            child: Column(
+              children: [
+                Image.asset(a.asset!, width: 48, height: 48),
+                // 图标下方文字已按需求删除
+              ],
+            ),
           ),
         )).toList(),
       ),
