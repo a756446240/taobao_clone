@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import 'account_pay_screens.dart';
@@ -21,6 +22,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _soundVibrate = true;
   bool _wifiVideo = false;
   String _cacheSize = '128.6MB';
+
+  static const _kMsgNotify = 'settings_msg_notify';
+  static const _kSoundVibrate = 'settings_sound_vibrate';
+  static const _kWifiVideo = 'settings_wifi_video';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSwitches();
+  }
+
+  /// 读取持久化的开关状态
+  Future<void> _loadSwitches() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _msgNotify = prefs.getBool(_kMsgNotify) ?? true;
+      _soundVibrate = prefs.getBool(_kSoundVibrate) ?? true;
+      _wifiVideo = prefs.getBool(_kWifiVideo) ?? false;
+    });
+  }
+
+  /// 更新开关并持久化
+  void _saveSwitch(String key, bool value, ValueChanged<bool> apply) {
+    setState(() => apply(value));
+    SharedPreferences.getInstance().then((p) => p.setBool(key, value));
+  }
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context)
@@ -97,11 +125,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ]),
           _group([
             _switchRow('消息通知', '接收订单/物流/优惠推送', _msgNotify,
-                (v) => setState(() => _msgNotify = v)),
+                (v) => _saveSwitch(_kMsgNotify, v, (x) => _msgNotify = x)),
             _switchRow('声音与震动', '新消息提示音和震动', _soundVibrate,
-                (v) => setState(() => _soundVibrate = v)),
+                (v) => _saveSwitch(_kSoundVibrate, v, (x) => _soundVibrate = x)),
             _switchRow('WiFi 下自动播放视频', '微淘/详情页视频自动播放', _wifiVideo,
-                (v) => setState(() => _wifiVideo = v)),
+                (v) => _saveSwitch(_kWifiVideo, v, (x) => _wifiVideo = x)),
           ]),
           _group([
             _arrowRow('清除缓存',
