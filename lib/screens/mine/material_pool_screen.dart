@@ -350,7 +350,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                 if (pool.aiProgress != null)
                   Container(
                     width: double.infinity,
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     padding:
                         const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     child: Row(
@@ -401,7 +401,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 4, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.45),
+                                    color: Colors.black.withValues(alpha: 0.45),
                                     borderRadius:
                                         const BorderRadius.vertical(
                                             bottom: Radius.circular(8)),
@@ -438,7 +438,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 4, vertical: 1),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.4),
+                                        color: Colors.black.withValues(alpha: 0.4),
                                         borderRadius:
                                             BorderRadius.circular(4),
                                       ),
