@@ -18,12 +18,24 @@ class DoubaoService {
   static const _keyModel = 'doubao_model';
   // 用户自己的推理接入点（视觉模型 Doubao-Seed-2.0-Mini / 260428）
   static const defaultModel = 'ep-20260831210012-wl7c7';
+
+  /// 内嵌默认 API Key：新装/重装 App 后开箱即可用 AI 识别，
+  /// 用户在素材库页手动配置的 Key 优先级更高（覆盖此默认值）。
+  static const defaultApiKey = String.fromEnvironment(
+    'DOUBAO_API_KEY',
+    defaultValue: 'ark-1e734c89-PLACEHOLDER',
+  );
+
   static const _endpoint =
       'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
   static Future<String> getApiKey() async {
     final p = await SharedPreferences.getInstance();
-    return p.getString(_keyApiKey) ?? '';
+    final custom = p.getString(_keyApiKey) ?? '';
+    if (custom.isNotEmpty) return custom;
+    // 未手动配置时回退到内嵌默认 Key（占位符视为未配置）
+    if (!defaultApiKey.contains('PLACEHOLDER')) return defaultApiKey;
+    return '';
   }
 
   static Future<void> saveApiKey(String key) async {
