@@ -97,11 +97,12 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     );
     if (confirmed != true) return;
     final result = provider.importSyncedShops(shops);
+    final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
     if (result.added > 0) {
-      _toast('已导入 ${result.added} 条新订单（跳过重复 ${result.skipped} 条）');
+      _toast('已导入 ${result.added} 条新订单（跳过重复 ${result.skipped} 条$tail）');
       if (mounted) Navigator.of(context).pop();
     } else {
-      _toast('没有新订单，${result.skipped} 条全部已存在');
+      _toast('没有新订单，${result.skipped} 条已存在$tail');
     }
   }
 
@@ -257,8 +258,76 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildBlacklistCard(),
         ],
       ),
     );
+  }
+
+  /// 已删除订单黑名单卡片：用户删掉的订单不会再被同步导入复活
+  Widget _buildBlacklistCard() {
+    return Consumer<CartProvider>(
+      builder: (context, provider, _) {
+        final count = provider.deletedTradeNosCount;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.delete_outline,
+                  size: 18, color: Color(0xFF999999)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  count > 0
+                      ? '已删除订单 $count 条（导入时永久跳过）'
+                      : '已删除订单黑名单为空',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF666666)),
+                ),
+              ),
+              if (count > 0)
+                TextButton(
+                  onPressed: () => _confirmClearBlacklist(provider),
+                  child: const Text('清空',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFFFF5000))),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmClearBlacklist(CartProvider provider) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('清空已删除黑名单？', style: TextStyle(fontSize: 16)),
+        content: const Text(
+          '清空后，下次同步导入会把你在淘宝里仍存在、但之前在本 App 删除过的订单重新导进来。',
+          style: TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('清空',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await provider.clearDeletedTradeNos();
+      _toast('黑名单已清空');
+    }
   }
 }
