@@ -698,6 +698,7 @@ class CartProvider extends ChangeNotifier {
     String? orderStatus,
     String? orderSubStatus,
     String? orderTotalTip,
+    int? orderBtnStyle,
     String? shopSubtitle,
     String? goodRate,
     String? csRate,
@@ -710,6 +711,7 @@ class CartProvider extends ChangeNotifier {
     if (orderStatus != null) shop.orderStatus = orderStatus;
     if (orderSubStatus != null) shop.orderSubStatus = orderSubStatus;
     if (orderTotalTip != null) shop.orderTotalTip = orderTotalTip;
+    if (orderBtnStyle != null) shop.orderBtnStyle = orderBtnStyle;
     if (shopSubtitle != null) shop.shopSubtitle = shopSubtitle;
     if (goodRate != null) shop.goodRate = goodRate;
     if (csRate != null) shop.csRate = csRate;
