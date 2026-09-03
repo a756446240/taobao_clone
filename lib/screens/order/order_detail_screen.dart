@@ -376,12 +376,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       color: Colors.white,
       child: Row(
         children: [
-          // 商家头像：圆角小方块，双击从手机相册选择
+          // 商家头像：圆角小方块（32×32，对齐真实淘宝订单详情尺寸），双击从手机相册选择
           GestureDetector(
             onDoubleTap: () => _pickShopAvatar(),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: SizedBox(width: 40, height: 40, child: _shopAvatar()),
+              child: SizedBox(width: 32, height: 32, child: _shopAvatar()),
             ),
           ),
           const SizedBox(width: 10),
@@ -420,6 +420,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const SizedBox(width: 8),
+          // 「进店逛逛」灰色线框按钮，箭头收进框内与文字垂直居中
           GestureDetector(
             onTap: () {
               Navigator.of(context).push(
@@ -432,16 +433,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               );
             },
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              child: Row(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFDDDDDD)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text('进店逛逛',
-                      style: TextStyle(
-                          color: Color(0xFF666666), fontSize: 13)),
+                      style: TextStyle(color: Colors.black87, fontSize: 12)),
+                  SizedBox(width: 2),
                   Icon(Icons.chevron_right,
-                      color: Color(0xFF999999), size: 16),
+                      color: Color(0xFF999999), size: 14),
                 ],
               ),
             ),
@@ -457,13 +463,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         .watch<ProductImageProvider>()
         .imageFor('shop_avatar:${_shop.shopName}');
     if (override != null) {
-      return AppImage(url: override, width: 40, height: 40);
+      return AppImage(url: override, width: 32, height: 32);
     }
     return Container(
       color: const Color(0xFFF0F0F0),
       alignment: Alignment.center,
       child: const Icon(Icons.storefront,
-          color: Color(0xFFBBBBBB), size: 22),
+          color: Color(0xFFBBBBBB), size: 18),
     );
   }
 
