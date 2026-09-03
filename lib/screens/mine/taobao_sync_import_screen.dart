@@ -259,10 +259,78 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          _buildClearAllCard(),
+          const SizedBox(height: 10),
           _buildBlacklistCard(),
         ],
       ),
     );
+  }
+
+  /// 一键清空全部商品订单（仅淘宝商品订单，不影响闪购/飞猪；
+  /// 不写入已删黑名单，清空后可立即重新导入抓包 JSON）
+  Widget _buildClearAllCard() {
+    return Consumer<CartProvider>(
+      builder: (context, provider, _) {
+        final count = provider.shops.length;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.cleaning_services_outlined,
+                  size: 18, color: Color(0xFF999999)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  count > 0 ? '当前商品订单 $count 单' : '当前没有商品订单',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF666666)),
+                ),
+              ),
+              if (count > 0)
+                TextButton(
+                  onPressed: () => _confirmClearAll(provider, count),
+                  child: const Text('一键清空',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFFFF5000))),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmClearAll(CartProvider provider, int count) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('清空全部商品订单？', style: TextStyle(fontSize: 16)),
+        content: Text(
+          '将删除当前 $count 单商品订单（不含闪购/飞猪）。\n\n'
+          '清空后这些订单不会进已删黑名单，可立即重新导入抓包 JSON 全量恢复。',
+          style: const TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('清空',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final n = provider.clearAllShops();
+      _toast('已清空 $n 单商品订单');
+    }
   }
 
   /// 已删除订单黑名单卡片：用户删掉的订单不会再被同步导入复活
