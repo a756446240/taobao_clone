@@ -447,6 +447,7 @@ class CartProvider extends ChangeNotifier {
     String? imageUrl,
     String? deliveryPromise,
     bool? showDeliveryPromise,
+    String? shipPromise,
     String? paymentMethod,
     String? alipayTradeNo,
     String? wechatTradeNo,
@@ -508,6 +509,7 @@ class CartProvider extends ChangeNotifier {
     if (imageUrl != null) item.imageUrl = imageUrl;
     if (deliveryPromise != null) item.deliveryPromise = deliveryPromise;
     if (showDeliveryPromise != null) item.showDeliveryPromise = showDeliveryPromise;
+    if (shipPromise != null) item.shipPromise = shipPromise;
     if (paymentMethod != null) {
       item.paymentMethod = paymentMethod;
       // 切换支付方式时确保交易号同步呈现（保留之前的具体值，避免覆盖用户手动改的）
