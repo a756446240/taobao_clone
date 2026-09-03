@@ -750,6 +750,19 @@ class _OrderCard extends StatelessWidget {
   static bool isRefundStatus(String s) =>
       s.contains('退款') || s.contains('退货') || s.contains('售后');
 
+  /// 是否已签收/交易成功（店铺状态或单品状态任一命中即算，
+  /// 此类订单不再显示「催物流」）
+  bool get _isSigned {
+    final s = shop.orderSubStatus;
+    if (s.contains('签收') || s.contains('交易成功')) return true;
+    for (final it in items) {
+      if (it.statusTitle.contains('签收') || it.statusTitle.contains('交易成功')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     // 合计 = 各商品实付价直接相加（实付录入多少就是多少，不再乘规格数量）
@@ -861,13 +874,21 @@ class _OrderCard extends StatelessWidget {
                       _moreBtn('更多',
                           onDoubleTap: () => onEditItem(items.first)),
                       const Spacer(),
-                      _outlineBtn('催物流', onTap: () => _urgeLogistics(context)),
-                      const SizedBox(width: 8),
+                      // 已签收/交易成功的订单不再显示「催物流」（对齐真实淘宝）
+                      if (!_isSigned) ...[
+                        _outlineBtn('催物流',
+                            onTap: () => _urgeLogistics(context)),
+                        const SizedBox(width: 8),
+                      ],
                       _outlineBtn('查看物流',
                           onTap: () => _gotoLogistics(context, items.first)),
                       const SizedBox(width: 8),
-                      _primaryBtn(actionText,
-                          onTap: () => _onPrimaryTap(context)),
+                      // 「申请售后」对齐真实淘宝统一灰色线框，不用橙色实心
+                      actionText == '申请售后'
+                          ? _outlineBtn(actionText,
+                              onTap: () => _onPrimaryTap(context))
+                          : _primaryBtn(actionText,
+                              onTap: () => _onPrimaryTap(context)),
                     ],
                   ),
           ),
@@ -1348,8 +1369,18 @@ class _OrderItemTile extends StatelessWidget {
     // 待发货由灰色框架单独渲染（见 _buildNormalLayout），不再走纯文字状态行
     if (s.contains('待发货') || s.contains('等待发货')) return null;
     if (s.contains('签收') || s.contains('交易成功')) {
-      // 用户改过签收文案用用户值，否则签收人取订单收货人
-      if (item.deliveryText.isNotEmpty) return item.deliveryText;
+      // 用户自定义签收文案优先；但生成器默认的「预计xx送达」等运输中文案
+      // 在签收状态下属于过期信息，不能展示（否则列表与详情页状态互相矛盾）
+      final dt = item.deliveryText;
+      final isTransitText = dt.contains('预计') ||
+          dt.contains('发货') ||
+          dt.contains('承诺') ||
+          dt.contains('揽件') ||
+          dt.contains('运输') ||
+          dt.contains('派送');
+      if (dt.isNotEmpty && !isTransitText) return dt;
+      // 物流文字本身已是签收语时直接沿用，保证与详情页横幅同源
+      if (item.logistics.contains('签收')) return item.logistics;
       final signer = item.receiver.isNotEmpty ? item.receiver : '本人';
       return '已签收 · 您的快件已送达，签收人：$signer';
     }
