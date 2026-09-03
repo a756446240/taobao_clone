@@ -51,10 +51,39 @@ class CartProvider extends ChangeNotifier {
   List<ShoppingCartShop> _shops = [];
   bool _loading = true;
 
+  /// 已删除订单号黑名单：用户主动删掉的订单号会记在这里，
+  /// 淘宝同步导入时永久跳过（防止已删订单复活）。
+  final Set<String> _deletedTradeNos = {};
+
+  /// 已删除黑名单中的订单号数量（同步导入页展示用）
+  int get deletedTradeNosCount => _deletedTradeNos.length;
+
+  /// 判断订单号是否在已删除黑名单里
+  bool isTradeNoDeleted(String orderNo) => _deletedTradeNos.contains(orderNo);
+
+  /// 把订单号记入已删除黑名单并持久化
+  void _markDeleted(Iterable<String> orderNos) {
+    var changed = false;
+    for (final no in orderNos) {
+      if (no.isNotEmpty && _deletedTradeNos.add(no)) changed = true;
+    }
+    if (changed) {
+      PersistenceService.saveDeletedTradeNos(_deletedTradeNos.toList());
+    }
+  }
+
+  /// 清空已删除黑名单（之后同步导入可重新导入这些订单）
+  Future<void> clearDeletedTradeNos() async {
+    _deletedTradeNos.clear();
+    await PersistenceService.saveDeletedTradeNos(const []);
+    notifyListeners();
+  }
+
   /// 淘宝同步导入：按订单号去重，只追加本地不存在的新订单。
-  /// 已在本地的订单（含用户编辑过的内容）绝不覆盖。
-  /// 返回 (新增订单条数, 跳过重复条数)。
-  ({int added, int skipped}) importSyncedShops(
+  /// 已在本地的订单（含用户编辑过的内容）绝不覆盖；
+  /// 用户删除过的订单（黑名单）永久跳过、不会复活。
+  /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数)。
+  ({int added, int skipped, int blocked}) importSyncedShops(
       List<ShoppingCartShop> incoming) {
     final existingNos = <String>{
       for (final shop in _shops)
@@ -62,10 +91,13 @@ class CartProvider extends ChangeNotifier {
     };
     var added = 0;
     var skipped = 0;
+    var blocked = 0;
     for (final shop in incoming) {
       final newItems = <OrderItem>[];
       for (final it in shop.items) {
-        if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
+        if (it.orderNo.isNotEmpty && _deletedTradeNos.contains(it.orderNo)) {
+          blocked++;
+        } else if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
           skipped++;
         } else {
           newItems.add(it);
@@ -91,7 +123,7 @@ class CartProvider extends ChangeNotifier {
       _persist();
       notifyListeners();
     }
-    return (added: added, skipped: skipped);
+    return (added: added, skipped: skipped, blocked: blocked);
   }
 
   /// AI 截图解析导入：把识别出的订单追加为新店铺卡片（自动持久化，无需重新构建）
@@ -207,6 +239,8 @@ class CartProvider extends ChangeNotifier {
   Future<void> _restoreFromDisk() async {
     try {
       final saved = await PersistenceService.loadShops();
+      // 加载已删除订单号黑名单（同步导入防复活）
+      _deletedTradeNos.addAll(await PersistenceService.loadDeletedTradeNos());
       if (saved != null && saved.isNotEmpty) {
         _shops = saved;
         _migrateTradeNos();
@@ -395,6 +429,11 @@ class CartProvider extends ChangeNotifier {
   }
 
   void removeSelected() {
+    _markDeleted([
+      for (final shop in _shops)
+        for (final item in shop.items)
+          if (item.isSelected) item.orderNo,
+    ]);
     for (final shop in _shops) {
       shop.items.removeWhere((item) => item.isSelected);
     }
@@ -654,6 +693,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   void removeItem(OrderItem item) {
+    _markDeleted([item.orderNo]);
     for (final shop in _shops) {
       shop.items.remove(item);
     }
@@ -664,6 +704,7 @@ class CartProvider extends ChangeNotifier {
 
   /// 删除整单（订单管理页左滑删除）
   void removeShop(ShoppingCartShop shop) {
+    _markDeleted(shop.items.map((e) => e.orderNo));
     _shops.remove(shop);
     _persist();
     notifyListeners();
