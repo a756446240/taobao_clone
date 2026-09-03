@@ -15,6 +15,7 @@ class PersistenceService {
   static const _kDeletedTitle = 'persisted_deleted_titles_v1';
   static const _kOrderSort = 'persisted_order_sort_v1';
   static const _kPresetVersion = 'imported_preset_version_v1';
+  static const _kDeletedTradeNos = 'persisted_deleted_trade_nos_v1';
 
   static Future<List<ShoppingCartShop>?> loadShops() async {
     final prefs = await SharedPreferences.getInstance();
@@ -76,6 +77,17 @@ class PersistenceService {
   static Future<void> saveDeletedTitles(List<String> titles) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_kDeletedTitle, titles);
+  }
+
+  /// 已删除订单号黑名单：用户删掉的订单，淘宝同步导入时永久跳过（防止复活）
+  static Future<List<String>> loadDeletedTradeNos() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_kDeletedTradeNos) ?? const [];
+  }
+
+  static Future<void> saveDeletedTradeNos(List<String> nos) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kDeletedTradeNos, nos);
   }
 
   static Future<bool> loadOrderSort() async {
