@@ -444,6 +444,8 @@ class CartProvider extends ChangeNotifier {
     String? deliveryText,
     bool? showOnTime,
     String? onTimeText,
+    int? onTimeStyle,
+    String? onTimeText2,
     String? imageUrl,
     String? deliveryPromise,
     bool? showDeliveryPromise,
@@ -506,6 +508,8 @@ class CartProvider extends ChangeNotifier {
     if (deliveryText != null) item.deliveryText = deliveryText;
     if (showOnTime != null) item.showOnTime = showOnTime;
     if (onTimeText != null) item.onTimeText = onTimeText;
+    if (onTimeStyle != null) item.onTimeStyle = onTimeStyle;
+    if (onTimeText2 != null) item.onTimeText2 = onTimeText2;
     if (imageUrl != null) item.imageUrl = imageUrl;
     if (deliveryPromise != null) item.deliveryPromise = deliveryPromise;
     if (showDeliveryPromise != null) item.showDeliveryPromise = showDeliveryPromise;
@@ -699,6 +703,7 @@ class CartProvider extends ChangeNotifier {
     String? orderSubStatus,
     String? orderTotalTip,
     int? orderBtnStyle,
+    int? shopLineStyle,
     String? shopSubtitle,
     String? goodRate,
     String? csRate,
@@ -712,6 +717,7 @@ class CartProvider extends ChangeNotifier {
     if (orderSubStatus != null) shop.orderSubStatus = orderSubStatus;
     if (orderTotalTip != null) shop.orderTotalTip = orderTotalTip;
     if (orderBtnStyle != null) shop.orderBtnStyle = orderBtnStyle;
+    if (shopLineStyle != null) shop.shopLineStyle = shopLineStyle;
     if (shopSubtitle != null) shop.shopSubtitle = shopSubtitle;
     if (goodRate != null) shop.goodRate = goodRate;
     if (csRate != null) shop.csRate = csRate;
