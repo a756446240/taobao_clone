@@ -791,7 +791,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final productTotal = _item.productTotal > 0
         ? _item.productTotal
         : _item.price + _item.shopDiscount + _item.platformCoupon;
-    final total = _item.price;
+    // 实付款：抓包导入的订单带整单实付总额（单价×数量有分位差），优先用
+    final total =
+        _shop.actualTotal > 0 ? _shop.actualTotal : _item.price;
     // 共减 = 店铺优惠 + 平台优惠（优先用持久化的共减字段）
     final co = _item.coDiscount > 0
         ? _item.coDiscount
