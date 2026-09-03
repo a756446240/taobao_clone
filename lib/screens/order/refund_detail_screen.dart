@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -88,12 +87,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     }
   }
 
-  /// 生成 4 开头 17 位退款编号
+  /// 生成 4 开头 17 位退款编号（按订单号确定性派生，同一订单恒定）
   String _genRefundNumber() {
-    final rand = Random();
+    final src = _item.orderNo.isNotEmpty ? _item.orderNo : _item.title;
+    var h = 0x9e3779b9;
     final sb = StringBuffer('4');
     for (var i = 0; i < 16; i++) {
-      sb.write(rand.nextInt(10));
+      h = (h * 31 + src.codeUnitAt(i % src.length)) & 0x7fffffff;
+      sb.write(h % 10);
     }
     return sb.toString();
   }
@@ -101,6 +102,20 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   bool get _isPending =>
       _item.refundStatus == '待商家退款' || _item.refundStatus == '退款中';
   bool get _isDone => !_isPending;
+
+  /// 寄件人（退货时即买家本人）：姓名脱敏 + 按订单号确定性派生的脱敏手机号
+  String get _senderDesc {
+    final name = _item.receiver.isNotEmpty ? _item.receiver : '淘小宝';
+    final masked = '${name.substring(0, 1)}*';
+    final digits = _item.orderNo.replaceAll(RegExp(r'\D'), '');
+    final tail = digits.length >= 4 ? digits.substring(digits.length - 4) : '6688';
+    return '$masked 138****$tail';
+  }
+
+  /// 寄件地址：取订单收货地址（买家从哪里寄回）
+  String get _senderAddress => _item.address.isNotEmpty
+      ? _item.address
+      : '浙江省杭州市西湖区文三路 100 号';
 
   void _startTimerIfPending() {
     _timer?.cancel();
@@ -834,12 +849,19 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 推荐商品（AI 随机） ============
+  // ============ 推荐商品（确定性选取） ============
   Widget _buildRecommendCard() {
-    // AI 随机：每次 build 都从 MockData 随机抽 6 个（实际产品可加缓存避免每次滚动都换）
-    final allGoods = MockData.guessLikeGoods.toList();
-    allGoods.shuffle(Random());
-    final goods = allGoods.take(6).toList();
+    // 按订单号确定性轮换取 6 个：同一订单每次 build 结果一致，不再滚动闪烁
+    const allGoods = MockData.guessLikeGoods;
+    final seedSrc = _item.orderNo.isNotEmpty ? _item.orderNo : _item.title;
+    var seed = 0;
+    for (final c in seedSrc.codeUnits) {
+      seed = (seed * 31 + c) & 0x7fffffff;
+    }
+    final goods = <SearchResultItem>[
+      for (var i = 0; i < 6 && allGoods.isNotEmpty; i++)
+        allGoods[(seed + i * 5) % allGoods.length],
+    ];
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -1161,8 +1183,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               ),
               const SizedBox(height: 14),
               _shipRow('物流信息', _item.refundLogistics),
-              _shipRow('寄件人', '张* 138****8888'),
-              _shipRow('寄件地址', '江苏省南京市江宁区诚信大道 88 号'),
+              _shipRow('寄件人', _senderDesc),
+              _shipRow('寄件地址', _senderAddress),
               _shipRow('收件人', '${_shop.shopName}（退货仓）'),
               _shipRow('申请时间', _item.refundApplyTime),
               const SizedBox(height: 6),
