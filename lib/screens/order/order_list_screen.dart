@@ -844,8 +844,13 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 合计 = 各商品实付价直接相加（实付录入多少就是多少，不再乘规格数量）
-    final total = items.fold<double>(0, (sum, item) => sum + item.price);
+    // 合计：抓包导入的订单带 actualTotal（接口实付总额，单价×数量有分位差）优先用；
+    // 否则沿用旧逻辑 = 各商品实付价直接相加（实付录入多少就是多少，不再乘规格数量）
+    final total = shop.actualTotal > 0
+        ? shop.actualTotal
+        : items.fold<double>(0, (sum, item) => sum + item.price);
+    // 件数 = 各商品数量求和（对齐真实淘宝的"共N件"）
+    final pieceCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
     final isRefund = isRefundStatus(shop.orderSubStatus);
 
     return Container(
@@ -916,7 +921,7 @@ class _OrderCard extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Text('共${items.length}件商品 合计：',
+                  Text('共${pieceCount}件商品 合计：',
                       style: AppTextStyles.min),
                   Text('¥',
                       style: AppTextStyles.price.copyWith(fontSize: 13)),
