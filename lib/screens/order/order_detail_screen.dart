@@ -71,10 +71,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   children: [
                     _buildStatusHeader(),
+                    // 准时送达卡：独立白色框架，上下灰条间隔（可隐藏）
+                    if (_item.showOnTime) ...[
+                      _greyBar(),
+                      _buildOnTimeCard(),
+                    ],
                     _greyBar(),
                     _buildShopCard(),
-                    // 店铺与商品同一框架：去掉灰色间隔带，改虚线衔接
-                    _dashedDivider(),
+                    // 店铺与商品同一框架：细分隔线衔接（同下方灰线样式）
+                    _lineDivider(),
                     _buildProductCard(),
                     _greyBar(),
                     _buildOrderInfoCard(),
@@ -99,30 +104,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(height: 10, color: const Color(0xFFf0f0f0));
   }
 
-  /// 店铺卡与商品卡之间的虚线分隔（同一白色框架内）
-  Widget _dashedDivider() {
+  /// 店铺卡与商品卡之间的细分隔线（与下方价格区灰线一致）
+  Widget _lineDivider() {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const dashWidth = 4.0;
-          const dashSpace = 4.0;
-          final dashCount =
-              (constraints.maxWidth / (dashWidth + dashSpace)).floor();
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(
-              dashCount,
-              (_) => Container(
-                width: dashWidth,
-                height: 1,
-                color: const Color(0xFFDDDDDD),
-              ),
-            ),
-          );
-        },
-      ),
+      child: const Divider(height: 1, thickness: 1, color: Color(0xFFf0f0f0)),
     );
   }
 
@@ -326,41 +313,103 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           ],
-          // 准时送达行（可编辑文字，可隐藏）
-          if (_item.showOnTime) ...[
-            const SizedBox(height: 12),
-            GestureDetector(
-              onDoubleTap: () => _editText('修改准时送达文字', _item.onTimeText, (v) {
-                provider.updateOrderItem(_item, onTimeText: v);
-              }),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F7F7),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bolt,
-                        color: Color(0xFF2A9655), size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _item.onTimeText.isEmpty
-                            ? '准时送达 | 8月26日为您准时送达'
-                            : _item.onTimeText,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF333333)),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right,
-                        size: 14, color: Color(0xFF999999)),
-                  ],
-                ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 准时送达卡（独立白色框架，上下灰条间隔，单排/双排两种样式可选） ============
+  int get _onTimeStyle => _item.onTimeStyle >= 0
+      ? _item.onTimeStyle
+      : _item.title.hashCode.abs() % 2;
+
+  String get _onTimeMainText {
+    final t = _item.onTimeText;
+    if (t.isEmpty || t == '准时送达') {
+      return _onTimeStyle == 0 ? '预计明天送达' : '承诺08月30日送货上门';
+    }
+    return t;
+  }
+
+  Widget _buildOnTimeCard() {
+    final provider = context.read<CartProvider>();
+    const iconColor = Color(0xFF2A9655);
+    const textStyle = TextStyle(
+        fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF333333));
+    if (_onTimeStyle == 0) {
+      // 样式0：单排「预计XX送达」+ 箭头
+      return Container(
+        width: double.infinity,
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: GestureDetector(
+          onDoubleTap: () => _editText('修改准时送达文字', _item.onTimeText, (v) {
+            provider.updateOrderItem(_item, onTimeText: v);
+          }),
+          child: Row(
+            children: [
+              const Icon(Icons.bolt, color: iconColor, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(_onTimeMainText, style: textStyle),
+              ),
+              const Icon(Icons.chevron_right,
+                  size: 16, color: Color(0xFF999999)),
+            ],
+          ),
+        ),
+      );
+    }
+    // 样式1：双排「承诺XX送货上门」/「送货上门」（中间细分隔线）
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Column(
+        children: [
+          GestureDetector(
+            onDoubleTap: () =>
+                _editText('修改准时送达文字', _item.onTimeText, (v) {
+              provider.updateOrderItem(_item, onTimeText: v);
+            }),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt, color: iconColor, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(_onTimeMainText, style: textStyle),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFf0f0f0)),
+          GestureDetector(
+            onDoubleTap: () =>
+                _editText('修改第二行文字', _item.onTimeText2, (v) {
+              provider.updateOrderItem(_item, onTimeText2: v);
+            }),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_shipping_outlined,
+                      color: iconColor, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _item.onTimeText2.isEmpty
+                          ? '送货上门'
+                          : _item.onTimeText2,
+                      style: textStyle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -441,19 +490,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    GestureDetector(
-                      onDoubleTap: () => _editText('修改店铺副标题', _shop.shopSubtitle, (v) {
-                        context.read<CartProvider>().updateShop(_shop, shopSubtitle: v);
-                      }),
-                      child: Text(
-                        _shop.shopSubtitle.isEmpty
-                            ? '德国直邮 · 保税仓发货 · 正品保障'
-                            : _shop.shopSubtitle,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF999999)),
-                      ),
-                    ),
+                    const SizedBox(height: 3),
+                    // 店名下方信息行：6 种样式可选（双击切换），对标真实淘宝
+                    _shopInfoLine(),
                   ],
                 ),
               ),
@@ -473,26 +512,81 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _rateText('好评率', _shop.goodRate),
-              const SizedBox(width: 10),
-              _rateText('客服满意度', _shop.csRate),
-              const SizedBox(width: 10),
-              _rateText('粉丝', _shop.fansCount),
-              const Spacer(),
-              const Icon(Icons.star, color: Color(0xFFFFB300), size: 14),
-              Text(_shop.shopScore.toStringAsFixed(1),
-                  style: const TextStyle(
-                      color: Color(0xFFff5000),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold)),
-            ],
-          ),
         ],
       ),
     );
+  }
+
+  // ---- 店名下方信息行：6 种样式可选（-1=按店名随机），双击弹出切换 ----
+  static const List<String> _shopLineOptions = [
+    '随机（按店名）',
+    '★星级 + 粉丝数',
+    '88VIP好评率 + 平均退款时长',
+    '88VIP好评率 + 客服满意度',
+    '好评率 + 平均退款时长',
+    '90天新增好评 + 平均退款时长',
+    '90天新增好评',
+  ];
+
+  int get _shopLineStyle => _shop.shopLineStyle >= 0
+      ? _shop.shopLineStyle
+      : _shop.shopName.hashCode.abs() % 6;
+
+  /// 90天新增好评条数：按店名稳定生成 20~99
+  int get _shopNewReviews => 20 + _shop.shopName.hashCode.abs() % 80;
+
+  void _pickShopLineStyle() {
+    DialogHelpers.showOptionPicker(
+      context,
+      title: '店铺信息行样式',
+      options: _shopLineOptions,
+      currentValue: _shopLineOptions[_shop.shopLineStyle + 1],
+    ).then((v) {
+      if (v == null) return;
+      final idx = _shopLineOptions.indexOf(v);
+      context.read<CartProvider>().updateShop(_shop, shopLineStyle: idx - 1);
+    });
+  }
+
+  Widget _shopInfoLine() {
+    const grey = TextStyle(fontSize: 11, color: Color(0xFF999999));
+    Widget child;
+    switch (_shopLineStyle) {
+      case 0:
+        child = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...List.generate(
+                5,
+                (_) => const Icon(Icons.star,
+                    color: Color(0xFFFF5000), size: 12)),
+            const SizedBox(width: 3),
+            Text('${_shop.fansCount}粉丝',
+                style: grey, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        );
+        break;
+      case 1:
+        child = Text('88VIP好评率${_shop.goodRate}，平均17小时退款',
+            style: grey, maxLines: 1, overflow: TextOverflow.ellipsis);
+        break;
+      case 2:
+        child = Text('88VIP好评率${_shop.goodRate}，客服满意度${_shop.csRate}',
+            style: grey, maxLines: 1, overflow: TextOverflow.ellipsis);
+        break;
+      case 3:
+        child = Text('好评率${_shop.goodRate}，平均21小时退款',
+            style: grey, maxLines: 1, overflow: TextOverflow.ellipsis);
+        break;
+      case 4:
+        child = Text('90天新增$_shopNewReviews条好评，平均2天退款',
+            style: grey, maxLines: 1, overflow: TextOverflow.ellipsis);
+        break;
+      default:
+        child = Text('90天新增$_shopNewReviews条好评',
+            style: grey, maxLines: 1, overflow: TextOverflow.ellipsis);
+    }
+    return GestureDetector(onDoubleTap: _pickShopLineStyle, child: child);
   }
 
   /// 商家头像显示：优先相册替换图（以店铺名为 key 持久化）
@@ -500,9 +594,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final override =
         context.watch<ProductImageProvider>().imageFor('shop_avatar:${_shop.shopName}');
     if (override != null) {
-      return AppImage(url: override, width: 36, height: 36);
+      return AppImage(url: override, width: 30, height: 30);
     }
-    return const Icon(Icons.favorite, color: Colors.white, size: 18);
+    return const Icon(Icons.favorite, color: Colors.white, size: 16);
   }
 
   Future<void> _pickShopAvatar() async {
@@ -530,37 +624,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         const SnackBar(content: Text('图片选择失败')),
       );
     }
-  }
-
-  Widget _rateText(String label, String value) {
-    return GestureDetector(
-      onDoubleTap: () {
-        if (label == '好评率') {
-          _editText('修改好评率', _shop.goodRate, (v) {
-            context.read<CartProvider>().updateShop(_shop, goodRate: v);
-          });
-        } else if (label == '客服满意度') {
-          _editText('修改客服满意度', _shop.csRate, (v) {
-            context.read<CartProvider>().updateShop(_shop, csRate: v);
-          });
-        } else {
-          _editText('修改粉丝数', _shop.fansCount, (v) {
-            context.read<CartProvider>().updateShop(_shop, fansCount: v);
-          });
-        }
-      },
-      child: Text.rich(TextSpan(children: [
-        TextSpan(
-            text: '$label ',
-            style: const TextStyle(fontSize: 11, color: Color(0xFF999999))),
-        TextSpan(
-            text: value,
-            style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFFff5000),
-                fontWeight: FontWeight.bold)),
-      ])),
-    );
   }
 
   // ============ 商品卡片 ============
@@ -1606,6 +1669,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         provider.updateOrderItem(_item, showOnTime: !v);
                         setSheetState(() {});
                       }),
+                      _editTile(Icons.view_agenda_outlined, '准时送达卡片样式', () {
+                        const options = [
+                          '随机',
+                          '单排 · 预计送达',
+                          '双排 · 承诺+送货上门',
+                        ];
+                        DialogHelpers.showOptionPicker(
+                          context,
+                          title: '准时送达卡片样式',
+                          options: options,
+                          currentValue: options[_item.onTimeStyle + 1],
+                        ).then((v) {
+                          if (v == null) return;
+                          provider.updateOrderItem(_item,
+                              onTimeStyle: options.indexOf(v) - 1);
+                        });
+                      }),
                       _switchTile(Icons.visibility_off, '隐藏"平台加补后"价',
                           value: !_item.showPlatformPriceRow, onChanged: (v) {
                         provider.updateOrderItem(_item, showPlatformPriceRow: !v);
@@ -1631,10 +1711,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           provider.updateShop(_shop, shopName: v);
                         });
                       }),
-                      _editTile(Icons.short_text, '修改店铺副标题', () {
-                        _editText('修改店铺副标题', _shop.shopSubtitle, (v) {
-                          provider.updateShop(_shop, shopSubtitle: v);
-                        });
+                      _editTile(Icons.short_text, '店铺信息行样式', () {
+                        _pickShopLineStyle();
                       }),
                       _editTile(Icons.thumb_up, '修改好评率', () {
                         _editText('修改好评率', _shop.goodRate, (v) {
