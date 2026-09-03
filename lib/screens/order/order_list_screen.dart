@@ -750,6 +750,85 @@ class _OrderCard extends StatelessWidget {
   static bool isRefundStatus(String s) =>
       s.contains('退款') || s.contains('退货') || s.contains('售后');
 
+  /// 是否交易成功订单（下方无物流框架，底部按钮为 3 种样式组合）
+  bool get _isTradeSuccess => shop.orderSubStatus.contains('交易成功');
+
+  /// 交易成功底部按钮样式：shop.orderBtnStyle 指定（0/1/2），-1 时按店名哈希稳定随机
+  int get _successBtnStyle {
+    if (shop.orderBtnStyle >= 0 && shop.orderBtnStyle <= 2) {
+      return shop.orderBtnStyle;
+    }
+    final h = shop.shopName.codeUnits
+        .fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    return h % 3;
+  }
+
+  /// 交易成功订单底部按钮行（对齐真实淘宝的 3 种组合，编辑菜单可切换/随机）：
+  /// 0：评价 + 加入购物车 + 再买一单（高亮）
+  /// 1：闲鱼转卖 + 评价 + 加入购物车（高亮）
+  /// 2：加入购物车 + 查看物流 + 评价（高亮）
+  Widget _buildSuccessButtons(BuildContext context) {
+    const gap = SizedBox(width: 8);
+    final List<Widget> btns;
+    switch (_successBtnStyle) {
+      case 0:
+        btns = [
+          _outlineBtn('评价', onTap: () => _onRateTap(context)),
+          gap,
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+          gap,
+          _primaryBtn('再买一单', onTap: () => _reAddToCart(context)),
+        ];
+        break;
+      case 1:
+        btns = [
+          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
+          gap,
+          _outlineBtn('评价', onTap: () => _onRateTap(context)),
+          gap,
+          _primaryBtn('加入购物车', onTap: () => _reAddToCart(context)),
+        ];
+        break;
+      default:
+        btns = [
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+          gap,
+          _outlineBtn('查看物流',
+              onTap: () => _gotoLogistics(context, items.first)),
+          gap,
+          _primaryBtn('评价', onTap: () => _onRateTap(context)),
+        ];
+    }
+    return Row(
+      children: [
+        // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
+        _moreBtn('更多', onDoubleTap: () => onEditItem(items.first)),
+        const Spacer(),
+        ...btns,
+      ],
+    );
+  }
+
+  /// 「评价」：进入发表评价页
+  void _onRateTap(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RateOrderScreen(shop: shop, item: items.first),
+      ),
+    );
+  }
+
+  /// 「闲鱼转卖」：外部 App 功能，演示样式仅提示
+  void _xianyuToast(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('闲鱼转卖为演示样式按钮'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   /// 是否已签收/交易成功（店铺状态或单品状态任一命中即算，
   /// 此类订单不再显示「催物流」）
   bool get _isSigned {
@@ -868,7 +947,9 @@ class _OrderCard extends StatelessWidget {
                           onTap: () => _contactShop(context)),
                     ],
                   )
-                : Row(
+                : _isTradeSuccess
+                    ? _buildSuccessButtons(context)
+                    : Row(
                     children: [
                       // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
                       _moreBtn('更多',
@@ -1322,24 +1403,35 @@ class _OrderItemTile extends StatelessWidget {
               ),
             ),
           )
-        else if (_statusLine != null)
+        // 交易成功：下方不再显示任何框架（对齐真实淘宝）
+        // 其余状态行全部统一灰色圆角框架（图标 + 粗体状态词 + 灰色描述 + 箭头）
+        else if (_statusLine != null && !_isTradeSuccess)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              children: [
-                Icon(_statusIcon,
-                    color: const Color(0xFF999999), size: 14),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(_statusLine!,
+            child: Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(_statusIcon,
+                      color: const Color(0xFF999999), size: 14),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: _statusLineSpans),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.min
-                          .copyWith(color: const Color(0xFF666666))),
-                ),
-                const Icon(Icons.chevron_right,
-                    color: Color(0xFF999999), size: 16),
-              ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: Color(0xFF999999), size: 16),
+                ],
+              ),
             ),
           ),
       ],
@@ -1390,6 +1482,23 @@ class _OrderItemTile extends StatelessWidget {
   /// 是否待发货订单（普通布局里显示灰色发货承诺框架）
   bool get _isPendingShip =>
       orderStatus.contains('待发货') || orderStatus.contains('等待发货');
+
+  /// 是否交易成功（此类订单下方不显示任何物流/状态框架）
+  bool get _isTradeSuccess => orderStatus.contains('交易成功');
+
+  /// 状态行富文本：首个词（已发货/运输中/派送中…）粗体深色，其余灰色（对齐真实淘宝灰框样式）
+  List<TextSpan> get _statusLineSpans {
+    final line = _statusLine!;
+    final idx = line.indexOf(' ');
+    const head = TextStyle(
+        fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A));
+    const tail = TextStyle(fontSize: 12, color: Color(0xFF999999));
+    if (idx <= 0) return [TextSpan(text: line, style: head)];
+    return [
+      TextSpan(text: line.substring(0, idx), style: head),
+      TextSpan(text: line.substring(idx), style: tail),
+    ];
+  }
 
   /// 待发货灰框时间文案：用户改过用用户值，否则按商品标题确定性分配
   /// 变体对齐真实淘宝：预计明天/后天到达、今天/明天/后天 HH:mm 前发货、预售 M月d日 HH:mm 前发货
@@ -1502,6 +1611,7 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
     ('标记为已签收', Icons.check_circle),
     ('修改签收/派送文字', Icons.edit),
     ('修改退款条样式', Icons.autorenew),
+    ('完成单按钮样式', Icons.dashboard_customize),
     ('隐藏"准时送达"行', Icons.visibility_off),
     ('隐藏"进口税"行', Icons.visibility_off),
     ('隐藏"优惠"', Icons.visibility_off),
@@ -1732,6 +1842,29 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
         if (v == null) return;
         provider.updateOrderItem(_item, refundBarStyle: styles.indexOf(v));
         _toast('退款条样式已切换为「$v」');
+      });
+      return;
+    }
+    if (label == '完成单按钮样式') {
+      Navigator.of(context).pop();
+      const styles = [
+        '随机（每单自动分配）',
+        '样式1：评价 + 加入购物车 + 再买一单',
+        '样式2：闲鱼转卖 + 评价 + 加入购物车',
+        '样式3：加入购物车 + 查看物流 + 评价',
+      ];
+      const values = [-1, 0, 1, 2];
+      final cur = values.indexOf(widget.shop.orderBtnStyle);
+      DialogHelpers.showOptionPicker(
+        widget.parentContext,
+        title: '完成单按钮样式（交易成功订单）',
+        options: styles,
+        currentValue: styles[cur < 0 ? 0 : cur],
+      ).then((v) {
+        if (v == null) return;
+        provider.updateShop(widget.shop,
+            orderBtnStyle: values[styles.indexOf(v)]);
+        _toast('完成单按钮样式已切换为「$v」');
       });
       return;
     }
