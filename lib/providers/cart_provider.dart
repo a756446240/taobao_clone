@@ -710,6 +710,18 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 一键清空全部商品订单（仅淘宝商品订单 _shops，不影响闪购/飞猪）。
+  /// 与逐单删除不同：**不写入已删黑名单**，方便清空后立即重新导入抓包订单。
+  /// 返回清掉的订单（店铺块）数。
+  int clearAllShops() {
+    final n = _shops.length;
+    if (n == 0) return 0;
+    _shops.clear();
+    _persist();
+    notifyListeners();
+    return n;
+  }
+
   /// 创建随机新订单（itemCount：单个店铺内商品数 1/2/3）
   void createRandomOrder({int itemCount = 1}) {
     final newShop =
