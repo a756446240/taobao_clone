@@ -164,6 +164,7 @@ class OrderItem {
   // ===== 3.4 订单详情页字段 =====
   String deliveryPromise; // 待发货承诺文案，如"承诺48小时内发货"（显示在地址下方）
   bool showDeliveryPromise; // 是否显示"承诺发货"行
+  String shipPromise; // 待发货灰框时间文案，如"今天13:46前发货"/"预计明天到达"/"预售，9月17日13:39前发货"（空=按标题确定性生成）
   String paymentMethod; // 支付方式
   String orderNo; // 订单编号（订单信息行）：5127 开头 19 位
   String alipayTradeNo; // 支付宝交易号：付款时间前8位 + 20位随机 = 28 位
@@ -243,6 +244,7 @@ class OrderItem {
     this.onTimeText = '准时送达',
     this.deliveryPromise = '承诺48小时内发货',
     this.showDeliveryPromise = true,
+    this.shipPromise = '',
     this.paymentMethod = '支付宝支付',
     this.orderNo = '',
     this.alipayTradeNo = '',
