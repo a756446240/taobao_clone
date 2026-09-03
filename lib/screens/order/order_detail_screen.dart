@@ -196,9 +196,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 color: Color(0xFFFF5000),
                                 fontWeight: FontWeight.w600)),
                         TextSpan(
-                          text: _item.logistics.isEmpty
-                              ? '您的快件已领取，收件人在[代收点](...)'
-                              : _item.logistics,
+                          text: _bannerLogisticsText,
                           style: const TextStyle(
                               fontSize: 14, color: Color(0xFF333333)),
                         ),
@@ -343,10 +341,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  /// 状态头物流文字：签收状态下过滤过期的运输中文案（与列表页状态行同源）
+  String get _bannerLogisticsText {
+    final l = _item.logistics;
+    final t = _item.statusTitle;
+    final signed = t.contains('签收') ||
+        t.contains('交易成功') ||
+        t.contains('完成') ||
+        t.contains('评价') ||
+        l.contains('签收');
+    if (signed) {
+      // 物流文字本身是签收语则沿用（如预设订单的「已签收 张三 送至…」），
+      // 否则给统一的签收兜底文案，避免出现「已签收 已揽件·预计后天送达」的矛盾
+      return l.contains('签收') ? l : '已签收 · 包裹已到达';
+    }
+    return l.isEmpty ? '您的快件已领取，收件人在[代收点](...)' : l;
+  }
+
   /// 根据物流文字推断阶段标签和图标
   (String, IconData) _logisticsStage() {
     final l = _item.logistics;
     final t = _item.statusTitle;
+    // 订单状态优先：交易成功/已签收/待评价时，即使物流文字过期（如仍是
+    // 「已揽件·预计后天送达」）也按已签收展示，保证与列表页状态行一致
+    if (t.contains('签收') ||
+        t.contains('交易成功') ||
+        t.contains('完成') ||
+        t.contains('评价')) {
+      return ('已签收', Icons.check_circle);
+    }
     if (l.contains('揽件')) {
       return ('已揽件', Icons.inventory_2_outlined);
     }
