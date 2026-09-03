@@ -77,11 +77,18 @@ class _MessageScreenState extends State<MessageScreen> {
     '专属客服为您服务',
   ];
 
-  /// 日期模板（2-4 周前）
-  static const _datePool = [
-    '26/08/06', '26/08/04', '26/08/03', '26/08/01', '26/07/30',
-    '26/07/28', '26/07/24', '26/07/22', '26/07/18', '26/07/15',
-  ];
+  /// 会话日期：距今天的天数偏移池（2 天 ~ 7 周前），
+  /// 渲染时按 DateTime.now() 动态回推，月份/年份永不穿越
+  static const _dateOffsets = [2, 4, 5, 7, 9, 12, 16, 20, 28, 45];
+
+  /// 距今天 [daysAgo] 天的日期，格式 yy/MM/dd
+  static String _dateFor(int daysAgo) {
+    final d = DateTime.now().subtract(Duration(days: daysAgo));
+    final yy = (d.year % 100).toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    return '$yy/$mm/$dd';
+  }
 
   @override
   void initState() {
@@ -170,7 +177,7 @@ class _MessageScreenState extends State<MessageScreen> {
       final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
       final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
       final msg = _msgTemplates[rand.nextInt(_msgTemplates.length)];
-      final date = _datePool[rand.nextInt(_datePool.length)];
+      final date = _dateFor(_dateOffsets[rand.nextInt(_dateOffsets.length)]);
       final unread =
           _hashOf(shopName) % 5 < 2 && !_readShops.contains(shopName);
       result.add(_HistoryMsg(
@@ -256,7 +263,9 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _onRefresh() async {
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    final rand = Random();
+    // 按当前列表状态确定性派生（同一次会话内每次刷新不同，跨重启可复现）
+    final rand = Random(_hashOf(
+        'refresh#${_history.length}#${_history.isNotEmpty ? _history.first.shopName : ''}'));
     final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
     final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
     setState(() {
