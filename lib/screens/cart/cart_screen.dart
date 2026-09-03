@@ -12,12 +12,14 @@ import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/coupons_provider.dart';
 import '../../providers/favorites_provider.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/shop_type_badge.dart';
+import '../home/search_result_screen.dart';
 import '../mine/coupon_center_screen.dart';
 import '../order/order_list_screen.dart';
 import '../product/shop_home_screen.dart';
@@ -218,7 +220,7 @@ class _CartScreenState extends State<CartScreen> {
         for (final it in s.items)
           if (priceDropOf(it) != null) it,
     ];
-    // 素材池：为购物车商品随机分配"图+名对应"的素材（每次启动重抽，会话内稳定）
+    // 素材池：为购物车商品分配"图+名对应"的素材（种子确定性派生，跨重启稳定）
     final pool = context.watch<MaterialPoolProvider>();
     if (!pool.loading && !pool.isEmpty) {
       final keys = <String>[
@@ -435,29 +437,35 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // ============ AI 省钱助手（按当前勾选金额给出凑单/用券建议）============
+  // ============ AI 省钱助手（按当前勾选金额给出凑单/用券建议，券状态联动卡券包）============
   void _showAiSavingSheet(BuildContext context) {
     final cart = context.read<CartProvider>();
+    final coupons = context.read<CouponsProvider>();
     final total = cart.totalPrice;
     const couponThreshold = 599.0;
     const couponValue = 61.0;
     final gap = couponThreshold - total;
+    final unclaimedCount = coupons.unclaimed.length;
+    final platformClaimed = coupons.isClaimed('消费券', '61');
+    // 61 元消费券未领取时的提醒文案
+    final claimTip =
+        platformClaimed ? '61 元消费券已在你的卡券包，结算时直接出示即可' : '记得先去领券中心领取 61 元消费券再结算';
     final List<String> tips;
     if (cart.selectedItemCount == 0) {
       tips = [
         '先勾选想买的商品，我帮你算怎么买最划算',
-        '领券中心有 3 张共 61 元消费券待领取',
+        if (unclaimedCount > 0) '领券中心有 $unclaimedCount 张券待领取' else '领券中心的券你都领齐了，结算记得用',
       ];
     } else if (gap > 0) {
       tips = [
         '当前勾选 ¥${total.toStringAsFixed(2)}，再凑 ¥${gap.toStringAsFixed(2)} 即可用 61 元消费券（满 599 可用）',
         '去「猜你喜欢」挑一件小件凑单最划算',
-        '领券中心还有超市/服饰/数码加补券可叠加',
+        if (unclaimedCount > 0) '领券中心还有 $unclaimedCount 张券可叠加领取',
       ];
     } else {
       tips = [
         '当前勾选 ¥${total.toStringAsFixed(2)}，已满足 61 元消费券使用门槛，结算立减 ¥${couponValue.toStringAsFixed(0)}',
-        '记得先去领券中心领取消费券再结算',
+        claimTip,
       ];
     }
     // 凑单推荐：价格升序取 6 件（优先不贵于缺口的）
@@ -487,7 +495,7 @@ class _CartScreenState extends State<CartScreen> {
           } else {
             liveTips = [
               '当前勾选 ¥${curTotal.toStringAsFixed(2)}，已满足 61 元消费券使用门槛，结算立减 ¥${couponValue.toStringAsFixed(0)}',
-              '记得先去领券中心领取消费券再结算',
+              claimTip,
             ];
           }
           return SafeArea(
@@ -653,8 +661,14 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // ============ 顶部消费券提示条 ============
+  // ============ 顶部消费券提示条（数据联动全局卡券包） ============
   Widget _buildCouponBar(BuildContext context) {
+    final cp = context.watch<CouponsProvider>();
+    final un = cp.unclaimed;
+    // 目录内券全部领完后收起提示条
+    if (un.isEmpty) return const SizedBox.shrink();
+    final totalValue =
+        un.fold<int>(0, (s, c) => s + (int.tryParse(c.value) ?? 0));
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -666,9 +680,9 @@ class _CartScreenState extends State<CartScreen> {
         children: [
           const Icon(Icons.local_offer, color: Colors.red, size: 16),
           const SizedBox(width: 6),
-          const Expanded(
-            child: Text('您有3张共61元消费券待领取',
-                style: TextStyle(fontSize: 12, color: Colors.red)),
+          Expanded(
+            child: Text('您有${un.length}张共$totalValue元券待领取',
+                style: const TextStyle(fontSize: 12, color: Colors.red)),
           ),
           GestureDetector(
             onTap: () => Navigator.of(context).push(
@@ -682,7 +696,7 @@ class _CartScreenState extends State<CartScreen> {
                 color: Colors.red,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text('领61元',
+              child: const Text('去领券',
                   style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -901,10 +915,43 @@ class _CartScreenState extends State<CartScreen> {
               ],
             ),
           ),
+          // 店铺级促销横条（按店名确定性派生，点击去领券中心）
+          if (_promoOf(shop) != null)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CouponCenterScreen()),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(42, 0, 12, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_activity,
+                        color: AppColors.primary, size: 13),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(_promoOf(shop)!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    const Text('去凑单',
+                        style:
+                            TextStyle(color: Color(0xFF999999), fontSize: 10)),
+                    const Icon(Icons.chevron_right,
+                        size: 12, color: Color(0xFF999999)),
+                  ],
+                ),
+              ),
+            ),
           const Divider(height: 1, color: AppColors.divider),
-          // 商品列表（带右滑操作，展示素材库随机分配的图+名）
+          // 商品列表（带右滑操作，展示素材库分配的图+名）
           ...shop.items.map((item) => _SlidableCartItem(
                 item: item,
+                shopName: shop.shopName,
                 material: pool.cartMaterialFor(CartScreen.cartItemKey(item)),
               )),
         ],
@@ -912,15 +959,30 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // ============ 商品项（右滑显示“换图 / 编辑 / 删除”）============
-  Widget _SlidableCartItem({required OrderItem item, MaterialEntry? material}) {
+  /// 店铺级促销文案：按店名哈希确定性派生，约 2/3 的店铺有促销
+  String? _promoOf(ShoppingCartShop shop) {
+    if (shop.items.isEmpty) return null;
+    var h = 0;
+    for (final c in shop.shopName.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    if (h % 3 == 2) return null;
+    const promos = ['每满300减30', '店铺券满199减20', '满2件9折', '会员立减15元'];
+    return promos[h % promos.length];
+  }
+
+  // ============ 商品项（右滑显示"换图 / 编辑 / 移入收藏 / 找相似 / 删除"）============
+  Widget _SlidableCartItem(
+      {required OrderItem item,
+      required String shopName,
+      MaterialEntry? material}) {
     return Builder(
       builder: (context) => Slidable(
         key: ValueKey(item.hashCode),
         direction: Axis.horizontal,
         endActionPane: ActionPane(
           motion: const ScrollMotion(),
-          extentRatio: 0.38,
+          extentRatio: 0.62,
           children: [
             CustomSlidableAction(
               onPressed: (_) => _pickCartItemImage(context, item),
@@ -945,6 +1007,40 @@ class _CartScreenState extends State<CartScreen> {
                   Icon(Icons.edit, size: 20),
                   SizedBox(height: 2),
                   Text('编辑', style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+            CustomSlidableAction(
+              onPressed: (_) => _moveItemToFavorites(context, item, shopName),
+              backgroundColor: const Color(0xFF12A150),
+              foregroundColor: Colors.white,
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.favorite_border, size: 20),
+                  SizedBox(height: 2),
+                  Text('收藏', style: TextStyle(fontSize: 11)),
+                ],
+              ),
+            ),
+            CustomSlidableAction(
+              onPressed: (_) {
+                final kw = item.title.length > 6
+                    ? item.title.substring(0, 6)
+                    : item.title;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => SearchResultScreen(keyword: kw)),
+                );
+              },
+              backgroundColor: const Color(0xFF8E24AA),
+              foregroundColor: Colors.white,
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search, size: 20),
+                  SizedBox(height: 2),
+                  Text('找相似', style: TextStyle(fontSize: 11)),
                 ],
               ),
             ),
@@ -1308,9 +1404,36 @@ class _CartScreenState extends State<CartScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.small),
                 const SizedBox(height: 4),
-                Text(item.configuration,
-                    style: AppTextStyles.min
-                        .copyWith(color: AppColors.subText)),
+                // 规格胶囊（点击进入编辑弹层改规格）
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.5),
+                  child: GestureDetector(
+                    onTap: () => _showEditCartItemSheet(context, item),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(item.configuration,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.min
+                                    .copyWith(color: AppColors.subText)),
+                          ),
+                          const Icon(Icons.arrow_drop_down,
+                              size: 14, color: AppColors.subText),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 6),
                 // 立减/补贴/官方立减 标签
                 Wrap(
@@ -1358,20 +1481,24 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                   ],
                 ),
-                // 比加入时降价 标签
+                // 比加入时降价 标签（红底白字胶囊，对齐真实淘宝）
                 if (_CartScreenState.priceDropOf(item) != null) ...[
                   const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.trending_down,
-                          size: 12, color: Color(0xFFe6432e)),
-                      const SizedBox(width: 3),
-                      Text(
-                        '比加入时降¥${_CartScreenState.priceDropOf(item)!.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFFe6432e)),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6432E),
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                    ],
+                      child: Text(
+                        '已降 ¥${_CartScreenState.priceDropOf(item)!.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.white),
+                      ),
+                    ),
                   ),
                 ],
                 if (item.taxInfo.isNotEmpty) ...[
@@ -1380,11 +1507,54 @@ class _CartScreenState extends State<CartScreen> {
                       style: const TextStyle(
                           color: Color(0xFF999999), fontSize: 11)),
                 ],
+                const SizedBox(height: 8),
+                // 数量步进器（右下角 - 数量 +）
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [_qtyStepper(context, item)],
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// 数量步进器：直接调 CartProvider.changeQuantity，1~99 边界置灰
+  Widget _qtyStepper(BuildContext context, OrderItem item) {
+    final cart = context.read<CartProvider>();
+    Widget stepBtn(IconData icon, int delta, {required bool disabled}) {
+      return GestureDetector(
+        onTap: disabled ? null : () => cart.changeQuantity(item, delta),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: disabled
+                ? const Color(0xFFF7F7F7)
+                : const Color(0xFFF0F0F0),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(icon,
+              size: 14,
+              color: disabled
+                  ? const Color(0xFFCCCCCC)
+                  : const Color(0xFF666666)),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        stepBtn(Icons.remove, -1, disabled: item.quantity <= 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('${item.quantity}', style: AppTextStyles.small),
+        ),
+        stepBtn(Icons.add, 1, disabled: item.quantity >= 99),
+      ],
     );
   }
 
@@ -1437,6 +1607,17 @@ class _CartScreenState extends State<CartScreen> {
   // ============ 底部栏（结算 / 管理两种模式） ============
   Widget _buildBottomBar(BuildContext context, CartProvider cart) {
     if (_managing) return _buildManageBar(context, cart);
+    // 勾选商品的划线价总让利（用于「共减」明细行）
+    var save = 0.0;
+    for (final s in cart.shops) {
+      for (final it in s.items) {
+        if (it.isSelected &&
+            it.originalPrice != null &&
+            it.originalPrice! > it.price) {
+          save += (it.originalPrice! - it.price) * it.quantity;
+        }
+      }
+    }
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1469,7 +1650,18 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ],
               ),
-              const Text('不含运费', style: AppTextStyles.min),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('不含运费', style: AppTextStyles.min),
+                  if (save > 0) ...[
+                    const SizedBox(width: 4),
+                    Text('共减 ¥${save.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            color: AppColors.primary, fontSize: 10)),
+                  ],
+                ],
+              ),
             ],
           ),
           const SizedBox(width: 12),
@@ -1477,9 +1669,13 @@ class _CartScreenState extends State<CartScreen> {
             onTap: () => _checkout(context, cart),
             child: Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 22, vertical: 12),
+                  horizontal: 26, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF5000), Color(0xFFFF7A33)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Text(
@@ -1589,6 +1785,27 @@ class _CartScreenState extends State<CartScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
           builder: (_) => const OrderListScreen(type: '待付款')),
+    );
+  }
+
+  /// 单个商品移入收藏（右滑操作）：写入收藏夹后从购物车移除
+  void _moveItemToFavorites(
+      BuildContext context, OrderItem item, String shopName) {
+    final favs = context.read<FavoritesProvider>();
+    final already = favs.isFav(item.title);
+    if (!already) {
+      favs.toggle(SearchResultItem(
+        imageUrl: item.imageUrl,
+        title: item.title,
+        shopName: shopName,
+        price: item.price.toStringAsFixed(2),
+      ));
+    }
+    context.read<CartProvider>().removeItem(item);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(already ? '该商品已在收藏夹，已从购物车移除' : '已移入收藏夹'),
+          duration: const Duration(seconds: 1)),
     );
   }
 
