@@ -774,25 +774,32 @@ class _OrderCard extends StatelessWidget {
                   child: ShopTypeBadge(shop: shop),
                 ),
                 const SizedBox(width: 6),
-                Flexible(
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ShopHomeScreen(
-                            shopName: shop.shopName,
-                            shopType: shop.shopType),
+                // Expanded(tight) 吃掉全部剩余空间，保证状态文字贴卡片右缘；
+                // 内层 Row 让店名 + 箭头保持左对齐（箭头跟在店名后）
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: GestureDetector(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ShopHomeScreen(
+                                  shopName: shop.shopName,
+                                  shopType: shop.shopType),
+                            ),
+                          ),
+                          child: Text(shop.shopName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.smallBold),
+                        ),
                       ),
-                    ),
-                    child: Text(shop.shopName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.smallBold),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.chevron_right,
+                          color: Color(0xFF999999), size: 18),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 2),
-                const Icon(Icons.chevron_right,
-                    color: Color(0xFF999999), size: 18),
-                const Spacer(),
                 // 售后卡片右上角只写"退款"（橘色），与真实淘宝一致
                 Text(isRefund ? '退款' : shop.orderSubStatus,
                     style: AppTextStyles.small.copyWith(
@@ -1255,7 +1262,45 @@ class _OrderItemTile extends StatelessWidget {
             ),
           ],
         ),
-        if (_statusLine != null)
+        // 待发货：灰底圆角框架（图标 + "待发货"粗体 + 时间文案），双击编辑具体时间
+        if (_isPendingShip)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: GestureDetector(
+              onDoubleTap: () => _editShipPromise(context),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule,
+                        color: Color(0xFF999999), size: 14),
+                    const SizedBox(width: 4),
+                    const Text('待发货',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A))),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(_shipPromiseText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF999999))),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else if (_statusLine != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -1299,11 +1344,59 @@ class _OrderItemTile extends StatelessWidget {
     }
     if (s.contains('交易关闭')) return '交易关闭';
     if (s.contains('待付款') || s.contains('等待付款')) return '等待买家付款';
-    if (s.contains('待发货') || s.contains('等待发货')) return '等待卖家发货';
+    // 待发货由灰色框架单独渲染（见 _buildNormalLayout），不再走纯文字状态行
+    if (s.contains('待发货') || s.contains('等待发货')) return null;
     if (s.contains('签收') || s.contains('交易成功')) {
       return '已签收 · 您的快件已送达，签收人：单位前台';
     }
     return item.logistics.isEmpty ? null : item.logistics;
+  }
+
+  /// 是否待发货订单（普通布局里显示灰色发货承诺框架）
+  bool get _isPendingShip =>
+      orderStatus.contains('待发货') || orderStatus.contains('等待发货');
+
+  /// 待发货灰框时间文案：用户改过用用户值，否则按商品标题确定性分配
+  /// 变体对齐真实淘宝：预计明天/后天到达、今天/明天/后天 HH:mm 前发货、预售 M月d日 HH:mm 前发货
+  String get _shipPromiseText {
+    if (item.shipPromise.isNotEmpty) return item.shipPromise;
+    final h =
+        item.title.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    final hh = (8 + h % 14).toString().padLeft(2, '0'); // 08~21 点
+    final mm = (h % 60).toString().padLeft(2, '0');
+    switch (h % 6) {
+      case 0:
+        return '预计明天到达';
+      case 1:
+        return '预计后天到达';
+      case 2:
+        return '今天$hh:$mm前发货';
+      case 3:
+        return '明天$hh:$mm前发货';
+      case 4:
+        return '后天$hh:$mm前发货';
+      default:
+        return '预售，9月${10 + h % 18}日$hh:$mm前发货';
+    }
+  }
+
+  /// 双击灰色框架：编辑发货时间文案（持久化到 shipPromise）
+  void _editShipPromise(BuildContext context) {
+    DialogHelpers.showTextInput(
+      context,
+      title: '修改发货时间',
+      initial: _shipPromiseText,
+    ).then((v) {
+      if (v == null || v.isEmpty) return;
+      if (!context.mounted) return;
+      context.read<CartProvider>().updateOrderItem(item, shipPromise: v);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('发货时间已修改：$v'),
+          duration: const Duration(seconds: 1),
+        ));
+    });
   }
 
   IconData get _statusIcon {
