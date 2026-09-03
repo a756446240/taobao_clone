@@ -26,8 +26,8 @@ class _Coupon {
     required this.fg,
   });
 
-  /// 从全局卡券包的领取记录构造（用于「已领取」Tab 展示）
-  factory _Coupon.fromClaimed(ClaimedCoupon c) => _Coupon(
+  /// 从目录条目构造（未领取状态）
+  factory _Coupon.fromCatalog(ClaimedCoupon c) => _Coupon(
         value: c.value,
         name: c.name,
         condition: c.condition,
@@ -35,7 +35,11 @@ class _Coupon {
         expiry: c.expiry,
         bg: Color(c.bg),
         fg: Color(c.fg),
-      )..claimed = true;
+      );
+
+  /// 从全局卡券包的领取记录构造（用于「已领取」Tab 展示）
+  factory _Coupon.fromClaimed(ClaimedCoupon c) =>
+      _Coupon.fromCatalog(c)..claimed = true;
 }
 
 /// 淘宝式领券中心完整页：精选好券 / 已领取 双 Tab
@@ -49,56 +53,9 @@ class CouponCenterScreen extends StatefulWidget {
 class _CouponCenterScreenState extends State<CouponCenterScreen> {
   int _tab = 0; // 0=精选好券 1=已领取
 
-  final List<_Coupon> _coupons = [
-    _Coupon(
-        value: '61',
-        name: '消费券',
-        condition: '满599元可用',
-        scope: '全平台实物商品通用',
-        expiry: '领取后 3 天内有效',
-        bg: const Color(0xFFFFF1E8),
-        fg: const Color(0xFFFF5000)),
-    _Coupon(
-        value: '10',
-        name: '超市加补券',
-        condition: '满99元可用',
-        scope: '天猫超市指定商品',
-        expiry: '领取后 7 天内有效',
-        bg: const Color(0xFFE8F8EE),
-        fg: const Color(0xFF12A150)),
-    _Coupon(
-        value: '50',
-        name: '珠宝加补券',
-        condition: '满999元可用',
-        scope: '珠宝配饰类目指定商品',
-        expiry: '领取后 7 天内有效',
-        bg: const Color(0xFFF3EBFF),
-        fg: const Color(0xFF7C3AED)),
-    _Coupon(
-        value: '45',
-        name: '玩具加补券',
-        condition: '满399元可用',
-        scope: '玩具乐器类目指定商品',
-        expiry: '领取后 7 天内有效',
-        bg: const Color(0xFFE8F1FF),
-        fg: const Color(0xFF2B6DEF)),
-    _Coupon(
-        value: '20',
-        name: '服饰加补券',
-        condition: '满199元可用',
-        scope: '服饰鞋包类目指定商品',
-        expiry: '领取后 5 天内有效',
-        bg: const Color(0xFFFFEEF3),
-        fg: const Color(0xFFE03A6C)),
-    _Coupon(
-        value: '30',
-        name: '数码加补券',
-        condition: '满599元可用',
-        scope: '手机数码类目指定商品',
-        expiry: '领取后 5 天内有效',
-        bg: const Color(0xFFE8F7FA),
-        fg: const Color(0xFF0E8A9E)),
-  ];
+  /// 预置券目录以全局卡券包为准（购物车券条/AI 省钱助手共用同一份数据）
+  List<_Coupon> get _coupons =>
+      CouponsProvider.catalog.map(_Coupon.fromCatalog).toList();
 
   /// 可领取：预置券中未被领取过的（领取状态以全局卡券包为准，重启不丢）
   List<_Coupon> _available(BuildContext context) {
