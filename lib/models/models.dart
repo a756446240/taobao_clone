@@ -306,6 +306,7 @@ class ShoppingCartShop {
   String orderStatus; // 订单状态标签，如"待发货""已发货"
   String orderSubStatus; // 店铺名右侧状态，如"待付款""已发货"
   String orderTotalTip; // 店铺合计提示，如"共1件商品 合计："
+  int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
 
   // ===== 3.4 店铺信息字段 =====
   String shopSubtitle; // 店铺副标题，如"德国直邮 · 保税仓发货 · 正品保障"
@@ -327,6 +328,7 @@ class ShoppingCartShop {
     this.orderStatus = '',
     this.orderSubStatus = '',
     this.orderTotalTip = '',
+    this.orderBtnStyle = -1,
     this.shopSubtitle = '',
     this.goodRate = '99%',
     this.csRate = '96%',
