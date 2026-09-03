@@ -73,8 +73,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     _buildStatusHeader(),
                     _greyBar(),
                     _buildShopCard(),
-                    _greyBar(),
-                    // 商品与价格明细合并在同一栏目（中间无空白分隔框）
+                    // 店铺与商品同一框架：去掉灰色间隔带，改虚线衔接
+                    _dashedDivider(),
                     _buildProductCard(),
                     _greyBar(),
                     _buildOrderInfoCard(),
@@ -97,6 +97,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// 栏目之间的灰色长条（直角通栏分隔）
   Widget _greyBar() {
     return Container(height: 10, color: const Color(0xFFf0f0f0));
+  }
+
+  /// 店铺卡与商品卡之间的虚线分隔（同一白色框架内）
+  Widget _dashedDivider() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const dashWidth = 4.0;
+          const dashSpace = 4.0;
+          final dashCount =
+              (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(
+              dashCount,
+              (_) => Container(
+                width: dashWidth,
+                height: 1,
+                color: const Color(0xFFDDDDDD),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   // ============ 顶部栏 ============
@@ -379,8 +406,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               GestureDetector(
                 onDoubleTap: () => _pickShopAvatar(),
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 30,
+                  height: 30,
                   decoration: const BoxDecoration(
                     color: Color(0xFFff0036),
                     shape: BoxShape.circle,
@@ -406,11 +433,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.bold)),
                           ),
                           const Icon(Icons.chevron_right,
-                              color: Color(0xFF999999), size: 20),
+                              color: Color(0xFF999999), size: 18),
                         ],
                       ),
                     ),
@@ -446,7 +473,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
             children: [
               _rateText('好评率', _shop.goodRate),
