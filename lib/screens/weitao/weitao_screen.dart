@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/mock_data.dart';
+import '../../models/models.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/follow_shops_provider.dart';
+import '../../widgets/app_image.dart';
+import '../product/product_detail_screen.dart';
 
 /// 微淘 AI 视频数据（搬运自 HaotaoMarket v3.4 APK）
 class _WeitaoVideo {
@@ -29,12 +37,48 @@ const List<_WeitaoVideo> _videos = [
       '海外直营', Color(0xFF7C3AED), 6782, 175, 866, 94),
 ];
 
-/// 预设评论池（按视频索引循环取用）
+/// 预设评论池（按视频索引循环取用，每视频 8 条）
 const List<List<String>> _commentPool = [
-  ['已下单，等活动价！', '这个牌子一直在吃，效果不错', '物流很快，隔天就到了', '主播推荐来的，先收藏'],
-  ['原来包裹是这么分拣的，涨知识了', '国际件也能全程追踪，安心', '希望配送再快一点', '科技感满满'],
-  ['618 力度比去年还大', '已经加购三件了', '求优惠券链接', '全球好物节必蹲'],
-  ['产地直拍好治愈', '这样的溯源才敢买', '求上架同款', '航拍太美了'],
+  [
+    '已下单，等活动价！',
+    '这个牌子一直在吃，效果不错',
+    '物流很快，隔天就到了',
+    '主播推荐来的，先收藏',
+    '给家里老人买的，复购第三次了',
+    '比线下药店便宜不少，正品可验',
+    '胶囊不大，好吞咽',
+    '求问和鱼油能一起吃吗',
+  ],
+  [
+    '原来包裹是这么分拣的，涨知识了',
+    '国际件也能全程追踪，安心',
+    '希望配送再快一点',
+    '科技感满满',
+    '昨天刚收到件，确实是这个流程',
+    '跨境 5 天到手，比预期快',
+    '分拣中心的机械臂太帅了',
+    '建议多拍点这类溯源视频',
+  ],
+  [
+    '618 力度比去年还大',
+    '已经加购三件了',
+    '求优惠券链接',
+    '全球好物节必蹲',
+    '预售定金已付，坐等尾款',
+    '去年囤的还没用完，今年继续',
+    '直播间还有额外满减吗',
+    '爆款清单求整理',
+  ],
+  [
+    '产地直拍好治愈',
+    '这样的溯源才敢买',
+    '求上架同款',
+    '航拍太美了',
+    '看完直接下了一单',
+    '风景绝了，想去旅游',
+    '跨境直采这个价格很良心',
+    '希望多出一些产地系列',
+  ],
 ];
 
 /// 微淘页：抖音式全屏沉浸式视频流（1:1 对齐淘宝视频 Tab）
@@ -67,14 +111,15 @@ class _WeitaoScreenState extends State<WeitaoScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 视频流：上下滑动切换，铺满整个栏目
+          // 视频流：上下滑动切换，铺满整个栏目（无限循环 feed，刷不到底）
           PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
-            itemCount: _videos.length,
+            itemCount: null,
             onPageChanged: (i) => setState(() => _current = i),
             itemBuilder: (context, index) => _VideoPage(
-              video: _videos[index],
+              key: ValueKey(index),
+              video: _videos[index % _videos.length],
               isActive: index == _current,
               muted: _muted,
             ),
@@ -154,6 +199,7 @@ class _VideoPage extends StatefulWidget {
   final bool muted;
 
   const _VideoPage({
+    super.key,
     required this.video,
     required this.isActive,
     required this.muted,
@@ -169,17 +215,51 @@ class _VideoPageState extends State<_VideoPage> {
   bool _playing = false;
   bool _initializing = false;
 
-  // 互动状态（本地）
+  // 互动状态（SharedPreferences 持久化，重启不丢）
   bool _liked = false;
   bool _faved = false;
   bool _shared = false;
-  bool _followed = false;
+
+  // 双击点赞飘心动画
+  final List<int> _hearts = [];
+  int _heartSeq = 0;
+
+  String get _interactKey => 'weitao_interact_${widget.video.asset}';
 
   @override
   void initState() {
     super.initState();
+    _loadInteract();
     // 只初始化当前激活页，避免同时创建多个播放器导致低端机解码器实例不足
     if (widget.isActive) _init();
+  }
+
+  Future<void> _loadInteract() async {
+    final p = await SharedPreferences.getInstance();
+    final raw = p.getString(_interactKey);
+    if (raw == null || !mounted) return;
+    setState(() {
+      _liked = raw.contains('L');
+      _faved = raw.contains('F');
+      _shared = raw.contains('S');
+    });
+  }
+
+  Future<void> _saveInteract() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_interactKey,
+        '${_liked ? 'L' : ''}${_faved ? 'F' : ''}${_shared ? 'S' : ''}');
+  }
+
+  void _toggleLike() {
+    setState(() => _liked = !_liked);
+    _saveInteract();
+  }
+
+  /// 双击：未点赞则补赞 + 飘心动画（对齐抖音/逛逛手势）
+  void _onDoubleTap() {
+    if (!_liked) _toggleLike();
+    setState(() => _hearts.add(++_heartSeq));
   }
 
   Future<void> _init() async {
@@ -286,6 +366,7 @@ class _VideoPageState extends State<_VideoPage> {
     final c = _ctl;
     return GestureDetector(
       onTap: _togglePlay,
+      onDoubleTap: _onDoubleTap,
       child: Container(
         color: Colors.black,
         child: _initError
@@ -350,6 +431,50 @@ class _VideoPageState extends State<_VideoPage> {
                           child: Icon(Icons.play_circle_fill,
                               size: 64, color: Colors.white70),
                         ),
+                      // 双击点赞飘心层
+                      for (final id in _hearts)
+                        Center(
+                          child: TweenAnimationBuilder<double>(
+                            key: ValueKey(id),
+                            tween: Tween(begin: 0, end: 1),
+                            duration: const Duration(milliseconds: 700),
+                            onEnd: () {
+                              if (mounted) {
+                                setState(() => _hearts.remove(id));
+                              }
+                            },
+                            builder: (_, t, __) => Opacity(
+                              opacity: 1 - t,
+                              child: Transform.translate(
+                                offset: Offset(0, -60 * t),
+                                child: Transform.scale(
+                                  scale: 0.8 + 0.6 * t,
+                                  child: const Icon(Icons.favorite,
+                                      color: Color(0xFFFF2E4D), size: 80),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      // 播放进度条（可拖动）
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                          height: 3,
+                          child: VideoProgressIndicator(
+                            c,
+                            allowScrubbing: true,
+                            padding: EdgeInsets.zero,
+                            colors: const VideoProgressColors(
+                              playedColor: AppColors.primary,
+                              bufferedColor: Colors.white24,
+                              backgroundColor: Colors.white12,
+                            ),
+                          ),
+                        ),
+                      ),
                       // 右侧操作栏
                       Positioned(
                         right: 8,
@@ -398,6 +523,9 @@ class _VideoPageState extends State<_VideoPage> {
                                     height: 1.35,
                                     fontWeight: FontWeight.w500),
                               ),
+                              const SizedBox(height: 8),
+                              // 带货商品卡（按视频确定性选品）
+                              _buildGoodsCard(context),
                             ],
                           ),
                         ),
@@ -408,15 +536,102 @@ class _VideoPageState extends State<_VideoPage> {
     );
   }
 
+  /// 带货商品：按视频标题哈希从猜你喜欢池确定性选 1 件
+  SearchResultItem get _goods {
+    const pool = MockData.guessLikeGoods;
+    var h = _videos.indexOf(widget.video) * 3 + 7;
+    for (final c in widget.video.title.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return pool[h % pool.length];
+  }
+
+  Widget _buildGoodsCard(BuildContext context) {
+    final goods = _goods;
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ProductDetailScreen(item: goods)),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: AppImage(url: goods.imageUrl, width: 36, height: 36),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(goods.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF333333))),
+                  const SizedBox(height: 2),
+                  Text('视频同款 ¥${goods.price}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFFF5000),
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                context.read<CartProvider>().addToCart(
+                      shopName: goods.shopName,
+                      title: goods.title,
+                      price: double.tryParse(goods.price) ?? 0,
+                      imageUrl: goods.imageUrl,
+                      spec: '视频同款',
+                      quantity: 1,
+                    );
+                _toast('已加入购物车');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF5000), Color(0xFFFF7A33)],
+                  ),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Text('去购买',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ============ 右侧操作栏：头像+关注 / 点赞 / 评论 / 收藏 / 分享 ============
   Widget _buildActionRail() {
     final v = widget.video;
+    // 关注状态走全局 FollowShopsProvider（与直播间/店铺主页/关注列表同源）
+    final followProvider = context.watch<FollowShopsProvider>();
+    final followed = followProvider.isFollowed(v.shop);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // 头像 + 关注角标
         GestureDetector(
-          onTap: () => setState(() => _followed = !_followed),
+          onTap: () {
+            final now = followProvider.toggle(v.shop);
+            _toast(now ? '已关注 ${v.shop}' : '已取消关注');
+          },
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
@@ -442,14 +657,14 @@ class _VideoPageState extends State<_VideoPage> {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: _followed
+                    color: followed
                         ? const Color(0xFF999999)
                         : AppColors.primary,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 1.2),
                   ),
                   child: Icon(
-                      _followed ? Icons.check : Icons.add,
+                      followed ? Icons.check : Icons.add,
                       color: Colors.white,
                       size: 12),
                 ),
@@ -462,7 +677,7 @@ class _VideoPageState extends State<_VideoPage> {
           icon: _liked ? Icons.favorite : Icons.favorite_border,
           color: _liked ? const Color(0xFFFF2E4D) : Colors.white,
           label: _fmtCount(v.likes + (_liked ? 1 : 0)),
-          onTap: () => setState(() => _liked = !_liked),
+          onTap: _toggleLike,
         ),
         const SizedBox(height: 16),
         _railItem(
@@ -476,7 +691,10 @@ class _VideoPageState extends State<_VideoPage> {
           icon: _faved ? Icons.star : Icons.star_border,
           color: _faved ? const Color(0xFFFFC107) : Colors.white,
           label: _fmtCount(v.favorites + (_faved ? 1 : 0)),
-          onTap: () => setState(() => _faved = !_faved),
+          onTap: () {
+            setState(() => _faved = !_faved);
+            _saveInteract();
+          },
         ),
         const SizedBox(height: 16),
         _railItem(
@@ -487,6 +705,7 @@ class _VideoPageState extends State<_VideoPage> {
             Clipboard.setData(const ClipboardData(
                 text: '【淘宝】https://m.tb.cn/h.weT88 这条微淘太有趣了，快来看看吧'));
             setState(() => _shared = true);
+            _saveInteract();
             _toast('链接已复制，快去分享吧');
           },
         ),
@@ -532,7 +751,22 @@ class _CommentSheet extends StatefulWidget {
 class _CommentSheetState extends State<_CommentSheet> {
   late final List<String> _comments;
   final _inputCtl = TextEditingController();
-  static const _nickPool = ['淘友**酱', '爱吃橘子的猫', '买家小Q', '种草达人Leo', '潜水用户007'];
+  static const _nickPool = [
+    '淘友**酱',
+    '爱吃橘子的猫',
+    '买家小Q',
+    '种草达人Leo',
+    '潜水用户007',
+    '囤货小能手',
+    '云逛街的阿May',
+    '数码老饕',
+    '宝妈爱剁手',
+    '性价比研究所',
+  ];
+
+  /// 评论者昵称/时间/点赞数：按评论内容哈希确定性派生，不再清一色循环
+  static int _hashOf(String s) =>
+      s.codeUnits.fold(0, (a, c) => (a * 31 + c) & 0x7fffffff);
 
   @override
   void initState() {
@@ -584,16 +818,22 @@ class _CommentSheetState extends State<_CommentSheet> {
                 separatorBuilder: (_, __) =>
                     const SizedBox(height: 14),
                 itemBuilder: (context, i) {
-                  final nick = i == 0 && _comments.length > widget.presets.length
-                      ? '我'
-                      : _nickPool[i % _nickPool.length];
+                  final isMine =
+                      i == 0 && _comments.length > widget.presets.length;
+                  final h = _hashOf('${_comments[i]}#$i');
+                  final nick = isMine ? '我' : _nickPool[h % _nickPool.length];
+                  // 时间文案：近几条按小时，其余按天
+                  final timeText = isMine
+                      ? '刚刚'
+                      : (i < 3 ? '${1 + h % 5}小时前' : '${1 + h % 6}天前');
+                  final likeCount = isMine ? 0 : 3 + h % 80;
                   final colors = [
                     const Color(0xFFFF5000),
                     const Color(0xFF2B6DEF),
                     const Color(0xFF12A150),
                     const Color(0xFF7C3AED),
                   ];
-                  final color = colors[i % colors.length];
+                  final color = colors[h % colors.length];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
@@ -613,7 +853,7 @@ class _CommentSheetState extends State<_CommentSheet> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(nick,
+                              Text('$nick · $timeText',
                                   style: const TextStyle(
                                       color: Color(0xFF999999),
                                       fontSize: 12)),
@@ -627,7 +867,7 @@ class _CommentSheetState extends State<_CommentSheet> {
                           children: [
                             const Icon(Icons.favorite_border,
                                 size: 16, color: Color(0xFFBBBBBB)),
-                            Text('${(i + 1) * 3}',
+                            Text('$likeCount',
                                 style: const TextStyle(
                                     color: Color(0xFFBBBBBB),
                                     fontSize: 10)),
