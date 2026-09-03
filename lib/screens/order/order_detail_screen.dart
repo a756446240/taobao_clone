@@ -16,9 +16,6 @@ import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
-import '../message/chat_screen.dart';
-import '../product/shop_home_screen.dart';
-import 'logistics_screen.dart';
 import 'refund_detail_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
@@ -172,46 +169,47 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          // 物流状态行（双击换选项）；待发货时不展示物流信息
-          if (!_isPendingShip)
-            GestureDetector(
-              onDoubleTap: () => _showOptionPicker(
-                title: '修改物流状态',
-                options: logisticsOptions,
-                currentValue: _item.logistics,
-                onSave: (v) => provider.updateOrderItem(_item, logistics: v),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(stage.$2, color: const Color(0xFFFF5000), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(children: [
-                        TextSpan(
-                            text: '${stage.$1}  ',
-                            style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFFFF5000),
-                                fontWeight: FontWeight.w600)),
-                        TextSpan(
-                          text: _bannerLogisticsText,
-                          style: const TextStyle(
-                              fontSize: 14, color: Color(0xFF333333)),
-                        ),
-                      ]),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right,
-                      size: 16, color: Color(0xFFcccccc)),
-                ],
-              ),
+          // 物流状态行（双击换选项）
+          GestureDetector(
+            onDoubleTap: () => _showOptionPicker(
+              title: '修改物流状态',
+              options: logisticsOptions,
+              currentValue: _item.logistics,
+              onSave: (v) => provider.updateOrderItem(_item, logistics: v),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(stage.$2, color: const Color(0xFFFF5000), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                          text: '${stage.$1}  ',
+                          style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFFF5000),
+                              fontWeight: FontWeight.w600)),
+                      TextSpan(
+                        text: _item.logistics.isEmpty
+                            ? '您的快件已领取，收件人在[代收点](...)'
+                            : _item.logistics,
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF333333)),
+                      ),
+                    ]),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Icon(Icons.chevron_right,
+                    size: 16, color: Color(0xFFcccccc)),
+              ],
+            ),
+          ),
           // 地址区（双击手动输入：第一行收件人，其余地址）
-          if (!_isPendingShip) const SizedBox(height: 14),
+          const SizedBox(height: 14),
           GestureDetector(
             onDoubleTap: () => _editText('修改地址（第一行收件人，第二行起地址）',
                 '${_item.receiver}\n${_item.address}', (v) {
@@ -341,35 +339,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 状态头物流文字：签收状态下过滤过期的运输中文案（与列表页状态行同源）
-  String get _bannerLogisticsText {
-    final l = _item.logistics;
-    final t = _item.statusTitle;
-    final signed = t.contains('签收') ||
-        t.contains('交易成功') ||
-        t.contains('完成') ||
-        t.contains('评价') ||
-        l.contains('签收');
-    if (signed) {
-      // 物流文字本身是签收语则沿用（如预设订单的「已签收 张三 送至…」），
-      // 否则给统一的签收兜底文案，避免出现「已签收 已揽件·预计后天送达」的矛盾
-      return l.contains('签收') ? l : '已签收 · 包裹已到达';
-    }
-    return l.isEmpty ? '您的快件已领取，收件人在[代收点](...)' : l;
-  }
-
   /// 根据物流文字推断阶段标签和图标
   (String, IconData) _logisticsStage() {
     final l = _item.logistics;
     final t = _item.statusTitle;
-    // 订单状态优先：交易成功/已签收/待评价时，即使物流文字过期（如仍是
-    // 「已揽件·预计后天送达」）也按已签收展示，保证与列表页状态行一致
-    if (t.contains('签收') ||
-        t.contains('交易成功') ||
-        t.contains('完成') ||
-        t.contains('评价')) {
-      return ('已签收', Icons.check_circle);
-    }
     if (l.contains('揽件')) {
       return ('已揽件', Icons.inventory_2_outlined);
     }
@@ -391,109 +364,118 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return ('等待发货', Icons.access_time);
   }
 
-  // ============ 店铺卡片（对齐真实淘宝：小方头像 + 店名/副标题 + 进店逛逛›） ============
+  // ============ 店铺卡片 ============
   Widget _buildShopCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(14),
       color: Colors.white,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 商家头像：圆角小方块（32×32，对齐真实淘宝订单详情尺寸），双击从手机相册选择
-          GestureDetector(
-            onDoubleTap: () => _pickShopAvatar(),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(width: 32, height: 32, child: _shopAvatar()),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onDoubleTap: () => _editText('修改店铺名', _shop.shopName, (v) {
-                    context.read<CartProvider>().updateShop(_shop, shopName: v);
-                  }),
-                  child: Text(_shop.shopName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.smallBold),
-                ),
-                const SizedBox(height: 3),
-                GestureDetector(
-                  onDoubleTap: () =>
-                      _editText('修改店铺副标题', _shop.shopSubtitle, (v) {
-                    context
-                        .read<CartProvider>()
-                        .updateShop(_shop, shopSubtitle: v);
-                  }),
-                  child: Text(
-                    _shop.shopSubtitle.isEmpty
-                        ? '88VIP好评率99%，平均8小时退款'
-                        : _shop.shopSubtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF999999)),
+          Row(
+            children: [
+              // 商家头像：双击从手机相册选择
+              GestureDetector(
+                onDoubleTap: () => _pickShopAvatar(),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFff0036),
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: _shopAvatar(),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 「进店逛逛」灰色线框按钮，箭头收进框内与文字垂直居中
-          GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ShopHomeScreen(
-                    shopName: _shop.shopName,
-                    shopType: _shop.shopType,
-                  ),
-                ),
-              );
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFDDDDDD)),
-                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Row(
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onDoubleTap: () => _editText('修改店铺名', _shop.shopName, (v) {
+                        context.read<CartProvider>().updateShop(_shop, shopName: v);
+                      }),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(_shop.shopName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                          const Icon(Icons.chevron_right,
+                              color: Color(0xFF999999), size: 20),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    GestureDetector(
+                      onDoubleTap: () => _editText('修改店铺副标题', _shop.shopSubtitle, (v) {
+                        context.read<CartProvider>().updateShop(_shop, shopSubtitle: v);
+                      }),
+                      child: Text(
+                        _shop.shopSubtitle.isEmpty
+                            ? '德国直邮 · 保税仓发货 · 正品保障'
+                            : _shop.shopSubtitle,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF999999)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 进店逛逛：无边框，仅文字 + 箭头（对齐真实淘宝订单详情）
+              const Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text('进店逛逛',
-                      style: TextStyle(color: Colors.black87, fontSize: 12)),
-                  SizedBox(width: 2),
+                      style: TextStyle(
+                          color: Color(0xFF333333),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
                   Icon(Icons.chevron_right,
-                      color: Color(0xFF999999), size: 14),
+                      color: Color(0xFF999999), size: 16),
                 ],
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _rateText('好评率', _shop.goodRate),
+              const SizedBox(width: 10),
+              _rateText('客服满意度', _shop.csRate),
+              const SizedBox(width: 10),
+              _rateText('粉丝', _shop.fansCount),
+              const Spacer(),
+              const Icon(Icons.star, color: Color(0xFFFFB300), size: 14),
+              Text(_shop.shopScore.toStringAsFixed(1),
+                  style: const TextStyle(
+                      color: Color(0xFFff5000),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// 商家头像显示：优先相册替换图（以店铺名为 key 持久化），默认灰色店铺图标
+  /// 商家头像显示：优先相册替换图（以店铺名为 key 持久化）
   Widget _shopAvatar() {
-    final override = context
-        .watch<ProductImageProvider>()
-        .imageFor('shop_avatar:${_shop.shopName}');
+    final override =
+        context.watch<ProductImageProvider>().imageFor('shop_avatar:${_shop.shopName}');
     if (override != null) {
-      return AppImage(url: override, width: 32, height: 32);
+      return AppImage(url: override, width: 36, height: 36);
     }
-    return Container(
-      color: const Color(0xFFF0F0F0),
-      alignment: Alignment.center,
-      child: const Icon(Icons.storefront,
-          color: Color(0xFFBBBBBB), size: 18),
-    );
+    return const Icon(Icons.favorite, color: Colors.white, size: 18);
   }
 
   Future<void> _pickShopAvatar() async {
@@ -513,16 +495,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await context
           .read<ProductImageProvider>()
           .setOverride('shop_avatar:${_shop.shopName}', saved.path);
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片选择失败')),
       );
     }
+  }
+
+  Widget _rateText(String label, String value) {
+    return GestureDetector(
+      onDoubleTap: () {
+        if (label == '好评率') {
+          _editText('修改好评率', _shop.goodRate, (v) {
+            context.read<CartProvider>().updateShop(_shop, goodRate: v);
+          });
+        } else if (label == '客服满意度') {
+          _editText('修改客服满意度', _shop.csRate, (v) {
+            context.read<CartProvider>().updateShop(_shop, csRate: v);
+          });
+        } else {
+          _editText('修改粉丝数', _shop.fansCount, (v) {
+            context.read<CartProvider>().updateShop(_shop, fansCount: v);
+          });
+        }
+      },
+      child: Text.rich(TextSpan(children: [
+        TextSpan(
+            text: '$label ',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF999999))),
+        TextSpan(
+            text: value,
+            style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFFff5000),
+                fontWeight: FontWeight.bold)),
+      ])),
+    );
   }
 
   // ============ 商品卡片 ============
@@ -605,13 +616,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               _outlineBtn('加入购物车', onTap: _reAddToCart),
               const SizedBox(width: 8),
-              // 对齐真实淘宝：待发货为「申请退款」，其余为「申请售后」，统一灰色线框
-              _outlineBtn(_isPendingShip ? '申请退款' : '申请售后',
-                  onTap: _gotoRefund),
+              _orangeOutlineBtn('申请售后', onTap: _gotoRefund),
             ],
           ),
-          // 价格明细与上方商品处于同一栏目（无分隔线/虚框）
-          const SizedBox(height: 16),
+          // 价格明细与上方商品处于同一栏目（无空白虚框分隔）
+          const Divider(height: 24, color: Color(0xFFf0f0f0)),
           ..._priceSectionChildren(),
         ],
       ),
@@ -635,13 +644,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await context
           .read<ProductImageProvider>()
           .setOverride(_item.title, saved.path);
-      if (!mounted) return;
       context.read<CartProvider>().updateOrderItem(_item, imageUrl: saved.path);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('图片选择失败')),
       );
@@ -819,9 +826,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 订单信息（默认折叠，点击标题行展开全部明细） ============
-  bool _orderInfoExpanded = false;
-
+  // ============ 订单信息（对齐 v3.4 image#13） ============
   Widget _buildOrderInfoCard() {
     final provider = context.read<CartProvider>();
     // 按 image#13 顺序：支付方式 -> 天猫积分 -> 微信/支付宝交易号 -> 创建时间 -> 付款时间 -> 发货时间
@@ -877,31 +882,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         children: [
           Row(
             children: [
-              // 标题区：单击展开/收起下方明细
-              GestureDetector(
-                onTap: () => setState(
-                    () => _orderInfoExpanded = !_orderInfoExpanded),
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('订单信息',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87)),
-                    Text('  共${entries.length}项',
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF999999))),
-                    Icon(
-                        _orderInfoExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: const Color(0xFF999999),
-                        size: 16),
-                  ],
-                ),
-              ),
+              const Text('订单信息',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87)),
+              Text('  共${entries.length}项',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF999999))),
               const Spacer(),
               GestureDetector(
                 onTap: () => _copy(_orderNo, '订单编号已复制'),
@@ -916,12 +904,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ],
                 ),
               ),
+              const Icon(Icons.chevron_right,
+                  color: Color(0xFFcccccc), size: 18),
             ],
           ),
-          if (_orderInfoExpanded) ...[
-            const SizedBox(height: 12),
-            ...entries,
-          ],
+          const SizedBox(height: 12),
+          ...entries,
         ],
       ),
     );
@@ -962,7 +950,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       options: CartProvider.orderStatusOptions,
       currentValue: _item.statusTitle,
     ).then((v) {
-      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderStatus(_shop, _item, v);
       }
@@ -976,7 +963,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       title: '修改倒计时',
       initial: _item.countDown.isEmpty ? '还剩3天21小时自动确认' : _item.countDown,
     ).then((v) {
-      if (!mounted) return;
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, countDown: v);
       }
@@ -1250,108 +1236,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
         children: [
-          _bottomAction(Icons.headset_mic_outlined, '客服',
-              onTap: _gotoServiceChat),
-          _bottomAction(Icons.report_problem_outlined, '投诉',
-              onTap: _reportShop),
+          _bottomAction(Icons.headset_mic_outlined, '客服'),
+          _bottomAction(Icons.report_problem_outlined, '投诉'),
           const Spacer(),
           if (_isPendingShip) ...[
-            _primaryBtn('催发货',
-                color: const Color(0xFFff5000), onTap: _urgeShipping),
+            _primaryBtn('催发货', color: const Color(0xFFff5000)),
             const SizedBox(width: 8),
-            _primaryBtn('修改地址',
-                color: const Color(0xFFff0036), onTap: _editAddress),
+            _primaryBtn('修改地址', color: const Color(0xFFff0036)),
           ] else
             Expanded(
-              child: _primaryBtn('查看详情',
-                  color: const Color(0xFFff5000), onTap: _gotoFurtherDetail),
+              child: _primaryBtn('查看详情', color: const Color(0xFFff5000)),
             ),
         ],
       ),
     );
   }
 
-  Widget _bottomAction(IconData icon, String label, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: const Color(0xFF666666), size: 22),
-            const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(color: Color(0xFF666666), fontSize: 10)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 底部「客服」→ 进入店铺客服会话
-  void _gotoServiceChat() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          conversation: Conversation(
-            avatar: '',
-            title: _shop.shopName,
-            description: '订单咨询',
-            createAt: '',
-          ),
-          accentColor: const Color(0xFFFF5000),
-        ),
-      ),
-    );
-  }
-
-  /// 底部「投诉」→ 选择原因后提交
-  void _reportShop() {
-    DialogHelpers.showOptionPicker(
-      context,
-      title: '选择投诉原因',
-      options: const ['发货问题', '商品与描述不符', '服务态度差', '虚假宣传', '其他'],
-      currentValue: '',
-    ).then((v) {
-      if (v == null) return;
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已提交「$v」投诉，平台将在48小时内处理')),
-      );
-    });
-  }
-
-  /// 待发货「催发货」→ 提醒卖家
-  void _urgeShipping() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已提醒卖家尽快发货'),
-        duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  /// 待发货「修改地址」
-  void _editAddress() {
-    final provider = context.read<CartProvider>();
-    _editText('修改地址', _item.address, (v) {
-      provider.updateOrderItem(_item, address: v);
-    });
-  }
-
-  /// 非待发货「查看详情」：售后单进退款详情，其余看物流
-  void _gotoFurtherDetail() {
-    final isRefund = _shop.orderSubStatus.contains('退款') ||
-        _shop.orderSubStatus.contains('退货') ||
-        _shop.orderSubStatus.contains('售后');
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => isRefund
-            ? RefundDetailScreen(shop: _shop, item: _item)
-            : LogisticsScreen(item: _item),
+  Widget _bottomAction(IconData icon, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF666666), size: 22),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(color: Color(0xFF666666), fontSize: 10)),
+        ],
       ),
     );
   }
@@ -1367,6 +1278,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         child: Text(text,
             style: const TextStyle(color: Colors.black87, fontSize: 12)),
+      ),
+    );
+  }
+
+  Widget _orangeOutlineBtn(String text, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFff5000)),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(text,
+            style: const TextStyle(color: Color(0xFFff5000), fontSize: 12)),
       ),
     );
   }
