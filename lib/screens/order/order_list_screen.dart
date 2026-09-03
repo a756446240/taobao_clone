@@ -320,7 +320,8 @@ class _OrderListScreenState extends State<OrderListScreen>
       _feizhuRecPicks = pool.recommendGoods(10);
     }
     return _feizhuRecPicks ??
-        ([...MockData.guessLikeGoods]..shuffle(Random()));
+        // 素材池未就绪时的兜底推荐：固定种子保证每次 build 顺序一致
+        ([...MockData.guessLikeGoods]..shuffle(Random(20260903)));
   }
 
   // ============ 频道栏（全部订单/购物/闪购/飞猪：撑满整宽，指示条随切换滑动） ============
@@ -1347,7 +1348,10 @@ class _OrderItemTile extends StatelessWidget {
     // 待发货由灰色框架单独渲染（见 _buildNormalLayout），不再走纯文字状态行
     if (s.contains('待发货') || s.contains('等待发货')) return null;
     if (s.contains('签收') || s.contains('交易成功')) {
-      return '已签收 · 您的快件已送达，签收人：单位前台';
+      // 用户改过签收文案用用户值，否则签收人取订单收货人
+      if (item.deliveryText.isNotEmpty) return item.deliveryText;
+      final signer = item.receiver.isNotEmpty ? item.receiver : '本人';
+      return '已签收 · 您的快件已送达，签收人：$signer';
     }
     return item.logistics.isEmpty ? null : item.logistics;
   }
@@ -1376,7 +1380,9 @@ class _OrderItemTile extends StatelessWidget {
       case 4:
         return '后天$hh:$mm前发货';
       default:
-        return '预售，9月${10 + h % 18}日$hh:$mm前发货';
+        // 预售日期按当前日期往后推 15~39 天（随标题哈希），月份不再写死
+        final d = DateTime.now().add(Duration(days: 15 + h % 25));
+        return '预售，${d.month}月${d.day}日$hh:$mm前发货';
     }
   }
 
@@ -1609,6 +1615,17 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
     });
   }
 
+  /// 默认确认收货倒计时：发货后 10 天自动确认（无发货时间时按 10 天整）
+  String _defaultCountdown() {
+    final ship = _item.shipTime.isNotEmpty
+        ? DateTime.tryParse(_item.shipTime.replaceAll(' ', 'T'))
+        : null;
+    if (ship == null) return '还剩10天0小时自动确认';
+    var remain = ship.add(const Duration(days: 10)).difference(DateTime.now());
+    if (remain.isNegative) remain = const Duration(hours: 1);
+    return '还剩${remain.inDays}天${remain.inHours % 24}小时自动确认';
+  }
+
   void _handleMenuTap(String label, CartProvider provider) {
     // 服务标签切换（修复：之前这三项点击无任何反应）
     if (_tagLabels.contains(label)) {
@@ -1663,8 +1680,7 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
       DialogHelpers.showCountdownPicker(
         widget.parentContext,
         title: '修改倒计时',
-        initial:
-            _item.countDown.isEmpty ? '还剩3天21小时自动确认' : _item.countDown,
+        initial: _item.countDown.isEmpty ? _defaultCountdown() : _item.countDown,
       ).then((v) {
         if (v != null && v.isNotEmpty) {
           provider.updateOrderItem(_item, countDown: v);
