@@ -98,7 +98,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   /// 合并素材池里与关键词相关的真实商品（图+名严格对应），排在最前
   List<SearchResultItem> _mergePoolMatches(List<SearchResultItem> base) {
     final kw = widget.keyword.trim();
-    final pool = context.read<MaterialPoolProvider>();
+    final pool = context.watch<MaterialPoolProvider>();
     if (kw.isEmpty || pool.isEmpty) return base;
     final seen = base.map((e) => e.title).toSet();
     final extra = <SearchResultItem>[];
