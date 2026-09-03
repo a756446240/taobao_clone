@@ -310,6 +310,7 @@ class ShoppingCartShop {
   String orderStatus; // 订单状态标签，如"待发货""已发货"
   String orderSubStatus; // 店铺名右侧状态，如"待付款""已发货"
   String orderTotalTip; // 店铺合计提示，如"共1件商品 合计："
+  double actualTotal; // 订单实付总额（抓包导入时写入；>0 时列表合计/详情实付款优先用它，因为单价×数量会有分位舍入差）
   int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
   int shopLineStyle; // 店名下方信息行样式：0星级+粉丝/1 88VIP好评率+平均退款/2 88VIP好评率+客服满意度/3好评率+平均退款/4 90天新增好评+平均退款/5 90天新增好评（-1=按店名随机）
 
@@ -333,6 +334,7 @@ class ShoppingCartShop {
     this.orderStatus = '',
     this.orderSubStatus = '',
     this.orderTotalTip = '',
+    this.actualTotal = 0,
     this.orderBtnStyle = -1,
     this.shopLineStyle = -1,
     this.shopSubtitle = '',
