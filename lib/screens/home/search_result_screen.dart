@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/material_pool_provider.dart';
 import '../../widgets/product_card.dart';
 
 /// 搜索结果页（列表/网格切换 + 真实排序 + 筛选抽屉）
@@ -40,8 +42,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   List<SearchResultItem> get _results {
-    // 关键词相关结果：真实池匹配优先 + 关键词确定性生成补足（替换原固定商品池）
-    var list = MockData.searchGoods(widget.keyword);
+    // 关键词相关结果：只保留真正相关的商品（真实池 + 素材池匹配），
+    // 不再用关键词拼凑图不对版的伪结果
+    var list = _mergePoolMatches(MockData.searchGoods(widget.keyword));
     // 筛选：价格区间
     bool inRange(SearchResultItem e) {
       final p = double.tryParse(e.price) ?? 0;
@@ -91,6 +94,34 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   /// 标题哈希（项目惯例：确定性假数据，同标题跨页面口径一致）
   static int _hashOf(String s) =>
       s.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+
+  /// 合并素材池里与关键词相关的真实商品（图+名严格对应），排在最前
+  List<SearchResultItem> _mergePoolMatches(List<SearchResultItem> base) {
+    final kw = widget.keyword.trim();
+    final pool = context.read<MaterialPoolProvider>();
+    if (kw.isEmpty || pool.isEmpty) return base;
+    final seen = base.map((e) => e.title).toSet();
+    final extra = <SearchResultItem>[];
+    for (final e in pool.entries) {
+      if (e.title.isEmpty || seen.contains(e.title)) continue;
+      if (MockData.relevanceScore(e.title, kw) <= 0) continue;
+      final h = _hashOf(e.title);
+      extra.add(SearchResultItem(
+        imageUrl: e.imagePath,
+        title: e.title,
+        shopName: '${MaterialPoolProvider.brandOf(e.title)}旗舰店',
+        price: ((19 + h % 880) + (h % 100) / 100).toStringAsFixed(2),
+        commentCount: '已售${1 + h % 900}+',
+        goodRate: '${95 + h % 5}%好评',
+        shipFrom: MockData.shipFromPool[h % MockData.shipFromPool.length],
+      ));
+      seen.add(e.title);
+    }
+    // 相关度高的排前面（素材池真实商品整体优先于内置池）
+    extra.sort((a, b) => MockData.relevanceScore(b.title, kw)
+        .compareTo(MockData.relevanceScore(a.title, kw)));
+    return [...extra, ...base];
+  }
 
   /// 是否包邮：约 3/4 商品包邮（确定性）
   static bool _freeShipOf(SearchResultItem e) => _hashOf(e.title) % 4 != 0;
@@ -150,35 +181,45 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   }
 
   Widget _buildEmpty() {
+    final hasFilter = _priceRange != 0 ||
+        _onlyTmall ||
+        _onlyFreeShip ||
+        _onlyInsurance ||
+        _shipFrom.isNotEmpty;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.search_off, size: 56, color: Color(0xFFDDDDDD)),
           const SizedBox(height: 8),
-          Text('没有符合筛选条件的宝贝',
+          Text(
+              hasFilter
+                  ? '没有符合筛选条件的宝贝'
+                  : '未找到与「${widget.keyword}」相关的宝贝',
               style: AppTextStyles.middleSub),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => setState(() {
-              _priceRange = 0;
-              _onlyTmall = false;
-              _onlyFreeShip = false;
-              _onlyInsurance = false;
-              _shipFrom = '';
-            }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 18, vertical: 7),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.primary),
-                borderRadius: BorderRadius.circular(16),
+          if (hasFilter) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => setState(() {
+                _priceRange = 0;
+                _onlyTmall = false;
+                _onlyFreeShip = false;
+                _onlyInsurance = false;
+                _shipFrom = '';
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 7),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primary),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text('清除筛选条件',
+                    style:
+                        TextStyle(color: AppColors.primary, fontSize: 13)),
               ),
-              child: const Text('清除筛选条件',
-                  style:
-                      TextStyle(color: AppColors.primary, fontSize: 13)),
             ),
-          ),
+          ],
         ],
       ),
     );
