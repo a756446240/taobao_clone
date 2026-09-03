@@ -88,7 +88,11 @@ class LogisticsScreen extends StatelessWidget {
     final it = item;
     if (it == null) return 2;
     final st = it.statusTitle;
-    if (st.contains('完成') || st.contains('签收') || st.contains('评价')) {
+    // 「交易成功」不含"完成/签收/评价"字样，需显式识别，否则会被误判为运输中
+    if (st.contains('完成') ||
+        st.contains('签收') ||
+        st.contains('评价') ||
+        st.contains('交易成功')) {
       return 3;
     }
     if (it.shipTime.isNotEmpty ||
