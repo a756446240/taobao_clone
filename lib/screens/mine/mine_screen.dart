@@ -617,15 +617,15 @@ class _MineScreenState extends State<MineScreen> {
           _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
               onTap: _openFollowedShops, onDoubleTap: _openAiAudit),
           _toolIcon(Icons.access_time, '足迹', '看过的内容',
-              onTap: _openFootprints, onDoubleTap: _openAiImport),
-          _toolIcon(Icons.sync, '同步订单', '搬真实订单',
-              onTap: _openTaobaoSync),
+              onTap: _openFootprints,
+              onDoubleTap: _openAiImport,
+              onLongPress: _openTaobaoSync),
         ],
       ),
     );
   }
 
-  /// 单击"同步订单" → 淘宝订单 JSON 导入
+  /// 长按「足迹」→ 淘宝订单 JSON 同步导入（隐藏入口，界面不显示）
   void _openTaobaoSync() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const TaobaoSyncImportScreen()),
@@ -699,11 +699,14 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   Widget _toolIcon(IconData icon, String title, String subtitle,
-      {VoidCallback? onTap, VoidCallback? onDoubleTap}) {
+      {VoidCallback? onTap,
+      VoidCallback? onDoubleTap,
+      VoidCallback? onLongPress}) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         onDoubleTap: onDoubleTap,
+        onLongPress: onLongPress,
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
