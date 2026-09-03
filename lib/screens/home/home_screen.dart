@@ -82,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted) return;
     final pool = context.read<MaterialPoolProvider>();
     final more = pool.loading
-        ? ([...MockData.guessLikeGoods]..shuffle(Random())).take(10).toList()
+        ? ([...MockData.guessLikeGoods]
+          ..shuffle(Random(20260903 + (_feedGoods?.length ?? 0))))
+            .take(10)
+            .toList()
         : pool.recommendGoods(10);
     setState(() {
       _feedGoods = [...?_feedGoods, ...more];
@@ -173,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen>
       _feedGoods = pool.recommendGoods(10);
     }
     final allGoods = _feedGoods ??
-        ([...MockData.guessLikeGoods]..shuffle(Random()));
+        ([...MockData.guessLikeGoods]..shuffle(Random(20260903)));
     // 按当前 Tab 过滤商品流：猜你喜欢=全部 / 直播 / 便宜好货=低价 / 品牌闪购=品牌店
     final feedGoods = _filterFeedByTab(allGoods, _tabController.index);
     return Scaffold(
@@ -767,7 +770,8 @@ class _HomeScreenState extends State<HomeScreen>
           source: ImageSource.gallery, maxWidth: 1024);
       if (x == null) return; // 用户取消
       const candidates = ['连衣裙', '小白鞋', '保温杯', '双肩包', '耳机'];
-      final kw = candidates[Random().nextInt(candidates.length)];
+      // 确定性模拟识别：按所选图片路径哈希决定结果（同一张图结果一致）
+      final kw = candidates[_hashOf(x.path) % candidates.length];
       _toast('识别成功，为你找到相似宝贝');
       _gotoResult(kw);
     } catch (_) {
