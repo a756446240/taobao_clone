@@ -52,12 +52,75 @@ class ClaimedCoupon {
 class CouponsProvider extends ChangeNotifier {
   static const _key = 'claimed_coupons_v1';
 
+  /// 领券中心预置券目录（claimedAt=0 表示未领取）。
+  /// 领券中心 / 购物车券条 / AI 省钱助手共用同一份数据，不再各写各的文案。
+  static const catalog = <ClaimedCoupon>[
+    ClaimedCoupon(
+        value: '61',
+        name: '消费券',
+        condition: '满599元可用',
+        scope: '全平台实物商品通用',
+        expiry: '领取后 3 天内有效',
+        bg: 0xFFFFF1E8,
+        fg: 0xFFFF5000,
+        claimedAt: 0),
+    ClaimedCoupon(
+        value: '10',
+        name: '超市加补券',
+        condition: '满99元可用',
+        scope: '天猫超市指定商品',
+        expiry: '领取后 7 天内有效',
+        bg: 0xFFE8F8EE,
+        fg: 0xFF12A150,
+        claimedAt: 0),
+    ClaimedCoupon(
+        value: '50',
+        name: '珠宝加补券',
+        condition: '满999元可用',
+        scope: '珠宝配饰类目指定商品',
+        expiry: '领取后 7 天内有效',
+        bg: 0xFFF3EBFF,
+        fg: 0xFF7C3AED,
+        claimedAt: 0),
+    ClaimedCoupon(
+        value: '45',
+        name: '玩具加补券',
+        condition: '满399元可用',
+        scope: '玩具乐器类目指定商品',
+        expiry: '领取后 7 天内有效',
+        bg: 0xFFE8F1FF,
+        fg: 0xFF2B6DEF,
+        claimedAt: 0),
+    ClaimedCoupon(
+        value: '20',
+        name: '服饰加补券',
+        condition: '满199元可用',
+        scope: '服饰鞋包类目指定商品',
+        expiry: '领取后 5 天内有效',
+        bg: 0xFFFFEEF3,
+        fg: 0xFFE03A6C,
+        claimedAt: 0),
+    ClaimedCoupon(
+        value: '30',
+        name: '数码加补券',
+        condition: '满599元可用',
+        scope: '手机数码类目指定商品',
+        expiry: '领取后 5 天内有效',
+        bg: 0xFFE8F7FA,
+        fg: 0xFF0E8A9E,
+        claimedAt: 0),
+  ];
+
   final List<ClaimedCoupon> _claimed = [];
   List<ClaimedCoupon> get claimed => List.unmodifiable(_claimed);
 
   /// 是否已领过同名同面额的券（防重复领取）
   bool isClaimed(String name, String value) =>
       _claimed.any((c) => c.name == name && c.value == value);
+
+  /// 目录中尚未领取的券
+  List<ClaimedCoupon> get unclaimed =>
+      catalog.where((c) => !isClaimed(c.name, c.value)).toList();
 
   /// 领取一张券；重复领取返回 false
   bool claim(ClaimedCoupon c) {
