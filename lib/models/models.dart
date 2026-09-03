@@ -160,6 +160,8 @@ class OrderItem {
   String deliveryText; // 签收/派送文字
   bool showOnTime; // 是否显示"准时送达"行
   String onTimeText; // 准时送达文字
+  int onTimeStyle; // 准时送达卡片样式：0单排"预计送达"/1双排"承诺+送货上门"（-1=随机）
+  String onTimeText2; // 双排样式第二行文字，如"送货上门"
 
   // ===== 3.4 订单详情页字段 =====
   String deliveryPromise; // 待发货承诺文案，如"承诺48小时内发货"（显示在地址下方）
@@ -242,6 +244,8 @@ class OrderItem {
     this.deliveryText = '',
     this.showOnTime = true,
     this.onTimeText = '准时送达',
+    this.onTimeStyle = -1,
+    this.onTimeText2 = '送货上门',
     this.deliveryPromise = '承诺48小时内发货',
     this.showDeliveryPromise = true,
     this.shipPromise = '',
@@ -307,6 +311,7 @@ class ShoppingCartShop {
   String orderSubStatus; // 店铺名右侧状态，如"待付款""已发货"
   String orderTotalTip; // 店铺合计提示，如"共1件商品 合计："
   int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
+  int shopLineStyle; // 店名下方信息行样式：0星级+粉丝/1 88VIP好评率+平均退款/2 88VIP好评率+客服满意度/3好评率+平均退款/4 90天新增好评+平均退款/5 90天新增好评（-1=按店名随机）
 
   // ===== 3.4 店铺信息字段 =====
   String shopSubtitle; // 店铺副标题，如"德国直邮 · 保税仓发货 · 正品保障"
@@ -329,6 +334,7 @@ class ShoppingCartShop {
     this.orderSubStatus = '',
     this.orderTotalTip = '',
     this.orderBtnStyle = -1,
+    this.shopLineStyle = -1,
     this.shopSubtitle = '',
     this.goodRate = '99%',
     this.csRate = '96%',
