@@ -223,7 +223,7 @@ class MaterialPoolProvider extends ChangeNotifier {
   // ============ 购物车商品素材随机分配（图+名严格对应） ============
 
   /// 为购物车商品 key 列表分配素材条目：
-  /// - 每次 load() 后重新随机（参与随机），会话内保持稳定
+  /// - 洗牌种子按待分配 key + 素材池规模确定性派生，跨重启分配结果一致
   /// - 素材数不足时循环使用；调用方在 build 中调用是安全的（不触发 notify）
   void assignCartMaterials(List<String> keys) {
     if (_entries.isEmpty || keys.isEmpty) return;
@@ -231,10 +231,21 @@ class MaterialPoolProvider extends ChangeNotifier {
     _cartAssignments.removeWhere((k, _) => !keys.contains(k));
     final missing = keys.where((k) => !_cartAssignments.containsKey(k)).toList();
     if (missing.isEmpty) return;
-    final pool = [..._entries]..shuffle(Random());
+    final pool = [..._entries]..shuffle(Random(_assignSeed(missing)));
     for (var i = 0; i < missing.length; i++) {
       _cartAssignments[missing[i]] = pool[i % pool.length];
     }
+  }
+
+  /// 分配种子：素材池规模与待分配 key 内容共同决定
+  int _assignSeed(List<String> keys) {
+    var h = _entries.length * 31 + 7;
+    for (final k in keys) {
+      for (final c in k.codeUnits) {
+        h = (h * 31 + c) & 0x7fffffff;
+      }
+    }
+    return h;
   }
 
   /// 取某个购物车商品分配到的素材（未分配返回 null）
