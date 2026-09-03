@@ -51,6 +51,49 @@ class CartProvider extends ChangeNotifier {
   List<ShoppingCartShop> _shops = [];
   bool _loading = true;
 
+  /// 淘宝同步导入：按订单号去重，只追加本地不存在的新订单。
+  /// 已在本地的订单（含用户编辑过的内容）绝不覆盖。
+  /// 返回 (新增订单条数, 跳过重复条数)。
+  ({int added, int skipped}) importSyncedShops(
+      List<ShoppingCartShop> incoming) {
+    final existingNos = <String>{
+      for (final shop in _shops)
+        for (final item in shop.items) item.orderNo,
+    };
+    var added = 0;
+    var skipped = 0;
+    for (final shop in incoming) {
+      final newItems = <OrderItem>[];
+      for (final it in shop.items) {
+        if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
+          skipped++;
+        } else {
+          newItems.add(it);
+        }
+      }
+      if (newItems.isEmpty) continue;
+      // 补全交易号（订单号保留抓取的真实单号）
+      for (final it in newItems) {
+        if (it.alipayTradeNo.length != 28) {
+          it.alipayTradeNo = _composeTradeNo(_timePrefix(it.payTime));
+        }
+        if (it.wechatTradeNo.length != 28) {
+          it.wechatTradeNo = _composeTradeNo(_timePrefix(it.payTime));
+        }
+      }
+      shop.items
+        ..clear()
+        ..addAll(newItems);
+      _shops.add(shop);
+      added += newItems.length;
+    }
+    if (added > 0) {
+      _persist();
+      notifyListeners();
+    }
+    return (added: added, skipped: skipped);
+  }
+
   /// AI 截图解析导入：把识别出的订单追加为新店铺卡片（自动持久化，无需重新构建）
   void importAiParsedOrder({
     required String shopName,
@@ -650,7 +693,8 @@ class CartProvider extends ChangeNotifier {
   /// 交易号固定 28 位（付款时间前8位+20位随机）
   void _migrateTradeNos() {
     var changed = false;
-    bool needOrderNo(String no) => !(no.startsWith('512') && no.length == 19);
+    bool needOrderNo(String no) => !((no.startsWith('512') && no.length == 19) ||
+        RegExp(r'^\d{15,20}$').hasMatch(no)); // 512生成单号与真实淘宝单号（15-20位）都保留
     bool needTradeNo(String no) => no.length != 28;
     for (final shop in _shops) {
       for (final item in shop.items) {
