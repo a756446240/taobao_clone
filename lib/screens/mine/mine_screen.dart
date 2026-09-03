@@ -11,21 +11,18 @@ import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/material_pool_provider.dart';
-import '../../providers/price_alert_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../providers/profile_provider.dart';
-import '../../providers/reviews_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import '../home/channel_screen.dart';
-import '../home/search_result_screen.dart';
 import '../message/chat_screen.dart';
 import '../order/logistics_screen.dart';
 import '../order/order_list_screen.dart';
-import '../product/product_detail_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
+import 'taobao_sync_import_screen.dart';
 import 'benefits_screen.dart';
 import 'coupon_center_screen.dart';
 import 'favorites_screen.dart';
@@ -71,7 +68,6 @@ class _MineScreenState extends State<MineScreen> {
 
   Future<void> _pickAvatar() async {
     final path = await _pickImageToLocal('profile_avatars');
-    if (!mounted) return;
     if (path != null) {
       await context.read<ProfileProvider>().updateAvatar(path);
     }
@@ -79,7 +75,6 @@ class _MineScreenState extends State<MineScreen> {
 
   Future<void> _pickHeaderBg() async {
     final path = await _pickImageToLocal('profile_headers');
-    if (!mounted) return;
     if (path != null) {
       await context.read<ProfileProvider>().updateHeaderBg(path);
     }
@@ -137,7 +132,7 @@ class _MineScreenState extends State<MineScreen> {
           ),
         ),
         Container(
-          color: hasBg ? Colors.black.withValues(alpha: 0.15) : Colors.transparent,
+          color: hasBg ? Colors.black.withOpacity(0.15) : Colors.transparent,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -316,7 +311,7 @@ class _MineScreenState extends State<MineScreen> {
         border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
+            color: Colors.black.withOpacity(0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -623,8 +618,17 @@ class _MineScreenState extends State<MineScreen> {
               onTap: _openFollowedShops, onDoubleTap: _openAiAudit),
           _toolIcon(Icons.access_time, '足迹', '看过的内容',
               onTap: _openFootprints, onDoubleTap: _openAiImport),
+          _toolIcon(Icons.sync, '同步订单', '搬真实订单',
+              onTap: _openTaobaoSync),
         ],
       ),
+    );
+  }
+
+  /// 单击"同步订单" → 淘宝订单 JSON 导入
+  void _openTaobaoSync() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TaobaoSyncImportScreen()),
     );
   }
 
@@ -852,8 +856,6 @@ class _MineScreenState extends State<MineScreen> {
   String? _recSig;
 
   Widget _buildFeedSection() {
-    // 我发布的评价数（角标实时联动）
-    final publishedCount = context.watch<ReviewsProvider>().all.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -865,7 +867,7 @@ class _MineScreenState extends State<MineScreen> {
             children: [
               _feedTabItem(0, '猜你喜欢'),
               _feedTabItem(1, '我的收藏'),
-              _feedTabItem(2, '我的评价', badge: publishedCount),
+              _feedTabItem(2, '我的评价', badge: 1),
             ],
           ),
         ),
@@ -1013,15 +1015,7 @@ class _MineScreenState extends State<MineScreen> {
     final overrideUrl =
         context.watch<ProductImageProvider>().imageFor(item.title);
     final imageUrl = overrideUrl ?? item.imageUrl;
-    // 单击整卡进商品详情（与首页/搜索页口径一致），双击图片换图
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => ProductDetailScreen(item: item)),
-        );
-      },
-      child: Container(
+    return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -1059,7 +1053,6 @@ class _MineScreenState extends State<MineScreen> {
             ),
           ),
         ],
-      ),
       ),
     );
   }
@@ -1100,41 +1093,8 @@ class _MineScreenState extends State<MineScreen> {
       case 3: // 收藏时间：最近收藏在前（倒序）
         break; // 素材池本身即倒序，无需调整
     }
-    // 降价横幅：有已开启提醒且当前已降价的宝贝时展示
-    final alerts = context.watch<PriceAlertProvider>();
-    final droppedAlerts =
-        alerts.droppedAlertCount(titled.map((e) => e.title));
     return Column(
       children: [
-        if (droppedAlerts > 0)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _favFilter = 0),
-            child: Container(
-              width: double.infinity,
-              color: const Color(0xFFFFF3E8),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.notifications_active,
-                      size: 15, color: Color(0xFFff5000)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '你关注的 $droppedAlerts 件宝贝降价了，点这里只看降价',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFff5000)),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right,
-                      size: 14, color: Color(0xFFff5000)),
-                ],
-              ),
-            ),
-          ),
         // 筛选行（可单击选中，选中橙色高亮并重排列表）
         Container(
           color: Colors.white,
@@ -1202,15 +1162,6 @@ class _MineScreenState extends State<MineScreen> {
     final coinBack = (h % 300) / 100 + 0.5;
     final shop =
         '${MaterialPoolProvider.brandOf(e.title)}海外旗舰店';
-    // 降价提醒：开启状态 + 确定性降价
-    final alerts = context.watch<PriceAlertProvider>();
-    final alertOn = alerts.isOn(e.title);
-    final dropped = PriceAlertProvider.hasDrop(e.title);
-    final nowPrice = PriceAlertProvider.droppedPrice(price, e.title);
-    final nowPriceText = nowPrice >= 100
-        ? nowPrice.toStringAsFixed(1)
-        : nowPrice.toStringAsFixed(2);
-    final savedText = (price - nowPrice).toStringAsFixed(2);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1259,48 +1210,11 @@ class _MineScreenState extends State<MineScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (dropped) ...[
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('¥$nowPriceText',
-                                    style: const TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFFff5000))),
-                                const SizedBox(width: 4),
-                                Padding(
-                                  padding:
-                                      const EdgeInsets.only(bottom: 1),
-                                  child: Text('¥$priceText',
-                                      style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF999999),
-                                          decoration: TextDecoration
-                                              .lineThrough)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFff5000),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: Text('已降 ¥$savedText',
-                                  style: const TextStyle(
-                                      fontSize: 9,
-                                      color: Colors.white)),
-                            ),
-                          ] else
-                            Text('¥$priceText',
-                                style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFFff5000))),
+                          Text('¥$priceText',
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFff5000))),
                           const SizedBox(height: 2),
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1320,36 +1234,9 @@ class _MineScreenState extends State<MineScreen> {
                         ],
                       ),
                     ),
-                    _favBtn(
-                      alertOn ? '提醒中' : '降价提醒',
-                      active: alertOn,
-                      onTap: () {
-                        final now = alerts.toggle(e.title);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(now
-                                ? (dropped
-                                    ? '已开启降价提醒，该宝贝当前已降 ¥$savedText'
-                                    : '已开启降价提醒，降价后将第一时间通知你')
-                                : '已关闭该宝贝的降价提醒'),
-                            duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                    ),
+                    _favBtn('降价提醒'),
                     const SizedBox(width: 6),
-                    _favBtn('找相似', onTap: () {
-                      // 找相似：取标题前 6 个字作关键词搜同款
-                      final kw = e.title.length <= 6
-                          ? e.title
-                          : e.title.substring(0, 6);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => SearchResultScreen(keyword: kw),
-                        ),
-                      );
-                    }),
+                    _favBtn('找相似'),
                   ],
                 ),
               ],
@@ -1360,26 +1247,15 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _favBtn(String text, {VoidCallback? onTap, bool active = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFFFFF3E8) : Colors.transparent,
-          border: Border.all(
-              color: active
-                  ? const Color(0xFFff5000)
-                  : const Color(0xFFdddddd)),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 11,
-                color: active
-                    ? const Color(0xFFff5000)
-                    : Colors.black87)),
+  Widget _favBtn(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFdddddd)),
+        borderRadius: BorderRadius.circular(14),
       ),
+      child:
+          Text(text, style: const TextStyle(fontSize: 11, color: Colors.black87)),
     );
   }
 
@@ -1416,17 +1292,12 @@ class _MineScreenState extends State<MineScreen> {
   ];
 
   Widget _buildMyReviews() {
-    // 我发布的评价排在最前（真实发布联动），其后是 4 条固定素材
-    final published = context.watch<ReviewsProvider>().all;
-    final cards = <Widget>[
-      for (final r in published) _userReviewCard(r),
-      for (final r in _myReviews) _reviewCard(r),
-    ];
     // 双列瀑布流（左右列高度自然错开）
     final left = <Widget>[];
     final right = <Widget>[];
-    for (var i = 0; i < cards.length; i++) {
-      (i.isEven ? left : right).add(cards[i]);
+    for (var i = 0; i < _myReviews.length; i++) {
+      final card = _reviewCard(_myReviews[i]);
+      (i.isEven ? left : right).add(card);
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1453,90 +1324,6 @@ class _MineScreenState extends State<MineScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// 我发布的评价卡（ReviewsProvider 真实数据：星级 + 正文 + 晒图 + 商品名）
-  Widget _userReviewCard(UserReview r) {
-    final hasPhoto = r.photoPaths.isNotEmpty;
-    return GestureDetector(
-      onTap: hasPhoto ? () => _previewImage(r.photoPaths.first) : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (hasPhoto)
-              AppImage(url: r.photoPaths.first, width: double.infinity),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 星级
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 1; i <= 5; i++)
-                        Icon(
-                          i <= r.stars ? Icons.star : Icons.star_border,
-                          color: AppColors.primary,
-                          size: 14,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(r.content,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13, color: Colors.black87)),
-                  const SizedBox(height: 4),
-                  Text(r.productTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF999999))),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 9,
-                        backgroundColor: Color(0xFFffd180),
-                        child: Icon(Icons.person,
-                            size: 12, color: Colors.white),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(r.anonymous ? '匿名用户' : '我',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF999999))),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text('我的发布',
-                            style: TextStyle(
-                                fontSize: 9, color: AppColors.primary)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
