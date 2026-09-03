@@ -264,86 +264,42 @@ class MockData {
   static bool hasFreightInsurance(SearchResultItem e) =>
       _hashOf('险${e.title}') % 3 != 0;
 
-  /// 关键词搜索结果：真实素材池中匹配的商品排前面，
-  /// 再按关键词确定性生成一批标题含关键词的商品补足一屏（哈希假数据，
-  /// 同一关键词每次结果一致）。
+  /// 关键词与商品标题的相关度评分：
+  /// - 标题整词含关键词 → 100
+  /// - 关键词包含商品核心名（如搜"牛仔外套oversize"命中"牛仔外套"）→ 90
+  /// - 否则按字符覆盖率，≥0.5 才算相关
+  static int relevanceScore(String title, String keyword) {
+    final kw = keyword.trim();
+    if (kw.isEmpty) return 0;
+    if (title.contains(kw)) return 100;
+    if (kw.length < 2) return 0;
+    if (title.length >= 2 && kw.contains(title)) return 90;
+    var hit = 0;
+    for (final ch in kw.split('')) {
+      if (title.contains(ch)) hit++;
+    }
+    final ratio = hit / kw.length;
+    return ratio >= 0.5 ? (ratio * 60).round() : 0;
+  }
+
+  /// 关键词搜索结果：只返回真正相关的商品（真实池匹配）。
+  /// 不再按关键词拼凑"标题全塞搜索词、图不对版"的伪结果；
+  /// 搜不到相关商品时返回空列表，由页面展示空态。
   static List<SearchResultItem> searchGoods(String keyword) {
     final kw = keyword.trim();
     if (kw.isEmpty) return List.of(guessLikeGoods);
 
-    // 1) 真实池匹配：整词命中优先，其次按字符覆盖率
-    int scoreOf(String title) {
-      if (title.contains(kw)) return 100;
-      if (kw.length < 2) return title.contains(kw) ? 100 : 0;
-      var hit = 0;
-      for (final ch in kw.split('')) {
-        if (title.contains(ch)) hit++;
-      }
-      final ratio = hit / kw.length;
-      return ratio >= 0.5 ? (ratio * 60).round() : 0;
-    }
-
     final matched = guessLikeGoods
-        .where((e) => scoreOf(e.title) > 0)
+        .where((e) => relevanceScore(e.title, kw) > 0)
         .map((e) => e.withShipFrom(shipFromOf(e)))
         .toList()
-      ..sort((a, b) => scoreOf(b.title).compareTo(scoreOf(a.title)));
+      ..sort((a, b) => relevanceScore(b.title, kw)
+          .compareTo(relevanceScore(a.title, kw)));
 
-    // 2) 关键词确定性生成（保证一屏 20+ 条且标题都含关键词）
-    int hash(String s) => _hashOf(s);
-
-    const titleTemplates = [
-      '{kw} 官方旗舰店正品包邮',
-      '{kw} 热卖爆款 当季新款',
-      '进口{kw} 免税仓直邮',
-      '{kw} 大促特价 假一赔十',
-      '{kw} 家庭装实惠装',
-      '【品牌直营】{kw} 专柜同款',
-      '{kw} 升级版 买二送一',
-      '{kw} 网红同款 抖音热推',
-      '{kw} 礼盒装 送礼佳品',
-      '{kw} 工厂直供 一件代发',
-      '新款{kw} 48小时发货',
-      '{kw} 测评推荐 万人回购',
-      '{kw} 清仓特价 库存有限',
-      '{kw} 高端定制 品质保证',
-      '{kw} 学生党平价好物',
-      '{kw} 套装组合更划算',
-      '正品{kw} 支持验货',
-      '{kw} 限时秒杀 今日特价',
-      '{kw} 加量不加价',
-      '{kw} 老客专享复购装',
-    ];
-    const shopSuffixes = ['旗舰店', '专营店', '海外旗舰店', '官方自营店', '品牌直销店'];
-    // 店名取关键词前 2~4 个字做"品牌"，避免全叫一个名
-    final brand = kw.length <= 4 ? kw : kw.substring(0, 4);
-
-    final generated = <SearchResultItem>[];
-    for (var i = 0; i < titleTemplates.length; i++) {
-      final h = hash('$kw#$i');
-      final title = titleTemplates[i].replaceAll('{kw}', kw);
-      final shop = '$brand${shopSuffixes[h % shopSuffixes.length]}';
-      final price = (9 + h % 990) + (h % 100) / 100;
-      final sold = h % 90000 + 1000;
-      final soldText = sold >= 10000
-          ? '已售${(sold / 10000).toStringAsFixed(1)}万+'
-          : '已售$sold+';
-      generated.add(SearchResultItem(
-        imageUrl:
-            'assets/materials/mat${(h % 17 + 1).toString().padLeft(2, '0')}.jpg',
-        title: title,
-        shopName: shop,
-        price: price.toStringAsFixed(2),
-        commentCount: soldText,
-        goodRate: '${95 + h % 5}%好评',
-        shipFrom: shipFromPool[h % shipFromPool.length],
-      ));
-    }
-
-    // 去重（真实池与生成池标题相同的情况）后合并
+    // 去重后返回
     final seen = <String>{};
     return [
-      for (final e in [...matched, ...generated])
+      for (final e in matched)
         if (seen.add(e.title)) e,
     ];
   }
