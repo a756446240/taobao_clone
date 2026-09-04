@@ -147,6 +147,15 @@ class CartProvider extends ChangeNotifier {
               oldItem.shipTime = it.shipTime;
               opsBackfilled = true;
             }
+            // 快递官方 logo/客服电话（v1.9.79）：抓包真实值只补空
+            if (oldItem.shipLogo.isEmpty && it.shipLogo.isNotEmpty) {
+              oldItem.shipLogo = it.shipLogo;
+              opsBackfilled = true;
+            }
+            if (oldItem.shipPhone.isEmpty && it.shipPhone.isNotEmpty) {
+              oldItem.shipPhone = it.shipPhone;
+              opsBackfilled = true;
+            }
           }
         }
       }
