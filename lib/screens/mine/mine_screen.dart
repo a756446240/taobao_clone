@@ -30,6 +30,7 @@ import 'followed_shops_screen.dart';
 import 'footprints_screen.dart';
 import 'settings_screen.dart';
 import 'material_pool_screen.dart';
+import 'address_screen.dart';
 import 'profile_edit_screen.dart';
 
 /// 我的页（1:1 复刻新版淘宝）
@@ -195,9 +196,10 @@ class _MineScreenState extends State<MineScreen> {
                     ],
                   ),
                 ),
-                // 素材库：UI 伪装成"地址"，单击进入
+                // 地址：单击进收货地址列表（对齐真实淘宝），双击进素材库
                 GestureDetector(
-                  onTap: _gotoMaterialPool,
+                  onTap: _gotoAddress,
+                  onDoubleTap: _gotoMaterialPool,
                   child: _headerIcon(Icons.location_on_outlined, '地址'),
                 ),
                 const SizedBox(width: 16),
@@ -274,10 +276,17 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  /// "地址"按钮 → 商品素材库（导入素材图，打开 App 时随机展示）
+  /// "地址"双击 → 商品素材库（导入素材图，打开 App 时随机展示）
   void _gotoMaterialPool() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const MaterialPoolScreen()),
+    );
+  }
+
+  /// "地址"单击 → 收货地址列表（对齐真实淘宝，左滑 设为默认/复制/删除）
+  void _gotoAddress() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AddressScreen()),
     );
   }
 
