@@ -36,6 +36,7 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late OrderItem _item;
   late ShoppingCartShop _shop;
+  bool _addressExpanded = false; // 地址区单击展开查看完整信息
 
   @override
   void initState() {
@@ -222,9 +223,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ),
           ),
-          // 地址区（双击手动输入：第一行收件人，其余地址）
+          // 地址区（单击展开/收起完整信息，双击手动输入：第一行收件人，其余地址）
           const SizedBox(height: 14),
           GestureDetector(
+            onTap: () =>
+                setState(() => _addressExpanded = !_addressExpanded),
             onDoubleTap: () => _editText('修改地址（第一行收件人，第二行起地址）',
                 '${_item.receiver}\n${_item.address}', (v) {
               final lines = v
@@ -280,7 +283,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const Text('取件出示虚拟号 ›',
                         style: TextStyle(
                             fontSize: 11, color: Color(0xFFFF5000))),
+                    const Spacer(),
+                    Icon(
+                      _addressExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: const Color(0xFFBBBBBB),
+                    ),
                   ],
+                ),
+                // 展开区：完整收货信息（对齐真实淘宝点击地址展开）
+                AnimatedCrossFade(
+                  firstChild: const SizedBox(width: double.infinity),
+                  secondChild: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F8F8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _addrInfoRow('收货人',
+                            _item.receiver.isEmpty ? '黑山灰' : _item.receiver),
+                        const SizedBox(height: 6),
+                        _addrInfoRow('手机号', '86-186****5652（号码保护中）'),
+                        const SizedBox(height: 6),
+                        _addrInfoRow(
+                            '收货地址',
+                            _item.address.isEmpty
+                                ? '中房房大厦C座1001'
+                                : _item.address.replaceAll('\n', ' ')),
+                        const SizedBox(height: 6),
+                        _addrInfoRow('虚拟号', '86-186****5652（取件出示）'),
+                      ],
+                    ),
+                  ),
+                  crossFadeState: _addressExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 200),
                 ),
               ],
             ),
@@ -1408,6 +1453,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============ 编辑弹窗 ============
+  /// 地址展开区的一行（标签灰 + 内容黑）
+  Widget _addrInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(label,
+              style:
+                  const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+        ),
+        Expanded(
+          child: Text(value,
+              style:
+                  const TextStyle(fontSize: 12, color: Color(0xFF333333))),
+        ),
+      ],
+    );
+  }
+
   void _editText(String title, String initial, ValueChanged<String> onSave,
       {int maxLines = 1}) {
     DialogHelpers.showTextInput(context,
