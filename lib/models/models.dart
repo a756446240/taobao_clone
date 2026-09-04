@@ -221,6 +221,8 @@ class OrderItem {
   // ===== 物流字段（3.6 抓包导入真实物流） =====
   String shipCompany; // 快递公司名，如"顺丰速运"（空=按旧逻辑写死顺丰）
   String waybillNo; // 运单号（空=按订单号派生）
+  String shipLogo; // 快递公司官方 logo URL（v1.9.79 起抓包 popupBodyCompony.icon，空=首字色块）
+  String shipPhone; // 快递官方客服电话（v1.9.79 起，空=按公司名映射常见客服号）
   String logisticsTraces; // 抓包真实全量物流时间线（v1.9.76 起）：JSON 数组 [{"time","tag","text"}] 最新在前，空=本地生成
 
   // ===== 退款详情·寄回商品卡（3.7 可编辑区域） =====
@@ -306,6 +308,8 @@ class OrderItem {
     this.showShipDetailBtn = true,
     this.shipCompany = '',
     this.waybillNo = '',
+    this.shipLogo = '',
+    this.shipPhone = '',
     this.logisticsTraces = '',
     this.refundSteps = '',
     this.pickupCode = '',
