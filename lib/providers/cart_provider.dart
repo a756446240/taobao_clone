@@ -563,6 +563,12 @@ class CartProvider extends ChangeNotifier {
     int? refundBarStyle,
     double? refundDiscount,
     bool? showRefundDiscount,
+    String? refundSteps,
+    String? pickupCode,
+    String? pickupGuarantee,
+    String? pickupTimeText,
+    String? pickupInsuranceText,
+    bool? showPickupCard,
   }) {
     if (title != null) item.title = title;
     if (configuration != null) item.configuration = configuration;
@@ -642,6 +648,14 @@ class CartProvider extends ChangeNotifier {
     if (showRefundDiscount != null) {
       item.showRefundDiscount = showRefundDiscount;
     }
+    if (refundSteps != null) item.refundSteps = refundSteps;
+    if (pickupCode != null) item.pickupCode = pickupCode;
+    if (pickupGuarantee != null) item.pickupGuarantee = pickupGuarantee;
+    if (pickupTimeText != null) item.pickupTimeText = pickupTimeText;
+    if (pickupInsuranceText != null) {
+      item.pickupInsuranceText = pickupInsuranceText;
+    }
+    if (showPickupCard != null) item.showPickupCard = showPickupCard;
     // 实付款规则：
     // 1) 直接修改实付价（price）时，以录入值为准，绝不再用其它字段重算覆盖
     // 2) 修改商品总价/运费/优惠等组成项时，才自动重算实付款
