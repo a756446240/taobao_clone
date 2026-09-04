@@ -131,6 +131,11 @@ class CartProvider extends ChangeNotifier {
               oldItem.logistics = it.logistics;
               opsBackfilled = true;
             }
+            // 发货时间：抓包真实值只补空（待发货本就为空，不反向清）
+            if (oldItem.shipTime.isEmpty && it.shipTime.isNotEmpty) {
+              oldItem.shipTime = it.shipTime;
+              opsBackfilled = true;
+            }
           }
         }
       }
