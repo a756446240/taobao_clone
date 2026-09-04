@@ -165,7 +165,8 @@ class CartGenerator {
         logistics: '已揽件 · 预计后天送达',
         createTime: _formatTime(today),
         payTime: payTime,
-        shipTime: _formatTime(today.add(const Duration(hours: 4))),
+        // 待发货订单没有发货时间（对齐真实淘宝：详情页自动隐藏该行）
+        shipTime: '',
         address: '中房大厦C座1001室\n黑山灰 86-186****5652',
         receiver: '黑山灰',
         isSigned: false,
