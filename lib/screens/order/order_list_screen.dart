@@ -197,6 +197,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                                   shop: filtered[i].shop,
                                   items: filtered[i].items,
                                   actionText: _actionText,
+                                  rateTab: _currentTab == '待评价',
                                   onEditItem: (item) =>
                                       _showEditMenu(filtered[i].shop, item),
                                   onDetail: (item) =>
@@ -775,6 +776,7 @@ class _OrderCard extends StatelessWidget {
   final ShoppingCartShop shop;
   final List<OrderItem> items; // 当前应展示的商品（搜索时可能只是部分）
   final String actionText;
+  final bool rateTab; // 待评价 Tab：右上角交易成功 + 评价引导灰框 + 评价高亮按钮
   final void Function(OrderItem item) onEditItem;
   final void Function(OrderItem item) onDetail;
 
@@ -784,6 +786,7 @@ class _OrderCard extends StatelessWidget {
     required this.actionText,
     required this.onEditItem,
     required this.onDetail,
+    this.rateTab = false,
   });
 
   /// 主按钮动作：评价 → 发表评价页；其他 → 订单详情
@@ -880,6 +883,58 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
+  /// 待评价 Tab 底部按钮行（对齐真实淘宝评价列表的 4 种组合，按店名哈希稳定随机）：
+  /// 0：更多 + 闲鱼转卖 + 再买一单 + 评价（高亮）
+  /// 1：更多 + 加入购物车 + 查看物流 + 评价（高亮）
+  /// 2：更多 + 加入购物车 + 再买一单 + 评价（高亮）
+  /// 3：更多 + 闲鱼转卖 + 加入购物车 + 评价（高亮）
+  Widget _buildRateButtons(BuildContext context) {
+    const gap = SizedBox(width: 8);
+    final h = shop.shopName.codeUnits
+        .fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    final List<Widget> btns;
+    switch (h % 4) {
+      case 0:
+        btns = [
+          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
+          gap,
+          _outlineBtn('再买一单', onTap: () => _reAddToCart(context)),
+        ];
+        break;
+      case 1:
+        btns = [
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+          gap,
+          _outlineBtn('查看物流',
+              onTap: () => _gotoLogistics(context, items.first)),
+        ];
+        break;
+      case 2:
+        btns = [
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+          gap,
+          _outlineBtn('再买一单', onTap: () => _reAddToCart(context)),
+        ];
+        break;
+      default:
+        btns = [
+          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
+          gap,
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+        ];
+    }
+    return Row(
+      children: [
+        // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
+        _moreBtn('更多', onDoubleTap: () => onEditItem(items.first)),
+        const Spacer(),
+        ...btns,
+        gap,
+        _primaryBtn('评价', onTap: () => _onRateTap(context)),
+      ],
+    );
+  }
+
   /// 「评价」：进入发表评价页
   void _onRateTap(BuildContext context) {
     Navigator.of(context).push(
@@ -969,8 +1024,14 @@ class _OrderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // 售后卡片右上角只写"退款"（橘色），与真实淘宝一致
-                Text(isRefund ? '退款' : shop.orderSubStatus,
+                // 售后卡片右上角只写"退款"（橘色），与真实淘宝一致；
+                // 待评价 Tab 右上角写"交易成功"（对齐真实淘宝评价列表）
+                Text(
+                    isRefund
+                        ? '退款'
+                        : rateTab
+                            ? '交易成功'
+                            : shop.orderSubStatus,
                     style: AppTextStyles.small.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w500)),
@@ -980,7 +1041,8 @@ class _OrderCard extends StatelessWidget {
           // 商品列表：点击进入详情，双击弹出编辑菜单
           ...items.map((item) => _OrderItemTile(
                 item: item,
-                orderStatus: shop.orderSubStatus,
+                orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
+                ratePrompt: rateTab,
                 onTap: () => onDetail(item),
                 onDoubleTap: () => onEditItem(item),
               )),
@@ -1023,7 +1085,9 @@ class _OrderCard extends StatelessWidget {
                           onTap: () => _contactShop(context)),
                     ],
                   )
-                : _isTradeSuccess
+                : rateTab
+                    ? _buildRateButtons(context)
+                    : _isTradeSuccess
                     ? _buildSuccessButtons(context)
                     : Row(
                     children: [
@@ -1181,6 +1245,7 @@ class _OrderCard extends StatelessWidget {
 class _OrderItemTile extends StatelessWidget {
   final OrderItem item;
   final String orderStatus; // 店铺级订单状态，决定下方状态行的文案与图标
+  final bool ratePrompt; // 待评价 Tab：商品下方显示评价引导灰框（随机文案+灰星）
   final VoidCallback onTap;
   final VoidCallback? onDoubleTap;
 
@@ -1189,6 +1254,7 @@ class _OrderItemTile extends StatelessWidget {
     required this.orderStatus,
     required this.onTap,
     this.onDoubleTap,
+    this.ratePrompt = false,
   });
 
   Future<void> _pickImage(BuildContext context) async {
@@ -1441,8 +1507,46 @@ class _OrderItemTile extends StatelessWidget {
             ),
           ],
         ),
+        // 待评价 Tab：评价引导灰框（随机文案 + 灰色星标行，对齐真实淘宝评价列表）
+        if (ratePrompt)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: _ratePromptSpans),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 灰色星标行（未评价，对齐真实淘宝）
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < 5; i++)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 2),
+                          child: Icon(Icons.star_rounded,
+                              color: Color(0xFFDDDDDD), size: 15),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          )
         // 待发货：灰底圆角框架（图标 + "待发货"粗体 + 时间文案），双击编辑具体时间
-        if (_isPendingShip)
+        else if (_isPendingShip)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: GestureDetector(
@@ -1512,6 +1616,51 @@ class _OrderItemTile extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  /// 待评价 Tab 评价引导文案池（对齐真实淘宝评价列表的随机引导语，
+  /// 按商品标题哈希稳定选取，同一商品每次一致）：
+  /// 0 返100淘金币（金币图标）/ 1 评价帮助更多人 / 2 评价将帮助X.X万人… /
+  /// 3 回购多次，怎么样？/ 4 分享使用心得，帮助更多人
+  List<InlineSpan> get _ratePromptSpans {
+    const grey = TextStyle(fontSize: 12, color: Color(0xFF999999));
+    const dark = TextStyle(
+        fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF333333));
+    final h =
+        item.title.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    switch (h % 5) {
+      case 0:
+        return [
+          const WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: EdgeInsets.only(right: 3),
+              child: Icon(Icons.monetization_on,
+                  color: Color(0xFFFFB300), size: 14),
+            ),
+          ),
+          const TextSpan(text: '返', style: grey),
+          const TextSpan(
+              text: '100',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFFF5000))),
+          const TextSpan(text: '淘金币', style: grey),
+        ];
+      case 1:
+        return [const TextSpan(text: '评价帮助更多人', style: dark)];
+      case 2:
+        final wan = (12 + h % 87) / 10; // 1.2 ~ 9.8 万
+        return [
+          TextSpan(
+              text: '评价将帮助${wan.toStringAsFixed(1)}万人…', style: dark)
+        ];
+      case 3:
+        return [const TextSpan(text: '回购多次，怎么样？', style: dark)];
+      default:
+        return [const TextSpan(text: '分享使用心得，帮助更多人', style: dark)];
+    }
   }
 
   /// 状态行文案：随订单状态变化（对齐真实淘宝各状态的展示格式）
