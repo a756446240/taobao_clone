@@ -335,6 +335,7 @@ class ShoppingCartShop {
   double actualTotal; // 订单实付总额（抓包导入时写入；>0 时列表合计/详情实付款优先用它，因为单价×数量会有分位舍入差）
   int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
   String orderOps; // 抓包真实按钮序列（v1.9.75 起）："再买一单*|加入购物车|评价|查看物流"，*=高亮；非空时卡片按钮照搬它，为空回退 orderBtnStyle 随机
+  String shopAvatar; // 抓包真实店铺头像 URL（v1.9.78 起，空=默认红圆图标）
   int shopLineStyle; // 店名下方信息行样式：0星级+粉丝/1 88VIP好评率+平均退款/2 88VIP好评率+客服满意度/3好评率+平均退款/4 90天新增好评+平均退款/5 90天新增好评（-1=按店名随机）
 
   // ===== 3.4 店铺信息字段 =====
@@ -360,6 +361,7 @@ class ShoppingCartShop {
     this.actualTotal = 0,
     this.orderBtnStyle = -1,
     this.orderOps = '',
+    this.shopAvatar = '',
     this.shopLineStyle = -1,
     this.shopSubtitle = '',
     this.goodRate = '99%',
