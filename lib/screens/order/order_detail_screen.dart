@@ -17,6 +17,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import 'refund_detail_screen.dart';
+import 'rate_order_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
 class OrderDetailScreen extends StatefulWidget {
@@ -47,6 +48,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   bool get _isPendingShip => _item.statusTitle.contains('待发货');
 
+  /// 待评价订单（已交易成功待买家评价）：详情页标题/物流条对齐真实淘宝交易成功单
+  bool get _isWaitRate =>
+      _item.statusTitle.contains('待评价') ||
+      _shop.orderSubStatus.contains('待评价');
+
   /// 订单编号（订单信息行）：5127 开头 19 位
   String get _orderNo => _item.orderNo;
 
@@ -58,7 +64,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     context.watch<CartProvider>();
     context.watch<ProductImageProvider>();
 
-    final title = _item.statusTitle.isEmpty ? '订单详情' : _item.statusTitle;
+    // 待评价订单详情标题对齐真实淘宝：交易成功
+    final title = _item.statusTitle.isEmpty
+        ? '订单详情'
+        : _isWaitRate
+            ? '交易成功'
+            : _item.statusTitle;
     return Scaffold(
       backgroundColor: const Color(0xFFf5f5f5),
       body: SafeArea(
@@ -207,9 +218,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               color: Color(0xFFFF5000),
                               fontWeight: FontWeight.w600)),
                       TextSpan(
-                        text: _item.logistics.isEmpty
-                            ? '您的快件已领取，收件人在[代收点](...)'
-                            : _item.logistics,
+                        text: _bannerLogisticsText,
                         style: const TextStyle(
                             fontSize: 14, color: Color(0xFF333333)),
                       ),
@@ -248,7 +257,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 Text(
                   _item.address.isEmpty
-                      ? '中房房大厦C座1001'
+                      ? '中房大厦C座1001'
                       : _item.address.replaceAll('\n', ' '),
                   style: const TextStyle(
                       fontSize: 15,
@@ -315,7 +324,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         _addrInfoRow(
                             '收货地址',
                             _item.address.isEmpty
-                                ? '中房房大厦C座1001'
+                                ? '中房大厦C座1001'
                                 : _item.address.replaceAll('\n', ' ')),
                         const SizedBox(height: 6),
                         _addrInfoRow('虚拟号', '86-186****5652（取件出示）'),
@@ -460,10 +469,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  /// 状态头物流条文字：待评价订单对齐真实淘宝交易成功单
+  /// （"已签收  黑山灰 86-186****5652 送至 中房…"），其余状态沿用原逻辑
+  String get _bannerLogisticsText {
+    final l = _item.logistics;
+    if (_isWaitRate) {
+      if (l.contains('签收')) return l;
+      final recv = _item.receiver.isEmpty ? '黑山灰' : _item.receiver;
+      final addr = _item.address.isEmpty
+          ? '中房大厦C座1001'
+          : _item.address.replaceAll('\n', ' ');
+      return '$recv 86-186****5652 送至 $addr';
+    }
+    return l.isEmpty ? '您的快件已领取，收件人在[代收点](...)' : l;
+  }
+
   /// 根据物流文字推断阶段标签和图标
   (String, IconData) _logisticsStage() {
     final l = _item.logistics;
     final t = _item.statusTitle;
+    // 待评价订单物流条固定为已签收（对齐真实淘宝交易成功单）
+    if (_isWaitRate) return ('已签收', Icons.check_circle);
     if (l.contains('揽件')) {
       return ('已揽件', Icons.inventory_2_outlined);
     }
@@ -1374,12 +1400,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Row(
         children: [
           _bottomAction(Icons.headset_mic_outlined, '客服'),
-          _bottomAction(Icons.report_problem_outlined, '投诉'),
+          _bottomAction(Icons.report_problem_outlined,
+              _isWaitRate ? '更多' : '投诉'),
           const Spacer(),
           if (_isPendingShip) ...[
             _primaryBtn('催发货', color: const Color(0xFFff5000)),
             const SizedBox(width: 8),
             _primaryBtn('修改地址', color: const Color(0xFFff0036)),
+          ] else if (_isWaitRate) ...[
+            // 待评价（交易成功）订单底栏对齐真实淘宝：评价 + 加入购物车 + 再买一单
+            _outlineBtn('评价', onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      RateOrderScreen(shop: _shop, item: _item),
+                ),
+              );
+            }),
+            const SizedBox(width: 8),
+            _outlineBtn('加入购物车', onTap: _reAddToCart),
+            const SizedBox(width: 8),
+            _primaryBtn('再买一单',
+                color: const Color(0xFFff5000), onTap: _reAddToCart),
           ] else
             Expanded(
               child: _primaryBtn('查看详情', color: const Color(0xFFff5000)),
