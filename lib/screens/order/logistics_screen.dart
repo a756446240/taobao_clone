@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,11 +8,12 @@ import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
 import '../../widgets/app_image.dart';
 
-/// 物流跟踪节点
+/// 物流跟踪节点（tag = 阶段标签：已签收/派送中/运输中/已揽收，对齐真实淘宝分组）
 class _TraceNode {
   final String text;
   final String time;
-  const _TraceNode(this.text, this.time);
+  final String tag;
+  const _TraceNode(this.text, this.time, {this.tag = ''});
 }
 
 /// 淘宝式物流详情页：状态横幅 + 运单卡 + 收货地址 + 物流跟踪时间线
@@ -56,14 +59,25 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return m?.group(1) ?? '杭州';
   }
 
-  /// 物流阶段：0=已下单 1=已付款 2=运输中 3=已签收
+  /// 物流阶段：0=已下单 1=已付款 2=运输中 3=派送中 4=已签收（v1.9.75 起补派送中，对齐真实淘宝 3 状态）
   int get _stage {
+    // 抓包真实时间线：按最新一条的阶段标签定状态
+    final real = _realTraces;
+    if (real != null) {
+      final tag = real.first.tag;
+      if (tag.contains('签收')) return 4;
+      if (tag.contains('派送')) return 3;
+      return 2;
+    }
     final it = item;
     if (it == null) return 2;
     final st = it.statusTitle;
-    if (st.contains('完成') || st.contains('签收') || st.contains('评价')) {
-      return 3;
+    final lg = it.logistics;
+    if (st.contains('完成') || st.contains('签收') || st.contains('评价') ||
+        lg.contains('签收')) {
+      return 4;
     }
+    if (lg.contains('派送')) return 3;
     if (it.shipTime.isNotEmpty ||
         st.contains('运输') ||
         st.contains('发货') ||
@@ -75,7 +89,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
   }
 
   /// 顶部横幅状态文案
-  String get _bannerStatus => const ['等待付款', '等待发货', '运输中', '已签收'][_stage];
+  String get _bannerStatus =>
+      const ['等待付款', '等待发货', '运输中', '派送中', '已签收'][_stage];
 
   /// 快递公司：抓包写入的真实公司优先，缺省顺丰
   String get _company =>
@@ -90,12 +105,37 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return 'SF${digits.padLeft(13, '0').substring(0, 13)}';
   }
 
+  /// 抓包真实全量时间线（v1.9.76 起）：logisticsTraces JSON [{"time","tag","text"}]
+  /// 最新在前；解析失败/为空返回 null，调用方回退本地生成
+  List<_TraceNode>? get _realTraces {
+    final raw = item?.logisticsTraces ?? '';
+    if (raw.isEmpty) return null;
+    try {
+      final list = jsonDecode(raw) as List;
+      final nodes = <_TraceNode>[];
+      for (final e in list) {
+        if (e is! Map) continue;
+        final text = (e['text'] ?? '').toString();
+        if (text.isEmpty) continue;
+        nodes.add(_TraceNode(text, (e['time'] ?? '').toString(),
+            tag: (e['tag'] ?? '').toString()));
+      }
+      return nodes.isEmpty ? null : nodes;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 根据订单时间线动态生成物流跟踪（每单不同，且与订单状态一致）。
-  /// 抓包订单的最新一条真实物流（item.logistics）置顶。
+  /// 抓包订单有真实全量时间线（logisticsTraces）时直接照搬；
+  /// 否则把抓包最新一条（item.logistics）置顶 + 本地补全历史。
   List<_TraceNode> _buildTraces() {
+    final real = _realTraces;
+    if (real != null) return real;
     final it = item;
     if (it == null) return _demoTraces;
     final city = _cityOf(it.address);
+    final recv = it.receiver.isNotEmpty ? it.receiver : '本人';
     final create = _parseT(it.createTime) ?? DateTime.now();
     final pay = _parseT(it.payTime);
     final ship = _parseT(it.shipTime) ??
@@ -103,28 +143,35 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     final traces = <_TraceNode>[];
     // 真实最新物流（抓包接口 orderStatus.subTitle）置顶
     if (it.logistics.isNotEmpty) {
-      traces.add(_TraceNode(it.logistics, '最新'));
+      traces.add(_TraceNode(it.logistics, '最新',
+          tag: const ['', '', '运输中', '派送中', '已签收'][_stage]));
+    }
+    if (_stage >= 4) {
+      traces.add(_TraceNode(
+          '【$city市】已签收，签收人：$recv。感谢使用$_company，期待再次为您服务',
+          _fmtT(ship.add(const Duration(hours: 52))),
+          tag: '已签收'));
     }
     if (_stage >= 3) {
       traces.add(_TraceNode(
-          '【$city市】快件已签收，签收人：本人。感谢使用$_company，期待再次为您服务',
-          _fmtT(ship.add(const Duration(hours: 52)))));
-      traces.add(_TraceNode('【$city市】快件正在派送中，快递员：李师傅 139****8877，请保持电话畅通',
-          _fmtT(ship.add(const Duration(hours: 46)))));
+          '【$city市】包裹正在派送中，派件人：王林，电话：131****0996，请保持电话畅通',
+          _fmtT(ship.add(const Duration(hours: 46))),
+          tag: '派送中'));
     }
     if (_stage >= 2) {
       traces.addAll([
-        _TraceNode('【$city市】快件已到达 $city转运中心，下一站 上海转运中心',
-            _fmtT(ship.add(const Duration(hours: 26)))),
-        _TraceNode('【金华市】快件已发车，发往 $city转运中心',
-            _fmtT(ship.add(const Duration(hours: 14)))),
+        _TraceNode('【$city市】快件已到达【$city转运中心】，准备发往下一站',
+            _fmtT(ship.add(const Duration(hours: 26))), tag: '运输中'),
+        _TraceNode('【金华市】快件已发车，发往【$city转运中心】',
+            _fmtT(ship.add(const Duration(hours: 14))), tag: '运输中'),
         _TraceNode(
-            '【金华市】快件已到达 金华集散点', _fmtT(ship.add(const Duration(hours: 5)))),
+            '【金华市】快件已到达 金华集散点', _fmtT(ship.add(const Duration(hours: 5))),
+            tag: '运输中'),
         _TraceNode('【金华市】$_company 已收取快件，揽件员：王师傅 138****6621',
-            _fmtT(ship.add(const Duration(hours: 2)))),
-        _TraceNode('商家已发货，包裹等待揽收', _fmtT(ship)),
+            _fmtT(ship.add(const Duration(hours: 2))), tag: '已揽收'),
+        _TraceNode('商家已发货，包裹等待揽收', _fmtT(ship), tag: '已揽收'),
         _TraceNode('包裹已出库，正在通知快递揽收',
-            _fmtT(ship.subtract(const Duration(hours: 1)))),
+            _fmtT(ship.subtract(const Duration(hours: 1))), tag: '已揽收'),
       ]);
     } else if (_stage == 1) {
       traces.add(_TraceNode(
@@ -134,6 +181,48 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       traces.add(_TraceNode('订单已创建，等待买家付款', _fmtT(create)));
     }
     return traces;
+  }
+
+  /// 横幅副文案：抓包真实时间线最新一条 > 抓包最新物流 > 按状态生成
+  String get _bannerSubtitle {
+    final real = _realTraces;
+    if (real != null) return real.first.text;
+    final it = item;
+    if (it != null && it.logistics.isNotEmpty) return it.logistics;
+    final city = _cityOf(it?.address ?? '');
+    final recv =
+        it != null && it.receiver.isNotEmpty ? it.receiver : '本人';
+    switch (_stage) {
+      case 4:
+        return '已签收，签收人：$recv。如有疑问请联系快递公司或商家';
+      case 3:
+        return '包裹正在派送中，【$city市】派件人：王林，电话：131****0996，请耐心等待';
+      case 2:
+        return '包裹正在运输中，【$city市】快件到达【$city转运中心】，准备发往下一站';
+      case 1:
+        return '商家正在备货，将在承诺时间内发出';
+      default:
+        return '订单已创建，等待买家付款';
+    }
+  }
+
+  /// 横幅时间：抓包真实时间线用最新一条的时间，否则按状态推算
+  String get _bannerTime {
+    final real = _realTraces;
+    if (real != null && real.first.time.isNotEmpty) return real.first.time;
+    final it = item;
+    final create = _parseT(it?.createTime ?? '') ?? DateTime.now();
+    final pay = _parseT(it?.payTime ?? '');
+    final ship = _parseT(it?.shipTime ?? '') ??
+        (pay ?? create).add(const Duration(hours: 8));
+    final t = switch (_stage) {
+      4 => ship.add(const Duration(hours: 52)),
+      3 => ship.add(const Duration(hours: 46)),
+      2 => ship.add(const Duration(hours: 26)),
+      _ => create,
+    };
+    return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
   }
 
   void _copy(BuildContext context, String text, String label) {
@@ -149,9 +238,6 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final latest = item?.logistics.isNotEmpty == true
-        ? item!.logistics
-        : '已揽件 · 预计后天送达';
     final receiver = item?.receiver.isNotEmpty == true ? item!.receiver : '淘小宝';
     final address = item?.address.isNotEmpty == true
         ? item!.address
@@ -173,7 +259,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          _buildStatusBanner(latest),
+          _buildStatusBanner(),
           const SizedBox(height: 8),
           _buildExpressCard(context),
           const SizedBox(height: 8),
@@ -185,8 +271,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     );
   }
 
-  /// 顶部橙色状态横幅：最新物流状态 + 商品缩略图
-  Widget _buildStatusBanner(String latest) {
+  /// 顶部橙色状态横幅：状态 + 最新物流文案 + 时间 + 商品缩略图（对齐真实淘宝）
+  Widget _buildStatusBanner() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       decoration: const BoxDecoration(
@@ -208,10 +294,15 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                Text(latest,
+                Text(_bannerSubtitle,
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 12)),
+                const SizedBox(height: 3),
+                Text(_bannerTime,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 11)),
               ],
             ),
           ),
@@ -344,9 +435,14 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
             alignment: Alignment.topCenter,
             child: Column(
               children: [
-                for (var i = 0; i < visible.length; i++)
+                for (var i = 0; i < visible.length; i++) ...[
+                  // 阶段分组标签（已签收/派送中/运输中/已揽收，对齐真实淘宝）
+                  if (visible[i].tag.isNotEmpty &&
+                      (i == 0 || visible[i].tag != visible[i - 1].tag))
+                    _traceTagRow(visible[i].tag, isFirst: i == 0),
                   _traceRow(visible[i],
                       isFirst: i == 0, isLast: i == visible.length - 1),
+                ],
               ],
             ),
           ),
@@ -391,6 +487,24 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// 阶段分组标签行（对齐真实淘宝：粗体黑字，如"已签收""派送中""运输中"）
+  Widget _traceTagRow(String tag, {required bool isFirst}) {
+    return Row(
+      children: [
+        const SizedBox(width: 20),
+        const SizedBox(width: 10),
+        Padding(
+          padding: EdgeInsets.only(bottom: 6, top: isFirst ? 0 : 4),
+          child: Text(tag,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isFirst ? AppColors.primary : const Color(0xFF1A1A1A))),
+        ),
+      ],
     );
   }
 
