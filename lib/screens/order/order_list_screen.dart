@@ -1206,7 +1206,9 @@ class _OrderCard extends StatelessWidget {
   /// 跳转物流详情页（带商品信息）
   void _gotoLogistics(BuildContext context, OrderItem item) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => LogisticsScreen(item: item)),
+      MaterialPageRoute(
+          builder: (_) =>
+              LogisticsScreen(item: item, shopName: shop.shopName)),
     );
   }
 
