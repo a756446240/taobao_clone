@@ -129,8 +129,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       final (d, h, m) = _merchantCountdown();
       return '商家还有${d}天${h}小时${m}分处理，如超时将自动退款';
     }
-    return '退款原路退回至${_item.refundMethod}';
+    // 退款成功：对齐真实淘宝——主动保障橙色文案（v1.9.78 起）
+    return '主动保障 本单享主动保障服务，平台同意退款';
   }
+
+  /// 副标题是否为主动保障样式（橙色加粗标签 + 橙色正文，对齐真实淘宝）
+  bool get _subtitleIsGuarantee =>
+      _item.refundSubtitle.isEmpty && !_isPending;
 
   @override
   Widget build(BuildContext context) {
@@ -227,10 +232,27 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           const SizedBox(height: 6),
           GestureDetector(
             onDoubleTap: _editSubtitle,
-            child: Text(_subtitle,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+            child: _subtitleIsGuarantee
+                // 主动保障：橙色加粗标签 + 橙色正文（照搬真实淘宝退款成功页）
+                ? Text.rich(
+                    const TextSpan(children: [
+                      TextSpan(
+                          text: '主动保障 ',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFFF5000))),
+                      TextSpan(
+                          text: '本单享主动保障服务，平台同意退款',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFFFF5000))),
+                    ]),
+                    textAlign: TextAlign.center,
+                  )
+                : Text(_subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF999999))),
           ),
           const SizedBox(height: 14),
           _stepRow(),
@@ -343,42 +365,143 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           const SizedBox(height: 12),
           const Divider(height: 1, color: Color(0xFFF0F0F0)),
           const SizedBox(height: 10),
-          // 等待快递员上门时间（双击编辑）
+          // 等待快递员上门时间 + 取件地址（双击编辑时间；对齐真实淘宝带地址行）
           GestureDetector(
             onDoubleTap: _editPickupTime,
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.schedule,
                     size: 15, color: Color(0xFFFF5000)),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text('等待快递员 $_pickupTime',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1A1A))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('等待快递员 $_pickupTime',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1A1A))),
+                      const SizedBox(height: 3),
+                      const Text(
+                          '山东省淄博市张店区科苑街道中房大厦C座1001，黑山灰，18653385652',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF999999))),
+                    ],
+                  ),
                 ),
+                const Icon(Icons.chevron_right,
+                    size: 16, color: Color(0xFFCCCCCC)),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          // 退货宝抵扣（双击编辑）
+          const SizedBox(height: 10),
+          // 承运快递员（对齐真实淘宝：[申通承运]李毅）
+          const Row(
+            children: [
+              Icon(Icons.person_pin_circle_outlined,
+                  size: 15, color: Color(0xFFFF5000)),
+              SizedBox(width: 6),
+              Text('[申通承运]李毅',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A))),
+              SizedBox(width: 6),
+              Icon(Icons.phone_in_talk_outlined,
+                  size: 14, color: Color(0xFFFFB300)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // 预估运费 + 退货宝（对齐真实淘宝）
           GestureDetector(
             onDoubleTap: _editPickupInsurance,
             child: Row(
               children: [
                 const Icon(Icons.local_shipping_outlined,
-                    size: 15, color: Color(0xFF999999)),
+                    size: 15, color: Color(0xFFFF5000)),
                 const SizedBox(width: 6),
-                Expanded(
-                  child: Text(_pickupInsurance,
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF999999))),
-                ),
+                const Text('预估运费',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A))),
+                const Spacer(),
+                const Text('退货宝 1kg内包运费',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32))),
               ],
             ),
           ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 21),
+            child: Text(_pickupInsurance,
+                style: const TextStyle(
+                    fontSize: 11, color: Color(0xFFFF5000))),
+          ),
+          const SizedBox(height: 10),
+          // 可上传商品及取件图片（对齐真实淘宝）
+          const Row(
+            children: [
+              Icon(Icons.assignment_outlined,
+                  size: 15, color: Color(0xFFFF5000)),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text('可上传商品及取件图片，避免后续纠纷',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF1A1A1A))),
+              ),
+              Icon(Icons.chevron_right,
+                  size: 16, color: Color(0xFFCCCCCC)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 操作按钮：物流客服 / 取消寄件 / 修改时间地址（对齐真实淘宝）
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _pickupBtn('物流客服'),
+              const SizedBox(width: 8),
+              _pickupBtn('取消寄件'),
+              const SizedBox(width: 8),
+              _pickupBtn('修改时间/地址', highlight: true),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  /// 寄回卡操作按钮：灰框黑字 / 橘框橘字（对齐真实淘宝）
+  Widget _pickupBtn(String text, {bool highlight = false}) {
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$text为演示样式按钮'),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(
+              color: highlight
+                  ? const Color(0xFFFF5000)
+                  : const Color(0xFFDDDDDD)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 12,
+                color: highlight
+                    ? const Color(0xFFFF5000)
+                    : Colors.black87)),
       ),
     );
   }
@@ -460,9 +583,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           if (_isDone) ...[
             const SizedBox(height: 10),
             // 退款明细列表（参考图 6：退回花呗/返还优惠/退回淘金币/运费保障）
+            // v1.9.78：银行卡渠道带真实尾号（对齐真实淘宝"退回银行卡 平安银行8738"）
             _buildRefundDetailRow(
               icon: Icons.account_balance,
-              label: '退回${_item.refundMethod}',
+              label: _item.refundMethod.contains('银行卡')
+                  ? '退回${_item.refundMethod} 平安银行8738'
+                  : '退回${_item.refundMethod}',
               value: '¥${_item.refundAmount.toStringAsFixed(2)}',
               iconColor: const Color(0xFF1890FF),
               onDoubleTap: _editRefundMethod,
