@@ -92,7 +92,48 @@ class CartProvider extends ChangeNotifier {
     var added = 0;
     var skipped = 0;
     var blocked = 0;
+    var opsBackfilled = false;
     for (final shop in incoming) {
+      // v1.9.75：已有订单只补缺省的抓包按钮序列（orderOps 是新版字段，
+      // 用户不可能手动改过，补齐不违反"只增不改"原则）
+      if (shop.orderOps.isNotEmpty) {
+        final incomingNos = shop.items.map((e) => e.orderNo).toSet();
+        for (final old in _shops) {
+          if (old.orderOps.isNotEmpty) continue;
+          if (old.items.any((e) => incomingNos.contains(e.orderNo))) {
+            old.orderOps = shop.orderOps;
+            opsBackfilled = true;
+          }
+        }
+      }
+      // v1.9.76：抓包真实物流（全量时间线/公司/单号）同步到已有订单——
+      // 只补空值，用户双击改过的物流文字绝不覆盖
+      for (final it in shop.items) {
+        if (it.orderNo.isEmpty) continue;
+        for (final old in _shops) {
+          for (final oldItem in old.items) {
+            if (oldItem.orderNo != it.orderNo) continue;
+            if (oldItem.logisticsTraces.isEmpty &&
+                it.logisticsTraces.isNotEmpty) {
+              oldItem.logisticsTraces = it.logisticsTraces;
+              opsBackfilled = true;
+            }
+            if (oldItem.shipCompany.isEmpty &&
+                it.shipCompany.isNotEmpty) {
+              oldItem.shipCompany = it.shipCompany;
+              opsBackfilled = true;
+            }
+            if (oldItem.waybillNo.isEmpty && it.waybillNo.isNotEmpty) {
+              oldItem.waybillNo = it.waybillNo;
+              opsBackfilled = true;
+            }
+            if (oldItem.logistics.isEmpty && it.logistics.isNotEmpty) {
+              oldItem.logistics = it.logistics;
+              opsBackfilled = true;
+            }
+          }
+        }
+      }
       final newItems = <OrderItem>[];
       for (final it in shop.items) {
         if (it.orderNo.isNotEmpty && _deletedTradeNos.contains(it.orderNo)) {
@@ -119,7 +160,7 @@ class CartProvider extends ChangeNotifier {
       _shops.add(shop);
       added += newItems.length;
     }
-    if (added > 0) {
+    if (added > 0 || opsBackfilled) {
       _persist();
       notifyListeners();
     }
