@@ -202,6 +202,73 @@ class MaterialPoolProvider extends ChangeNotifier {
     }
   }
 
+  /// 从电脑端抓包 JSON 导入素材：[{"imageUrl":..., "title":..., "price":..., "spec":...}]
+  /// 图片下载到 materials/ 目录持久化；按标题去重（已有同名的跳过）。
+  /// 返回 (新增数, 跳过数, 首条错误)
+  Future<(int, int, String)> importFromJson(String raw,
+      {void Function(String)? onProgress}) async {
+    List<dynamic> list;
+    try {
+      final decoded = jsonDecode(raw);
+      list = decoded is List ? decoded : (decoded['materials'] as List? ?? []);
+    } catch (e) {
+      return (0, 0, 'JSON 解析失败：$e');
+    }
+    final dir = await _materialsDir();
+    final titles = await _loadTitles();
+    var added = 0, skipped = 0;
+    var firstErr = '';
+    for (var i = 0; i < list.length; i++) {
+      final m = list[i] as Map<String, dynamic>;
+      final url = m['imageUrl']?.toString() ?? '';
+      final title = m['title']?.toString() ?? '';
+      if (url.isEmpty) {
+        skipped++;
+        continue;
+      }
+      // 同名素材已存在（内置或导入过）→ 跳过
+      if (title.isNotEmpty && _entries.any((e) => e.title == title)) {
+        skipped++;
+        continue;
+      }
+      onProgress?.call('下载素材 ${i + 1}/${list.length}…');
+      try {
+        final req = await HttpClient().getUrl(Uri.parse(url));
+        req.headers.set('Referer', 'https://www.taobao.com/');
+        req.headers.set('User-Agent',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
+        final resp = await req.close().timeout(const Duration(seconds: 15));
+        if (resp.statusCode != 200) {
+          skipped++;
+          if (firstErr.isEmpty) firstErr = 'HTTP ${resp.statusCode}';
+          continue;
+        }
+        final bytes = await consolidateHttpClientResponseBytes(resp);
+        if (bytes.length < 500) {
+          skipped++;
+          continue;
+        }
+        var ext = '.jpg';
+        final u = url.toLowerCase();
+        if (u.contains('.png')) ext = '.png';
+        if (u.contains('.webp')) ext = '.webp';
+        final name =
+            'mat_${DateTime.now().millisecondsSinceEpoch}_$added$ext';
+        final f = File('${dir.path}/$name');
+        await f.writeAsBytes(bytes, flush: true);
+        _entries.add(MaterialEntry(imagePath: f.path, title: title));
+        if (title.isNotEmpty) titles[name] = title;
+        added++;
+      } catch (e) {
+        skipped++;
+        if (firstErr.isEmpty) firstErr = e.toString();
+      }
+    }
+    await _saveTitles(titles);
+    notifyListeners();
+    return (added, skipped, firstErr);
+  }
+
   /// 删除一条素材（仅用户导入的可删）
   Future<void> remove(MaterialEntry e) async {
     if (e.bundled) return;
@@ -223,7 +290,7 @@ class MaterialPoolProvider extends ChangeNotifier {
   // ============ 购物车商品素材随机分配（图+名严格对应） ============
 
   /// 为购物车商品 key 列表分配素材条目：
-  /// - 洗牌种子按待分配 key + 素材池规模确定性派生，跨重启分配结果一致
+  /// - 每次 load() 后重新随机（参与随机），会话内保持稳定
   /// - 素材数不足时循环使用；调用方在 build 中调用是安全的（不触发 notify）
   void assignCartMaterials(List<String> keys) {
     if (_entries.isEmpty || keys.isEmpty) return;
@@ -231,21 +298,10 @@ class MaterialPoolProvider extends ChangeNotifier {
     _cartAssignments.removeWhere((k, _) => !keys.contains(k));
     final missing = keys.where((k) => !_cartAssignments.containsKey(k)).toList();
     if (missing.isEmpty) return;
-    final pool = [..._entries]..shuffle(Random(_assignSeed(missing)));
+    final pool = [..._entries]..shuffle(Random());
     for (var i = 0; i < missing.length; i++) {
       _cartAssignments[missing[i]] = pool[i % pool.length];
     }
-  }
-
-  /// 分配种子：素材池规模与待分配 key 内容共同决定
-  int _assignSeed(List<String> keys) {
-    var h = _entries.length * 31 + 7;
-    for (final k in keys) {
-      for (final c in k.codeUnits) {
-        h = (h * 31 + c) & 0x7fffffff;
-      }
-    }
-    return h;
   }
 
   /// 取某个购物车商品分配到的素材（未分配返回 null）
