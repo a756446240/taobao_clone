@@ -211,6 +211,48 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
 
   List<_TraceNode> get _traces => _realTraces ?? _buildLocalTraces();
 
+  /// 快递官方客服电话：抓包真实值优先，否则按公司名映射常见客服号
+  String get _shipPhone {
+    final p = item?.shipPhone ?? '';
+    if (p.isNotEmpty) return p;
+    const map = {
+      '圆通': '95554',
+      '申通': '95543',
+      '中通': '95311',
+      '顺丰': '95338',
+      '韵达': '95546',
+      '京东': '950616',
+      '邮政': '11183',
+      'EMS': '11183',
+      '极兔': '956025',
+      '百世': '95320',
+      '德邦': '95353',
+    };
+    for (final e in map.entries) {
+      if (_company.contains(e.key)) return e.value;
+    }
+    return '95338';
+  }
+
+  /// 快递公司 logo：抓包官方 logo 优先（v1.9.79），缺省首字色块
+  Widget _courierLogo(double size) {
+    final logo = item?.shipLogo ?? '';
+    if (logo.isNotEmpty) {
+      return ClipOval(child: AppImage(url: logo, width: size, height: size));
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: Color(0xFF7B5AA6),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(_company.characters.first,
+          style: TextStyle(color: Colors.white, fontSize: size * 0.45)),
+    );
+  }
+
   void _copy(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -415,17 +457,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
           // 公司行
           Row(
             children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF7B5AA6),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(_company.characters.first,
-                    style: const TextStyle(color: Colors.white, fontSize: 12)),
-              ),
+              _courierLogo(26),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('$_company $_waybillNo',
@@ -444,7 +476,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
               ),
               const SizedBox(width: 14),
               GestureDetector(
-                onTap: () => _copy('05338795880', '联系电话'),
+                onTap: () => _copy(_shipPhone, '快递客服电话'),
                 child: const Text('打电话',
                     style:
                         TextStyle(fontSize: 12, color: Color(0xFF666666))),
@@ -742,18 +774,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF7B5AA6),
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(_company.characters.first,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 10)),
-                  ),
+                  _courierLogo(22),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text('$_company $_waybillNo',
@@ -770,7 +791,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                   ),
                   const SizedBox(width: 14),
                   GestureDetector(
-                    onTap: () => _copy('05338795880', '联系电话'),
+                    onTap: () => _copy(_shipPhone, '快递客服电话'),
                     child: const Text('打电话',
                         style: TextStyle(
                             fontSize: 12, color: Color(0xFF666666))),
