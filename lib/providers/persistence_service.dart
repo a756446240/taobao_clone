@@ -177,6 +177,14 @@ class PersistenceService {
       'refundBarStyle': item.refundBarStyle,
       'refundDiscount': item.refundDiscount,
       'showRefundDiscount': item.showRefundDiscount,
+      'shipCompany': item.shipCompany,
+      'waybillNo': item.waybillNo,
+      'refundSteps': item.refundSteps,
+      'pickupCode': item.pickupCode,
+      'pickupGuarantee': item.pickupGuarantee,
+      'pickupTimeText': item.pickupTimeText,
+      'pickupInsuranceText': item.pickupInsuranceText,
+      'showPickupCard': item.showPickupCard,
     };
   }
 
@@ -249,6 +257,14 @@ class PersistenceService {
       refundBarStyle: j['refundBarStyle'] ?? -1,
       refundDiscount: (j['refundDiscount'] as num?)?.toDouble() ?? 0,
       showRefundDiscount: j['showRefundDiscount'] ?? true,
+      shipCompany: j['shipCompany'] ?? '',
+      waybillNo: j['waybillNo'] ?? '',
+      refundSteps: j['refundSteps'] ?? '',
+      pickupCode: j['pickupCode'] ?? '',
+      pickupGuarantee: j['pickupGuarantee'] ?? '',
+      pickupTimeText: j['pickupTimeText'] ?? '',
+      pickupInsuranceText: j['pickupInsuranceText'] ?? '',
+      showPickupCard: j['showPickupCard'] ?? true,
     );
   }
 
