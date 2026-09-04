@@ -1,12 +1,16 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
+import '../../widgets/product_card.dart';
 
 /// 物流跟踪节点（tag = 阶段标签：已签收/派送中/运输中/已揽收，对齐真实淘宝分组）
 class _TraceNode {
@@ -16,52 +20,57 @@ class _TraceNode {
   const _TraceNode(this.text, this.time, {this.tag = ''});
 }
 
-/// 淘宝式物流详情页：状态横幅 + 运单卡 + 收货地址 + 物流跟踪时间线
-/// 时间线三段展开（对齐真实淘宝）：
-///   0=只看最新 1 条「查看更多物流明细」
-///   1=最近 4 条「展开更多物流明细」
-///   2=全部历史「收起更多物流明细」
+/// 手机淘宝式物流详情页（v1.9.77 重做，对齐真实淘宝）：
+/// - 上半屏可缩放地图（双指缩放/拖动，货车 + 预计送达气泡 + 收货地标记）
+/// - 顶部悬浮头：状态 + 自动确认倒计时 + 客服/包裹/更多
+/// - 公司行（复制/打电话）→ 最新一条物流 → 「查看更多物流明细 ›」底部弹层
+/// - 送至固定收货地址 → 商品卡（查看全部订单信息）→ 商品推荐（同首页逻辑）
 class LogisticsScreen extends StatefulWidget {
   /// 可选：从订单卡片进入时带上商品信息
   final OrderItem? item;
+  final String shopName;
 
-  const LogisticsScreen({super.key, this.item});
+  const LogisticsScreen({super.key, this.item, this.shopName = ''});
 
   @override
   State<LogisticsScreen> createState() => _LogisticsScreenState();
 }
 
 class _LogisticsScreenState extends State<LogisticsScreen> {
-  /// 展开级别：0=最新1条 1=最近4条 2=全部
-  int _expandLevel = 0;
-
   OrderItem? get item => widget.item;
 
-  static const List<_TraceNode> _demoTraces = [
-    _TraceNode('【杭州市】快件已到达 杭州转运中心，下一站 上海转运中心', '今天 08:24'),
-    _TraceNode('【金华市】快件已发车，发往 杭州转运中心', '今天 02:10'),
-    _TraceNode('【金华市】快件已到达 金华集散点', '昨天 21:47'),
-    _TraceNode('【金华市】顺丰速运 已收取快件，揽件员：王师傅 138****6621', '昨天 18:05'),
-    _TraceNode('商家已发货，包裹等待揽收', '昨天 16:32'),
-    _TraceNode('包裹已出库，正在通知快递揽收', '昨天 15:20'),
-  ];
+  // ===== 固定收货信息（对齐用户真实默认地址：淄博 中房大厦） =====
+  static const _receiver = '黑山灰';
+  static const _phoneMasked = '86-186****5652';
+  static const _addrShort = '中房大厦C座1001';
+  static const _addrFull = '山东省 淄博市 张店区 科苑街道 中房大厦C座1001';
 
-  static DateTime? _parseT(String s) =>
-      s.isEmpty ? null : DateTime.tryParse(s.replaceAll(' ', 'T'));
+  List<SearchResultItem>? _recPicks;
 
-  static String _fmtT(DateTime t) =>
-      '${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  // ============ 数据：抓包真实时间线优先，本地生成兜底 ============
 
-  /// 从收货地址里提取城市名（默认杭州）
-  static String _cityOf(String address) {
-    final m = RegExp(r'([一-龥]{2,4})市').firstMatch(address);
-    return m?.group(1) ?? '杭州';
+  /// 抓包真实全量时间线（logisticsTraces JSON [{"time","tag","text"}] 最新在前）
+  List<_TraceNode>? get _realTraces {
+    final raw = item?.logisticsTraces ?? '';
+    if (raw.isEmpty) return null;
+    try {
+      final list = jsonDecode(raw) as List;
+      final nodes = <_TraceNode>[];
+      for (final e in list) {
+        if (e is! Map) continue;
+        final text = (e['text'] ?? '').toString();
+        if (text.isEmpty) continue;
+        nodes.add(_TraceNode(text, (e['time'] ?? '').toString(),
+            tag: (e['tag'] ?? '').toString()));
+      }
+      return nodes.isEmpty ? null : nodes;
+    } catch (_) {
+      return null;
+    }
   }
 
-  /// 物流阶段：0=已下单 1=已付款 2=运输中 3=派送中 4=已签收（v1.9.75 起补派送中，对齐真实淘宝 3 状态）
+  /// 物流阶段：0=已下单 1=已付款 2=运输中 3=派送中 4=已签收
   int get _stage {
-    // 抓包真实时间线：按最新一条的阶段标签定状态
     final real = _realTraces;
     if (real != null) {
       final tag = real.first.tag;
@@ -88,15 +97,61 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return 0;
   }
 
-  /// 顶部横幅状态文案
-  String get _bannerStatus =>
-      const ['等待付款', '等待发货', '运输中', '派送中', '已签收'][_stage];
+  /// 头部大状态（对齐真实淘宝：已发货/运输中/派送中/已签收）
+  String get _headStatus {
+    switch (_stage) {
+      case 4:
+        return '已签收';
+      case 3:
+        return '派送中';
+      case 2:
+        final tag = _realTraces?.first.tag ?? '';
+        return tag.isNotEmpty ? tag : '运输中';
+      case 1:
+        return '等待发货';
+      default:
+        return '已下单';
+    }
+  }
 
-  /// 快递公司：抓包写入的真实公司优先，缺省顺丰
-  String get _company =>
-      item != null && item!.shipCompany.isNotEmpty ? item!.shipCompany : '顺丰速运';
+  /// 自动确认倒计时（付款后 10 天，已签收不显示）
+  String get _countdown {
+    if (_stage >= 4) return '';
+    final it = item;
+    final base = _parseT(it?.payTime ?? '') ?? _parseT(it?.createTime ?? '');
+    if (base == null) return '还剩9天22小时自动确认';
+    final deadline = base.add(const Duration(days: 10));
+    var diff = deadline.difference(DateTime.now());
+    if (diff.isNegative) diff = Duration.zero;
+    return '还剩${diff.inDays}天${diff.inHours % 24}小时自动确认';
+  }
 
-  /// 运单号：抓包写入的真实单号优先，否则由订单号派生
+  /// 地图气泡（对齐真实淘宝：预计后天送达/预计今天送达/已送达）
+  String get _etaBubble => switch (_stage) {
+        4 => '已送达',
+        3 => '预计今天送达',
+        _ => '预计后天送达',
+      };
+
+  static DateTime? _parseT(String s) =>
+      s.isEmpty ? null : DateTime.tryParse(s.replaceAll(' ', 'T'));
+
+  static String _fmtT(DateTime t) =>
+      '${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// 快递公司：抓包真实公司优先，缺省按单号前缀推断，再缺省顺丰
+  String get _company {
+    final c = item?.shipCompany ?? '';
+    if (c.isNotEmpty) return c;
+    final no = item?.waybillNo ?? '';
+    if (no.startsWith('YT')) return '圆通速递';
+    if (no.startsWith('SF')) return '顺丰速运';
+    if (no.startsWith('ZTO') || no.startsWith('7')) return '中通快递';
+    return '顺丰速运';
+  }
+
+  /// 运单号：抓包真实单号优先，否则由订单号派生
   String get _waybillNo {
     final it = item;
     if (it == null) return 'SF3102886642157';
@@ -105,127 +160,56 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return 'SF${digits.padLeft(13, '0').substring(0, 13)}';
   }
 
-  /// 抓包真实全量时间线（v1.9.76 起）：logisticsTraces JSON [{"time","tag","text"}]
-  /// 最新在前；解析失败/为空返回 null，调用方回退本地生成
-  List<_TraceNode>? get _realTraces {
-    final raw = item?.logisticsTraces ?? '';
-    if (raw.isEmpty) return null;
-    try {
-      final list = jsonDecode(raw) as List;
-      final nodes = <_TraceNode>[];
-      for (final e in list) {
-        if (e is! Map) continue;
-        final text = (e['text'] ?? '').toString();
-        if (text.isEmpty) continue;
-        nodes.add(_TraceNode(text, (e['time'] ?? '').toString(),
-            tag: (e['tag'] ?? '').toString()));
-      }
-      return nodes.isEmpty ? null : nodes;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// 根据订单时间线动态生成物流跟踪（每单不同，且与订单状态一致）。
-  /// 抓包订单有真实全量时间线（logisticsTraces）时直接照搬；
-  /// 否则把抓包最新一条（item.logistics）置顶 + 本地补全历史。
-  List<_TraceNode> _buildTraces() {
-    final real = _realTraces;
-    if (real != null) return real;
-    final it = item;
-    if (it == null) return _demoTraces;
-    final city = _cityOf(it.address);
-    final recv = it.receiver.isNotEmpty ? it.receiver : '本人';
-    final create = _parseT(it.createTime) ?? DateTime.now();
-    final pay = _parseT(it.payTime);
-    final ship = _parseT(it.shipTime) ??
-        (pay ?? create).add(const Duration(hours: 8));
-    final traces = <_TraceNode>[];
-    // 真实最新物流（抓包接口 orderStatus.subTitle）置顶
-    if (it.logistics.isNotEmpty) {
-      traces.add(_TraceNode(it.logistics, '最新',
-          tag: const ['', '', '运输中', '派送中', '已签收'][_stage]));
-    }
-    if (_stage >= 4) {
-      traces.add(_TraceNode(
-          '【$city市】已签收，签收人：$recv。感谢使用$_company，期待再次为您服务',
-          _fmtT(ship.add(const Duration(hours: 52))),
-          tag: '已签收'));
-    }
-    if (_stage >= 3) {
-      traces.add(_TraceNode(
-          '【$city市】包裹正在派送中，派件人：王林，电话：131****0996，请保持电话畅通',
-          _fmtT(ship.add(const Duration(hours: 46))),
-          tag: '派送中'));
-    }
-    if (_stage >= 2) {
-      traces.addAll([
-        _TraceNode('【$city市】快件已到达【$city转运中心】，准备发往下一站',
-            _fmtT(ship.add(const Duration(hours: 26))), tag: '运输中'),
-        _TraceNode('【金华市】快件已发车，发往【$city转运中心】',
-            _fmtT(ship.add(const Duration(hours: 14))), tag: '运输中'),
-        _TraceNode(
-            '【金华市】快件已到达 金华集散点', _fmtT(ship.add(const Duration(hours: 5))),
-            tag: '运输中'),
-        _TraceNode('【金华市】$_company 已收取快件，揽件员：王师傅 138****6621',
-            _fmtT(ship.add(const Duration(hours: 2))), tag: '已揽收'),
-        _TraceNode('商家已发货，包裹等待揽收', _fmtT(ship), tag: '已揽收'),
-        _TraceNode('包裹已出库，正在通知快递揽收',
-            _fmtT(ship.subtract(const Duration(hours: 1))), tag: '已揽收'),
-      ]);
-    } else if (_stage == 1) {
-      traces.add(_TraceNode(
-          '订单已付款，商家正在备货，将在 48 小时内发出', _fmtT(pay ?? create)));
-    }
-    if (_stage <= 1) {
-      traces.add(_TraceNode('订单已创建，等待买家付款', _fmtT(create)));
-    }
-    return traces;
-  }
-
-  /// 横幅副文案：抓包真实时间线最新一条 > 抓包最新物流 > 按状态生成
-  String get _bannerSubtitle {
-    final real = _realTraces;
-    if (real != null) return real.first.text;
-    final it = item;
-    if (it != null && it.logistics.isNotEmpty) return it.logistics;
-    final city = _cityOf(it?.address ?? '');
-    final recv =
-        it != null && it.receiver.isNotEmpty ? it.receiver : '本人';
-    switch (_stage) {
-      case 4:
-        return '已签收，签收人：$recv。如有疑问请联系快递公司或商家';
-      case 3:
-        return '包裹正在派送中，【$city市】派件人：王林，电话：131****0996，请耐心等待';
-      case 2:
-        return '包裹正在运输中，【$city市】快件到达【$city转运中心】，准备发往下一站';
-      case 1:
-        return '商家正在备货，将在承诺时间内发出';
-      default:
-        return '订单已创建，等待买家付款';
-    }
-  }
-
-  /// 横幅时间：抓包真实时间线用最新一条的时间，否则按状态推算
-  String get _bannerTime {
-    final real = _realTraces;
-    if (real != null && real.first.time.isNotEmpty) return real.first.time;
+  /// 本地生成时间线（无抓包数据时的兜底，与订单状态一致）
+  List<_TraceNode> _buildLocalTraces() {
     final it = item;
     final create = _parseT(it?.createTime ?? '') ?? DateTime.now();
     final pay = _parseT(it?.payTime ?? '');
     final ship = _parseT(it?.shipTime ?? '') ??
         (pay ?? create).add(const Duration(hours: 8));
-    final t = switch (_stage) {
-      4 => ship.add(const Duration(hours: 52)),
-      3 => ship.add(const Duration(hours: 46)),
-      2 => ship.add(const Duration(hours: 26)),
-      _ => create,
-    };
-    return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
-        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+    final traces = <_TraceNode>[];
+    if (it != null && it.logistics.isNotEmpty) {
+      traces.add(_TraceNode(it.logistics, '最新',
+          tag: const ['', '', '运输中', '派送中', '已签收'][_stage]));
+    }
+    if (_stage >= 4) {
+      traces.add(_TraceNode(
+          '【淄博市】已签收，签收人：$_receiver。感谢使用$_company，期待再次为您服务',
+          _fmtT(ship.add(const Duration(hours: 52))),
+          tag: '已签收'));
+    }
+    if (_stage >= 3) {
+      traces.add(_TraceNode(
+          '【淄博市】包裹正在派送中，派件员：王林，电话：131****0996，请保持电话畅通',
+          _fmtT(ship.add(const Duration(hours: 46))),
+          tag: '派送中'));
+    }
+    if (_stage >= 2) {
+      traces.addAll([
+        _TraceNode('【淄博市】快件已到达【淄博转运中心】，准备发往下一站',
+            _fmtT(ship.add(const Duration(hours: 26))), tag: '运输中'),
+        _TraceNode('【金华市】快件已发车，发往【淄博转运中心】',
+            _fmtT(ship.add(const Duration(hours: 14))), tag: '运输中'),
+        _TraceNode('【金华市】$_company 已收取快件，揽件员：王师傅 138****6621',
+            _fmtT(ship.add(const Duration(hours: 2))), tag: '已揽收'),
+        _TraceNode('您的包裹已出库，等待配送，配送公司：$_company，发货单号[${_waybillNo}]',
+            _fmtT(ship), tag: '已发货'),
+        _TraceNode('商品已经下单', _fmtT(create), tag: '已下单'),
+      ]);
+    } else if (_stage == 1) {
+      traces.add(_TraceNode(
+          '订单已付款，商家正在备货，将在 48 小时内发出', _fmtT(pay ?? create),
+          tag: '已下单'));
+    }
+    if (_stage <= 1) {
+      traces.add(_TraceNode('商品已经下单', _fmtT(create), tag: '已下单'));
+    }
+    return traces;
   }
 
-  void _copy(BuildContext context, String text, String label) {
+  List<_TraceNode> get _traces => _realTraces ?? _buildLocalTraces();
+
+  void _copy(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -236,251 +220,276 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     );
   }
 
+  // ============ 页面结构 ============
+
   @override
   Widget build(BuildContext context) {
-    final receiver = item?.receiver.isNotEmpty == true ? item!.receiver : '淘小宝';
-    final address = item?.address.isNotEmpty == true
-        ? item!.address
-        : '浙江省杭州市西湖区文三路 100 号';
-
+    final top = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        title: const Text('物流详情',
-            style: TextStyle(
-                color: Colors.black87,
-                fontSize: 16,
-                fontWeight: FontWeight.w600)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+      body: Column(
         children: [
-          _buildStatusBanner(),
-          const SizedBox(height: 8),
-          _buildExpressCard(context),
-          const SizedBox(height: 8),
-          _buildAddressCard(receiver, address),
-          const SizedBox(height: 8),
-          _buildTraceCard(),
+          // 上半屏：可缩放地图 + 悬浮头
+          SizedBox(
+            height: 300 + top,
+            child: Stack(
+              children: [
+                Positioned.fill(child: _buildMap()),
+                Positioned(
+                  top: top + 4,
+                  left: 4,
+                  right: 8,
+                  child: _buildHeader(),
+                ),
+              ],
+            ),
+          ),
+          // 下半屏：物流信息 + 商品 + 推荐
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildLogisticsCard(),
+                const SizedBox(height: 10),
+                _buildAddrCard(),
+                const SizedBox(height: 10),
+                if (item != null) _buildProductCard(),
+                const SizedBox(height: 10),
+                _buildRecommend(),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// 顶部橙色状态横幅：状态 + 最新物流文案 + 时间 + 商品缩略图（对齐真实淘宝）
-  Widget _buildStatusBanner() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFFF5000), Color(0xFFFF7A33)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_bannerStatus,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                Text(_bannerSubtitle,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 12)),
-                const SizedBox(height: 3),
-                Text(_bannerTime,
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.75),
-                        fontSize: 11)),
-              ],
+  /// 悬浮头：返回 + 状态/倒计时（左），客服/包裹/更多（右）
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              shape: BoxShape.circle,
             ),
+            child: const Icon(Icons.arrow_back_ios,
+                size: 16, color: Colors.black87),
           ),
-          if (item != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: AppImage(
-                  url: item!.imageUrl,
-                  fit: BoxFit.cover,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_headStatus,
+                  style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A1A))),
+              if (_countdown.isNotEmpty)
+                Text(_countdown,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF666666))),
+            ],
+          ),
+        ),
+        _headerAction(Icons.headset_mic_outlined, '客服'),
+        const SizedBox(width: 12),
+        _headerAction(Icons.inventory_2_outlined, '包裹'),
+        const SizedBox(width: 12),
+        _headerAction(Icons.more_horiz, ''),
+      ],
+    );
+  }
+
+  Widget _headerAction(IconData icon, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF333333)),
+        if (label.isNotEmpty)
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 9, color: Color(0xFF333333))),
+      ],
+    );
+  }
+
+  /// 可缩放地图（双指缩放/拖动）：自绘风格化地图 + 货车标记 + 预计送达气泡
+  Widget _buildMap() {
+    return LayoutBuilder(
+      builder: (_, c) => InteractiveViewer(
+        minScale: 1,
+        maxScale: 3.5,
+        boundaryMargin: const EdgeInsets.all(120),
+        child: SizedBox(
+          width: c.maxWidth * 1.25,
+          height: c.maxHeight * 1.25,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _ZiboMapPainter()),
+              ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(_etaBubble,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    Container(width: 2, height: 8, color: AppColors.primary),
+                    const Icon(Icons.local_shipping,
+                        color: Color(0xFF5B3A29), size: 30),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFDDDDDD)),
+                      ),
+                      child: const Text('收  淄博市',
+                          style: TextStyle(
+                              fontSize: 10, color: Color(0xFF333333))),
+                    ),
+                  ],
                 ),
               ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  /// 快递公司 + 运单号卡
-  Widget _buildExpressCard(BuildContext context) {
-    final waybillNo = _waybillNo;
+  /// 物流卡：公司行（复制/打电话）+ 最新一条 + 查看更多物流明细
+  Widget _buildLogisticsCard() {
+    final latest = _traces.first;
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF1E8),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(Icons.local_shipping,
-                color: AppColors.primary, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_company,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 3),
-                Text('运单号 $waybillNo',
-                    style:
-                        const TextStyle(color: Color(0xFF999999), fontSize: 12)),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _copy(context, waybillNo, '运单号'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFDDDDDD)),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text('复制', style: TextStyle(fontSize: 12)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 收货地址卡
-  Widget _buildAddressCard(String receiver, String address) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
-            child: Icon(Icons.location_on_outlined,
-                color: Color(0xFF999999), size: 18),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('收货人：$receiver', style: AppTextStyles.small),
-                const SizedBox(height: 3),
-                Text(address,
-                    style: const TextStyle(
-                        color: Color(0xFF999999), fontSize: 12)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 物流跟踪时间线：三段展开（最新1条 → 最近4条 → 全部），动画过渡
-  Widget _buildTraceCard() {
-    final traces = _buildTraces();
-    final visibleCount = _expandLevel == 0
-        ? 1
-        : _expandLevel == 1
-            ? (traces.length < 4 ? traces.length : 4)
-            : traces.length;
-    final visible = traces.take(visibleCount).toList();
-    // 只有还有更多可展开时才显示按钮
-    final hasMore = visibleCount < traces.length;
-    final btnText = _expandLevel == 0
-        ? '查看更多物流明细'
-        : _expandLevel == 1 && hasMore
-            ? '展开更多物流明细'
-            : '收起更多物流明细';
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('物流跟踪',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeInOut,
-            alignment: Alignment.topCenter,
-            child: Column(
-              children: [
-                for (var i = 0; i < visible.length; i++) ...[
-                  // 阶段分组标签（已签收/派送中/运输中/已揽收，对齐真实淘宝）
-                  if (visible[i].tag.isNotEmpty &&
-                      (i == 0 || visible[i].tag != visible[i - 1].tag))
-                    _traceTagRow(visible[i].tag, isFirst: i == 0),
-                  _traceRow(visible[i],
-                      isFirst: i == 0, isLast: i == visible.length - 1),
-                ],
-              ],
-            ),
+          // 公司行
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF7B5AA6),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(_company.characters.first,
+                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('$_company $_waybillNo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A))),
+              ),
+              GestureDetector(
+                onTap: () => _copy(_waybillNo, '运单号'),
+                child: const Text('复制',
+                    style:
+                        TextStyle(fontSize: 12, color: Color(0xFF666666))),
+              ),
+              const SizedBox(width: 14),
+              GestureDetector(
+                onTap: () => _copy('05338795880', '联系电话'),
+                child: const Text('打电话',
+                    style:
+                        TextStyle(fontSize: 12, color: Color(0xFF666666))),
+              ),
+            ],
           ),
-          // 展开/收起按钮（对齐真实淘宝：空心圆点 + 灰字）
+          const SizedBox(height: 12),
+          // 最新一条物流（阶段标签 + 时间 橙色）
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 3),
+                child: Icon(Icons.fiber_manual_record,
+                    size: 10, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${latest.tag.isNotEmpty ? '${latest.tag}  ' : ''}${latest.time}',
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary),
+                          ),
+                        ),
+                        if (latest.tag.contains('发货') &&
+                            !latest.tag.contains('签收')) ...[
+                          const Spacer(),
+                          const Text('预计今天18:33前揽收',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.primary)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(latest.text,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF666666),
+                            height: 1.4)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 查看更多物流明细 → 底部弹层
           GestureDetector(
-            onTap: () => setState(() {
-              _expandLevel = _expandLevel == 0
-                  ? 1
-                  : _expandLevel == 1 && hasMore
-                      ? 2
-                      : 0;
-            }),
+            onTap: _showTraceSheet,
             behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
               child: Row(
                 children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(left: 6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: const Color(0xFFDDDDDD), width: 1.5),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(btnText,
-                      style: const TextStyle(
-                          color: Color(0xFF999999), fontSize: 12)),
-                  Icon(
-                    _expandLevel == 2 || (_expandLevel == 1 && !hasMore)
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    size: 16,
-                    color: const Color(0xFF999999),
-                  ),
+                  Icon(Icons.radio_button_unchecked,
+                      size: 10, color: Color(0xFFBBBBBB)),
+                  SizedBox(width: 8),
+                  Text('查看更多物流明细',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF999999))),
+                  Icon(Icons.chevron_right,
+                      size: 14, color: Color(0xFFBBBBBB)),
                 ],
               ),
             ),
@@ -490,77 +499,362 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     );
   }
 
-  /// 阶段分组标签行（对齐真实淘宝：粗体黑字，如"已签收""派送中""运输中"）
-  Widget _traceTagRow(String tag, {required bool isFirst}) {
-    return Row(
+  /// 送至地址卡（固定淄博 中房大厦）
+  Widget _buildAddrCard() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(14),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.radio_button_unchecked,
+                size: 12, color: Color(0xFFBBBBBB)),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('送至  $_addrShort',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A))),
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text('$_receiver  $_phoneMasked',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF999999))),
+                    SizedBox(width: 6),
+                    Text('号码保护中',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFFBBBBBB))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 商品卡：店铺 + 商品行 + 查看全部订单信息（对齐真实淘宝）
+  Widget _buildProductCard() {
+    final it = item!;
+    final total = it.price * it.quantity;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                    widget.shopName.isNotEmpty ? widget.shopName : '海外专营店',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A))),
+              ),
+              const Icon(Icons.chevron_right,
+                  size: 16, color: Color(0xFFBBBBBB)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: AppImage(url: it.imageUrl, width: 56, height: 56),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(it.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF1A1A1A))),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('¥${it.price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A))),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(it.configuration,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFF999999))),
+                        ),
+                        Text('~¥${(total + 11).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFBBBBBB),
+                                decoration: TextDecoration.lineThrough)),
+                        const SizedBox(width: 6),
+                        Text('x${it.quantity}',
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF999999))),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('7天价保  7天无理由退货  正品保障',
+                        style: TextStyle(
+                            fontSize: 10, color: Color(0xFF2E7D32))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('查看全部订单信息',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+                Icon(Icons.keyboard_arrow_down,
+                    size: 14, color: Color(0xFFBBBBBB)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 商品推荐：与首页推荐同逻辑（素材池优先，内置 mock 兜底）
+  Widget _buildRecommend() {
+    final pool = context.watch<MaterialPoolProvider>();
+    if (!pool.loading && _recPicks == null) {
+      _recPicks = pool.recommendGoods(6);
+    }
+    final picks = _recPicks ??
+        (([...MockData.guessLikeGoods]..shuffle(Random(20260904)))
+            .take(6)
+            .toList());
+    return Column(
       children: [
-        const SizedBox(width: 20),
-        const SizedBox(width: 10),
-        Padding(
-          padding: EdgeInsets.only(bottom: 6, top: isFirst ? 0 : 4),
-          child: Text(tag,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isFirst ? AppColors.primary : const Color(0xFF1A1A1A))),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.62,
+          ),
+          itemCount: picks.length,
+          itemBuilder: (_, i) => ProductCard(item: picks[i]),
         ),
       ],
     );
   }
 
-  Widget _traceRow(_TraceNode node, {required bool isFirst, required bool isLast}) {
-    final color = isFirst ? AppColors.primary : const Color(0xFF999999);
+  /// 「查看更多物流明细」底部弹层：完整时间线 + 底部收货地址（对齐真实淘宝）
+  void _showTraceSheet() {
+    final traces = _traces;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, ctrl) => Column(
+          children: [
+            // 标题栏
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Center(
+                      child: Text('详细信息',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.close,
+                        size: 22, color: Color(0xFF666666)),
+                  ),
+                ],
+              ),
+            ),
+            // 公司行
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF7B5AA6),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(_company.characters.first,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('$_company $_waybillNo',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                  GestureDetector(
+                    onTap: () => _copy(_waybillNo, '运单号'),
+                    child: const Text('复制',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF666666))),
+                  ),
+                  const SizedBox(width: 14),
+                  GestureDetector(
+                    onTap: () => _copy('05338795880', '联系电话'),
+                    child: const Text('打电话',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF666666))),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1, color: Color(0xFFF0F0F0)),
+            // 完整时间线
+            Expanded(
+              child: ListView.builder(
+                controller: ctrl,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                itemCount: traces.length + 1,
+                itemBuilder: (_, i) {
+                  if (i == traces.length) {
+                    // 底部收货地址（对齐真实淘宝弹层）
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7F8FA),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.location_on_outlined,
+                              size: 16, color: Color(0xFF999999)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '$_receiver，186****5652，$_addrFull',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                  height: 1.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final n = traces[i];
+                  return _sheetTraceRow(n, isFirst: i == 0);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 弹层时间线行：阶段标签(粗体) + 时间 + 文案
+  Widget _sheetTraceRow(_TraceNode n, {required bool isFirst}) {
+    final headColor = isFirst ? AppColors.primary : const Color(0xFF1A1A1A);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 圆点 + 竖线
           SizedBox(
-            width: 20,
+            width: 16,
             child: Column(
               children: [
                 Container(
-                  width: isFirst ? 12 : 8,
-                  height: isFirst ? 12 : 8,
-                  margin: EdgeInsets.only(top: isFirst ? 1 : 3),
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(top: 5),
                   decoration: BoxDecoration(
-                    color: isFirst ? AppColors.primary : const Color(0xFFDDDDDD),
                     shape: BoxShape.circle,
-                    border: isFirst
-                        ? Border.all(color: const Color(0xFFFFD9C2), width: 3)
-                        : null,
+                    color: isFirst
+                        ? AppColors.primary
+                        : Colors.transparent,
+                    border: Border.all(
+                        color: isFirst
+                            ? AppColors.primary
+                            : const Color(0xFFCCCCCC),
+                        width: 1.5),
                   ),
                 ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 1,
-                      color: const Color(0xFFEEEEEE),
-                    ),
-                  ),
+                Expanded(
+                  child: Container(
+                      width: 1, color: const Color(0xFFEEEEEE)),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 18),
+              padding: const EdgeInsets.only(bottom: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(node.text,
-                      style: TextStyle(
-                          color: color,
-                          fontSize: 13,
-                          fontWeight:
-                              isFirst ? FontWeight.w600 : FontWeight.normal)),
+                  Text(
+                    '${n.tag.isNotEmpty ? '${n.tag}  ' : ''}${n.time}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: headColor),
+                  ),
                   const SizedBox(height: 3),
-                  Text(node.time,
-                      style: TextStyle(
-                          color: isFirst
-                              ? AppColors.primary
-                              : const Color(0xFFBBBBBB),
-                          fontSize: 11)),
+                  Text(n.text,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF666666),
+                          height: 1.4)),
                 ],
               ),
             ),
@@ -569,4 +863,84 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       ),
     );
   }
+}
+
+/// 淄博张店风格化自绘地图（中房大厦周边，可缩放）
+class _ZiboMapPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // 底色（浅灰绿，仿高德浅色底图）
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFFEDF2EC));
+
+    final road = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final block = Paint()..color = const Color(0xFFE3EAE2);
+    final park = Paint()..color = const Color(0xFFD5E8D0);
+    final water = Paint()..color = const Color(0xFFCFE3F0);
+
+    // 地块
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(w * .06, h * .06, w * .3, h * .22),
+            const Radius.circular(6)),
+        block);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(w * .62, h * .08, w * .3, h * .18),
+            const Radius.circular(6)),
+        park);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(w * .08, h * .66, w * .26, h * .24),
+            const Radius.circular(6)),
+        block);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(w * .68, h * .7, w * .24, h * .2),
+            const Radius.circular(6)),
+        water);
+
+    // 路网（横竖主路 + 斜路）
+    road.strokeWidth = 14;
+    canvas.drawLine(Offset(0, h * .42), Offset(w, h * .38), road); // 华光路
+    road.strokeWidth = 10;
+    canvas.drawLine(Offset(w * .46, 0), Offset(w * .5, h), road); // 纵路
+    canvas.drawLine(Offset(0, h * .72), Offset(w, h * .78), road);
+    canvas.drawLine(Offset(w * .16, 0), Offset(w * .12, h), road);
+    road.strokeWidth = 5;
+    canvas.drawLine(Offset(w * .78, 0), Offset(w * .86, h), road);
+    canvas.drawLine(Offset(0, h * .18), Offset(w, h * .14), road);
+
+    // 文字标注
+    void label(String text, double x, double y,
+        {double size = 11, Color color = const Color(0xFF7A8A7C)}) {
+      final tp = TextPainter(
+        text: TextSpan(
+            text: text, style: TextStyle(fontSize: size, color: color)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x, y));
+    }
+
+    label('中房大厦(华光路)', w * .6, h * .3, size: 13, color: const Color(0xFF556255));
+    label('中房教育综合体', w * .56, h * .44);
+    label('卓霖装饰', w * .82, h * .46);
+    label('食养生鲜\n生活超市', w * .2, h * .5, size: 10);
+    label('中国移动', w * .4, h * .52);
+    label('中房天玺', w * .9, h * .28, size: 10);
+    label('庞氏推拿', w * .5, h * .12, size: 10);
+    label('东1门', w * .88, h * .04, size: 10);
+    label('5号楼', w * .54, h * .08, size: 10);
+    label('P', w * .1, h * .58, size: 12, color: const Color(0xFF7B8FDD));
+    label('P', w * .5, h * .62, size: 12, color: const Color(0xFF7B8FDD));
+    label('P', w * .04, h * .36, size: 12, color: const Color(0xFF7B8FDD));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
