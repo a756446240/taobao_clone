@@ -18,6 +18,7 @@ import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import 'refund_detail_screen.dart';
 import 'rate_order_screen.dart';
+import 'logistics_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
 class OrderDetailScreen extends StatefulWidget {
@@ -195,8 +196,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          // 物流状态行（双击换选项）
+          // 物流状态行（单击 → 物流详情页，对齐真实淘宝；双击换选项）
           GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => LogisticsScreen(item: _item)),
+            ),
             onDoubleTap: () => _showOptionPicker(
               title: '修改物流状态',
               options: logisticsOptions,
