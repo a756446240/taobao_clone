@@ -1,7 +1,7 @@
 name: taobao_clone
 description: 1:1 复刻淘宝 App 的全新架构 Flutter 项目（练习用）
 publish_to: "none"
-version: 1.9.77+121
+version: 1.9.78+122
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -28,6 +28,9 @@ dependencies:
   flutter_slidable: ^3.0.1
   # 文件选择（淘宝订单同步 JSON 导入）
   file_picker: ^8.0.0
+
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
 
 dev_dependencies:
   flutter_test:
