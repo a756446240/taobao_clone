@@ -106,6 +106,17 @@ class CartProvider extends ChangeNotifier {
           }
         }
       }
+      // v1.9.78：抓包真实店铺头像，按订单号匹配回填（只补空值）
+      if (shop.shopAvatar.isNotEmpty) {
+        final incomingNos = shop.items.map((e) => e.orderNo).toSet();
+        for (final old in _shops) {
+          if (old.shopAvatar.isNotEmpty) continue;
+          if (old.items.any((e) => incomingNos.contains(e.orderNo))) {
+            old.shopAvatar = shop.shopAvatar;
+            opsBackfilled = true;
+          }
+        }
+      }
       // v1.9.76：抓包真实物流（全量时间线/公司/单号）同步到已有订单——
       // 只补空值，用户双击改过的物流文字绝不覆盖
       for (final it in shop.items) {
