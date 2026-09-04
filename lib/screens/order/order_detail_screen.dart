@@ -673,6 +673,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (override != null) {
       return AppImage(url: override, width: 30, height: 30);
     }
+    // v1.9.78：抓包真实店铺头像优先
+    if (_shop.shopAvatar.isNotEmpty) {
+      return AppImage(url: _shop.shopAvatar, width: 30, height: 30);
+    }
     return const Icon(Icons.favorite, color: Colors.white, size: 16);
   }
 
@@ -783,7 +787,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               _outlineBtn('加入购物车', onTap: _reAddToCart),
               const SizedBox(width: 8),
-              _orangeOutlineBtn('申请售后', onTap: _gotoRefund),
+              // 对齐真实淘宝：待发货=申请退款，已发货/完成=申请售后，统一灰框黑字
+              _outlineBtn(_isPendingShip ? '申请退款' : '申请售后',
+                  onTap: _gotoRefund),
             ],
           ),
           // 价格明细与上方商品处于同一栏目（无空白虚框分隔）
