@@ -216,46 +216,37 @@ class _AddressScreenState extends State<AddressScreen> {
     );
   }
 
-  /// 左滑露出「设为默认 / 复制 / 删除」三个操作（对齐真实淘宝），松手回弹
+  /// 左滑露出「设为默认 / 复制 / 删除」三个操作（对齐真实淘宝）
+  /// v1.9.74：弃用 Dismissible（松手立即回弹点不到按钮），
+  /// 改为自绘滑动容器——滑开停住、点卡片或再右滑收回
   Widget _buildSwipeCard(_Address a, int index) {
-    return Dismissible(
+    return _SwipeReveal(
       key: ObjectKey(a),
-      direction: DismissDirection.endToStart,
-      // 不真正滑走，只露出操作区，松手回弹
-      confirmDismiss: (_) async => false,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
+      actionsWidth: 192, // 3 × 64
+      actions: [
+        _swipeAction(
+          label: '设为默认',
+          icon: Icons.check_circle_outline,
+          color: const Color(0xFFFF8C00),
+          onTap: () => _setDefault(a),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            _swipeAction(
-              label: '设为默认',
-              icon: Icons.check_circle_outline,
-              color: const Color(0xFFFF8C00),
-              onTap: () => _setDefault(a),
-            ),
-            _swipeAction(
-              label: '复制',
-              icon: Icons.copy_outlined,
-              color: const Color(0xFF3B82F6),
-              onTap: () => _copyAddress(a),
-            ),
-            _swipeAction(
-              label: '删除',
-              icon: Icons.delete_outline,
-              color: const Color(0xFFFF3B30),
-              onTap: () => _deleteAt(index),
-              radius: const BorderRadius.only(
-                topRight: Radius.circular(8),
-                bottomRight: Radius.circular(8),
-              ),
-            ),
-          ],
+        _swipeAction(
+          label: '复制',
+          icon: Icons.copy_outlined,
+          color: const Color(0xFF3B82F6),
+          onTap: () => _copyAddress(a),
         ),
-      ),
+        _swipeAction(
+          label: '删除',
+          icon: Icons.delete_outline,
+          color: const Color(0xFFFF3B30),
+          onTap: () => _deleteAt(index),
+          radius: const BorderRadius.only(
+            topRight: Radius.circular(8),
+            bottomRight: Radius.circular(8),
+          ),
+        ),
+      ],
       child: _buildCard(a),
     );
   }
@@ -476,5 +467,111 @@ class _AddressScreenState extends State<AddressScreen> {
       ..showSnackBar(SnackBar(
           content: Text(msg),
           duration: const Duration(seconds: 1)));
+  }
+}
+
+/// 左滑露出操作区的容器（对齐真实淘宝地址列表）：
+/// - 拖动超过一半松手 → 自动停在展开位；不到一半 → 弹回
+/// - 展开后点卡片或右滑 → 收回
+class _SwipeReveal extends StatefulWidget {
+  final Widget child;
+  final List<Widget> actions;
+  final double actionsWidth;
+
+  const _SwipeReveal({
+    super.key,
+    required this.child,
+    required this.actions,
+    required this.actionsWidth,
+  });
+
+  @override
+  State<_SwipeReveal> createState() => _SwipeRevealState();
+}
+
+class _SwipeRevealState extends State<_SwipeReveal>
+    with SingleTickerProviderStateMixin {
+  double _dx = 0; // 当前位移（0 = 关闭，-actionsWidth = 展开）
+  late final AnimationController _ctrl;
+  Animation<double>? _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 180))
+      ..addListener(() {
+        if (_anim != null) setState(() => _dx = _anim!.value);
+      });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(double target) {
+    _ctrl.stop();
+    _anim = Tween<double>(begin: _dx, end: target)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl
+      ..reset()
+      ..forward();
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    _ctrl.stop();
+    setState(() {
+      _dx = (_dx + d.delta.dx).clamp(-widget.actionsWidth, 0.0);
+    });
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (v < -300) {
+      _animateTo(-widget.actionsWidth); // 快速左滑直接展开
+    } else if (v > 300) {
+      _animateTo(0); // 快速右滑直接收回
+    } else {
+      _animateTo(_dx < -widget.actionsWidth / 2 ? -widget.actionsWidth : 0.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final open = _dx < -1;
+    return GestureDetector(
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      behavior: HitTestBehavior.opaque,
+      child: ClipRect(
+        child: Stack(
+          children: [
+            // 操作区（右侧，露出部分才可点）
+            Positioned.fill(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IgnorePointer(
+                    ignoring: !open,
+                    child: Row(children: widget.actions),
+                  ),
+                ],
+              ),
+            ),
+            // 卡片本体（随手指平移）
+            Transform.translate(
+              offset: Offset(_dx, 0),
+              child: GestureDetector(
+                // 展开状态下点卡片收回；关闭状态下不拦截原有点击
+                onTap: open ? () => _animateTo(0) : null,
+                child: widget.child,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
