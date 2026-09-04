@@ -29,6 +29,7 @@ class MessageScreen extends StatefulWidget {
 
 class _MessageScreenState extends State<MessageScreen> {
   late final List<_HistoryMsg> _history;
+  final _rand = Random();
 
   /// 会话搜索
   final TextEditingController _searchCtrl = TextEditingController();
@@ -40,11 +41,11 @@ class _MessageScreenState extends State<MessageScreen> {
     super.dispose();
   }
 
-  /// 4 个圆圈入口（固定；未读角标数在 _quickBadges 中，进入即清零）
+  /// 4 个圆圈入口（固定，badge 为未读角标，0 表示不显示）
   static const _quickEntries = <_QuickEntry>[
-    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350)),
-    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5)),
-    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a)),
+    _QuickEntry('通知消息', Icons.notifications_active, Color(0xFFef5350), badge: 3),
+    _QuickEntry('互动消息', Icons.thumb_up_alt, Color(0xFF42a5f5), badge: 12),
+    _QuickEntry('物流消息', Icons.local_shipping, Color(0xFF66bb6a), badge: 1),
     _QuickEntry('直播消息', Icons.videocam, Color(0xFFab47bc)),
   ];
 
@@ -77,84 +78,38 @@ class _MessageScreenState extends State<MessageScreen> {
     '专属客服为您服务',
   ];
 
-  /// 会话日期：距今天的天数偏移池（2 天 ~ 7 周前），
-  /// 渲染时按 DateTime.now() 动态回推，月份/年份永不穿越
-  static const _dateOffsets = [2, 4, 5, 7, 9, 12, 16, 20, 28, 45];
-
-  /// 距今天 [daysAgo] 天的日期，格式 yy/MM/dd
-  static String _dateFor(int daysAgo) {
-    final d = DateTime.now().subtract(Duration(days: daysAgo));
-    final yy = (d.year % 100).toString().padLeft(2, '0');
-    final mm = d.month.toString().padLeft(2, '0');
-    final dd = d.day.toString().padLeft(2, '0');
-    return '$yy/$mm/$dd';
-  }
+  /// 日期模板（2-4 周前）
+  static const _datePool = [
+    '26/08/06', '26/08/04', '26/08/03', '26/08/01', '26/07/30',
+    '26/07/28', '26/07/24', '26/07/22', '26/07/18', '26/07/15',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _init();
-  }
-
-  /// 初始化：先读持久化状态（自定义头像/已读会话/快捷入口角标），再生成历史
-  Future<void> _init() async {
-    await _loadCustomAvatars();
-    await _loadReadState();
+    _loadCustomAvatars();
     _history = _generateHistory();
-    if (mounted) setState(() {});
   }
 
   static const _avatarPrefKey = 'message_custom_avatars';
-  static const _readPrefKey = 'message_read_shops';
-  static const _quickBadgePrefKey = 'message_quick_badges';
   final Map<String, String> _customAvatars = {};
 
-  /// 已读会话（按店铺名持久化，重启后不再显示未读红点）
-  final Set<String> _readShops = {};
-
-  /// 4 个快捷入口的未读角标（进入对应页面即清零并持久化）
-  late List<int> _quickBadges = [3, 12, 1, 0];
-
-  Future<void> _loadReadState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _readShops.addAll(prefs.getStringList(_readPrefKey) ?? []);
-      final raw = prefs.getStringList(_quickBadgePrefKey);
-      if (raw != null && raw.length == _quickBadges.length) {
-        _quickBadges =
-            raw.map((s) => int.tryParse(s) ?? 0).toList();
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveReadState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_readPrefKey, _readShops.toList());
-      await prefs.setStringList(_quickBadgePrefKey,
-          _quickBadges.map((v) => v.toString()).toList());
-    } catch (_) {}
-  }
-
-  /// 字符串确定性哈希（项目惯例）
-  static int _hashOf(String s) {
-    var h = 0;
-    for (final c in s.codeUnits) {
-      h = (h * 31 + c) & 0x7fffffff;
-    }
-    return h;
-  }
-
   /// 读取已保存的自定义头像（按店铺名持久化，重启不丢）
+  /// 存的是文件名而非绝对路径：iOS 自签重装后沙盒容器路径会变，
+  /// 存绝对路径会导致更新后头像全部失效（v1.9.74 修复）
   Future<void> _loadCustomAvatars() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_avatarPrefKey);
       if (raw == null || raw.isEmpty) return;
+      final dir = await getApplicationDocumentsDirectory();
+      final saveDir = Directory('${dir.path}/message_avatars');
       final map = jsonDecode(raw) as Map<String, dynamic>;
       map.forEach((k, v) {
-        final path = v.toString();
-        if (File(path).existsSync()) _customAvatars[k] = path;
+        // 兼容旧数据：旧版存的绝对路径，取文件名部分
+        final name = v.toString().split(RegExp(r'[\\/]')).last;
+        final resolved = '${saveDir.path}/$name';
+        if (File(resolved).existsSync()) _customAvatars[k] = resolved;
       });
       if (mounted) setState(() {});
     } catch (_) {}
@@ -163,23 +118,23 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _saveCustomAvatars() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_avatarPrefKey, jsonEncode(_customAvatars));
+      // 只存文件名，加载时按当前沙盒目录重新拼路径
+      final names = _customAvatars.map(
+          (k, v) => MapEntry(k, v.split(RegExp(r'[\\/]')).last));
+      await prefs.setString(_avatarPrefKey, jsonEncode(names));
     } catch (_) {}
   }
 
-  /// 生成 10-15 条历史对话（固定种子：每次启动列表一致；
-  /// 未读按店铺名哈希确定，已读过的会话不再显示红点）
+  /// 每次启动随机生成 10-15 条历史对话
   List<_HistoryMsg> _generateHistory() {
-    final rand = Random(20260903);
-    final count = 10 + rand.nextInt(6); // 10-15
+    final count = 10 + _rand.nextInt(6); // 10-15
     final result = <_HistoryMsg>[];
     for (var i = 0; i < count; i++) {
-      final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
-      final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
-      final msg = _msgTemplates[rand.nextInt(_msgTemplates.length)];
-      final date = _dateFor(_dateOffsets[rand.nextInt(_dateOffsets.length)]);
-      final unread =
-          _hashOf(shopName) % 5 < 2 && !_readShops.contains(shopName);
+      final tpl = _shopTemplates[_rand.nextInt(_shopTemplates.length)];
+      final shopName = tpl.shopNames[_rand.nextInt(tpl.shopNames.length)];
+      final msg = _msgTemplates[_rand.nextInt(_msgTemplates.length)];
+      final date = _datePool[_rand.nextInt(_datePool.length)];
+      final unread = _rand.nextDouble() < 0.4; // 40% 概率有未读
       result.add(_HistoryMsg(
         shopName: shopName,
         message: msg,
@@ -233,7 +188,7 @@ class _MessageScreenState extends State<MessageScreen> {
     _HistoryMsg? markRead,
   }) {
     if (markRead != null && markRead.unread) {
-      _markRead(markRead);
+      setState(() => markRead.unread = false);
     }
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -259,29 +214,12 @@ class _MessageScreenState extends State<MessageScreen> {
       ));
   }
 
-  /// 下拉刷新消息列表（模拟拉取：收到一条新消息插入顶部，带未读红点）
+  /// 下拉刷新消息列表（模拟向服务端拉取最新会话）
   Future<void> _onRefresh() async {
     await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    // 按当前列表状态确定性派生（同一次会话内每次刷新不同，跨重启可复现）
-    final rand = Random(_hashOf(
-        'refresh#${_history.length}#${_history.isNotEmpty ? _history.first.shopName : ''}'));
-    final tpl = _shopTemplates[rand.nextInt(_shopTemplates.length)];
-    final shopName = tpl.shopNames[rand.nextInt(tpl.shopNames.length)];
-    setState(() {
-      _history.insert(
-        0,
-        _HistoryMsg(
-          shopName: shopName,
-          message: _msgTemplates[rand.nextInt(_msgTemplates.length)],
-          date: '刚刚',
-          unread: true,
-          color: tpl.color,
-          avatarUrl: _avatarForShop(shopName),
-        ),
-      );
-    });
-    _showMsg('收到 1 条新消息');
+    setState(() {});
+    _showMsg('消息已刷新');
   }
 
   /// 扫一扫：从相册选取图片识别二维码（真实走系统相册）
@@ -511,27 +449,18 @@ class _MessageScreenState extends State<MessageScreen> {
   }
 
   Widget _buildQuickEntry(_QuickEntry e, int index) {
-    final badge =
-        index < _quickBadges.length ? _quickBadges[index] : 0;
     return GestureDetector(
-      onTap: () {
-        // 进入对应消息页即清零未读角标（持久化）
-        if (badge > 0) {
-          setState(() => _quickBadges[index] = 0);
-          _saveReadState();
-        }
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => QuickMessagesScreen(
-              title: e.title,
-              icon: e.icon,
-              color: e.color,
-              kind: QuickMsgKind.values[index],
-            ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => QuickMessagesScreen(
+            title: e.title,
+            icon: e.icon,
+            color: e.color,
+            kind: QuickMsgKind.values[index],
           ),
-        );
-      },
+        ),
+      ),
       behavior: HitTestBehavior.opaque,
       child: Column(
         children: [
@@ -547,7 +476,7 @@ class _MessageScreenState extends State<MessageScreen> {
                 ),
                 child: Icon(e.icon, color: Colors.white, size: 24),
               ),
-              if (badge > 0)
+              if (e.badge > 0)
                 Positioned(
                   right: -4,
                   top: -4,
@@ -561,7 +490,7 @@ class _MessageScreenState extends State<MessageScreen> {
                           Border.all(color: Colors.white, width: 1.5),
                     ),
                     constraints: const BoxConstraints(minWidth: 18),
-                    child: Text('$badge',
+                    child: Text('${e.badge}',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                             color: Colors.white, fontSize: 10)),
@@ -591,7 +520,7 @@ class _MessageScreenState extends State<MessageScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
+                  color: color.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8)),
               child: Icon(icon, color: color, size: 26),
             ),
@@ -623,7 +552,7 @@ class _MessageScreenState extends State<MessageScreen> {
   // ============ 历史消息项（右滑显示操作）============
   Widget _historyTile(_HistoryMsg m, {bool pinned = false}) {
     final muted = context
-        .watch<ChatHistoryProvider>()
+        .read<ChatHistoryProvider>()
         .isMuted(m.shopName);
     return Slidable(
       key: ValueKey(m.shopName + m.date),
@@ -704,14 +633,6 @@ class _MessageScreenState extends State<MessageScreen> {
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.smallBold),
                         ),
-                        if (muted)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 4),
-                            child: Icon(
-                                Icons.notifications_off_outlined,
-                                size: 13,
-                                color: Color(0xFFBBBBBB)),
-                          ),
                         Text(m.date,
                             style: AppTextStyles.min
                                 .copyWith(color: const Color(0xFF999999))),
@@ -766,7 +687,7 @@ class _MessageScreenState extends State<MessageScreen> {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: m.color.withValues(alpha: 0.15),
+        color: m.color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
@@ -776,12 +697,8 @@ class _MessageScreenState extends State<MessageScreen> {
     );
   }
 
-  /// 标记已读：更新 UI + 持久化（重启后该会话不再显示未读）
   void _markRead(_HistoryMsg m) {
-    if (!m.unread) return;
     setState(() => m.unread = false);
-    _readShops.add(m.shopName);
-    _saveReadState();
   }
 
   void _deleteHistory(_HistoryMsg m) {
@@ -812,7 +729,8 @@ class _QuickEntry {
   final String title;
   final IconData icon;
   final Color color;
-  const _QuickEntry(this.title, this.icon, this.color);
+  final int badge;
+  const _QuickEntry(this.title, this.icon, this.color, {this.badge = 0});
 }
 
 class _ShopTpl {
