@@ -200,7 +200,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           GestureDetector(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
-                  builder: (_) => LogisticsScreen(item: _item)),
+                  builder: (_) => LogisticsScreen(
+                      item: _item, shopName: _shop.shopName)),
             ),
             onDoubleTap: () => _showOptionPicker(
               title: '修改物流状态',
@@ -1031,7 +1032,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }),
       ),
       // 发货时间：与其他信息行一致的普通行；显示/隐藏控制在右上角 ⋯ 菜单里
-      if (_item.showShipTime)
+      // v1.9.77 起：shipTime 为空（待发货）时自动隐藏该行（对齐真实淘宝）
+      if (_item.showShipTime && _item.shipTime.trim().isNotEmpty)
         _infoRow(
           label: '发货时间',
           value: _displayTime(_item.shipTime),
