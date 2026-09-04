@@ -218,6 +218,18 @@ class OrderItem {
   bool showHelpSection; // 是否显示"您是否遇到以下问题？"反馈区
   bool showShipDetailBtn; // 是否显示"寄件详情"按钮（退款成功状态）
 
+  // ===== 物流字段（3.6 抓包导入真实物流） =====
+  String shipCompany; // 快递公司名，如"顺丰速运"（空=按旧逻辑写死顺丰）
+  String waybillNo; // 运单号（空=按订单号派生）
+
+  // ===== 退款详情·寄回商品卡（3.7 可编辑区域） =====
+  String refundSteps; // 步骤条文字（逗号分隔 3 段，空=默认"申请退款,商家处理,退款结束"）
+  String pickupCode; // 取件码（空=默认 6033）
+  String pickupGuarantee; // 主动保障文案（空=默认）
+  String pickupTimeText; // 等待快递员上门时间文案（空=默认）
+  String pickupInsuranceText; // 退货宝抵扣文案（空=默认）
+  bool showPickupCard; // 是否显示寄回商品卡（退款进行中状态）
+
   OrderItem({
     required this.imageUrl,
     required this.title,
@@ -291,6 +303,14 @@ class OrderItem {
     this.refundInfoCollapsed = true,
     this.showHelpSection = true,
     this.showShipDetailBtn = true,
+    this.shipCompany = '',
+    this.waybillNo = '',
+    this.refundSteps = '',
+    this.pickupCode = '',
+    this.pickupGuarantee = '',
+    this.pickupTimeText = '',
+    this.pickupInsuranceText = '',
+    this.showPickupCard = true,
   });
 }
 
