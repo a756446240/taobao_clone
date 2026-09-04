@@ -172,6 +172,7 @@ class _OrderListScreenState extends State<OrderListScreen>
             _buildTopBar(),
             _buildChannelBar(),
             _buildSubTabBar(),
+            if (!isChannel && _currentTab == '售后') _buildRefundFilterBar(),
             Expanded(
               child: isChannel
                   ? RefreshIndicator(
@@ -372,7 +373,7 @@ class _OrderListScreenState extends State<OrderListScreen>
     );
   }
 
-  // ============ 子 Tab 行（撑满整宽可滑动，选中橙底白字胶囊；照搬购物频道样式） ============
+  // ============ 子 Tab 行（撑满整宽可滑动；对齐真实淘宝：灰底胶囊，选中橙字加粗） ============
   Widget _buildSubTabBar() {
     return Container(
       color: Colors.white,
@@ -400,9 +401,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _subIndex == i
-                                  ? AppColors.primary
-                                  : Colors.transparent,
+                              color: const Color(0xFFF5F5F5),
                               borderRadius: BorderRadius.circular(18),
                             ),
                             child: Text(
@@ -414,7 +413,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                                     ? FontWeight.bold
                                     : FontWeight.normal,
                                 color: _subIndex == i
-                                    ? Colors.white
+                                    ? const Color(0xFFFF5000)
                                     : Colors.black87,
                               ),
                             ),
@@ -431,12 +430,84 @@ class _OrderListScreenState extends State<OrderListScreen>
     );
   }
 
+  // ============ 退款/售后的「进行中/已完结」筛选（都不选=全部退款单，对齐真实淘宝） ============
+  /// 0=全部 1=进行中 2=已完结
+  int _refundFilter = 0;
+
+  Widget _buildRefundFilterBar() {
+    Widget chip(String label, int value) {
+      final selected = _refundFilter == value;
+      return GestureDetector(
+        onTap: () => setState(() => _refundFilter = selected ? 0 : value),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          margin: const EdgeInsets.only(left: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected
+                      ? const Color(0xFFFF5000)
+                      : Colors.black87,
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 2),
+                const Icon(Icons.close,
+                    size: 13, color: Color(0xFFFF5000)),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.only(left: 4, right: 12, bottom: 8),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Text('可筛选售后状态',
+                style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+          ),
+          const Spacer(),
+          chip('进行中', 1),
+          chip('已完结', 2),
+        ],
+      ),
+    );
+  }
+
+  /// 退款单按 进行中/已完结 过滤（基于店铺子状态文案）
+  bool _matchesRefundFilter(ShoppingCartShop shop) {
+    if (_refundFilter == 0) return true;
+    final s = shop.orderSubStatus;
+    final done = s.contains('成功') ||
+        s.contains('结束') ||
+        s.contains('关闭') ||
+        s.contains('完成');
+    return _refundFilter == 2 ? done : !done;
+  }
+
   /// 状态过滤 + 搜索过滤（商品标题/规格/店铺名 关键词）
   List<_ShopView> _visibleShops(List<ShoppingCartShop> shops) {
     final q = _query.trim().toLowerCase();
     final result = <_ShopView>[];
     for (final shop in shops) {
       if (!_matchesStatus(shop)) continue;
+      if (_currentTab == '售后' && !_matchesRefundFilter(shop)) continue;
       if (q.isEmpty || shop.shopName.toLowerCase().contains(q)) {
         result.add(_ShopView(shop, shop.items));
         continue;
