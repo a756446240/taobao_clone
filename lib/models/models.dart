@@ -221,6 +221,7 @@ class OrderItem {
   // ===== 物流字段（3.6 抓包导入真实物流） =====
   String shipCompany; // 快递公司名，如"顺丰速运"（空=按旧逻辑写死顺丰）
   String waybillNo; // 运单号（空=按订单号派生）
+  String logisticsTraces; // 抓包真实全量物流时间线（v1.9.76 起）：JSON 数组 [{"time","tag","text"}] 最新在前，空=本地生成
 
   // ===== 退款详情·寄回商品卡（3.7 可编辑区域） =====
   String refundSteps; // 步骤条文字（逗号分隔 3 段，空=默认"申请退款,商家处理,退款结束"）
@@ -305,6 +306,7 @@ class OrderItem {
     this.showShipDetailBtn = true,
     this.shipCompany = '',
     this.waybillNo = '',
+    this.logisticsTraces = '',
     this.refundSteps = '',
     this.pickupCode = '',
     this.pickupGuarantee = '',
@@ -332,6 +334,7 @@ class ShoppingCartShop {
   String orderTotalTip; // 店铺合计提示，如"共1件商品 合计："
   double actualTotal; // 订单实付总额（抓包导入时写入；>0 时列表合计/详情实付款优先用它，因为单价×数量会有分位舍入差）
   int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
+  String orderOps; // 抓包真实按钮序列（v1.9.75 起）："再买一单*|加入购物车|评价|查看物流"，*=高亮；非空时卡片按钮照搬它，为空回退 orderBtnStyle 随机
   int shopLineStyle; // 店名下方信息行样式：0星级+粉丝/1 88VIP好评率+平均退款/2 88VIP好评率+客服满意度/3好评率+平均退款/4 90天新增好评+平均退款/5 90天新增好评（-1=按店名随机）
 
   // ===== 3.4 店铺信息字段 =====
@@ -356,6 +359,7 @@ class ShoppingCartShop {
     this.orderTotalTip = '',
     this.actualTotal = 0,
     this.orderBtnStyle = -1,
+    this.orderOps = '',
     this.shopLineStyle = -1,
     this.shopSubtitle = '',
     this.goodRate = '99%',
