@@ -79,6 +79,7 @@ class _AddressScreenState extends State<AddressScreen> {
         _list
           ..clear()
           ..addAll(list);
+        _migrate();
       } else {
         _seedDefault();
       }
@@ -88,26 +89,62 @@ class _AddressScreenState extends State<AddressScreen> {
     if (mounted) setState(() => _loaded = true);
   }
 
+  /// v1.9.75 数据修正：
+  /// - 清掉旧版内置的假演示地址（张晓/李婷/13812348888 等，用户反馈"乱码"）
+  /// - 修正历史数据里的错字「中房房大厦」→「中房大厦」
+  void _migrate() {
+    const fakePhones = {'13812348888', '13998766666'};
+    final before = _list.length;
+    _list.removeWhere((a) =>
+        fakePhones.contains(a.phone) ||
+        (a.region.contains('杭州市') && a.detail.contains('文三路')) ||
+        (a.region.contains('浦东新区') && a.detail.contains('世纪大道')) ||
+        (a.region.contains('海淀区') && a.detail.contains('中关村')));
+    var dirty = _list.length != before;
+    for (final a in _list) {
+      if (a.detail.contains('中房房大厦')) {
+        a.detail = a.detail.replaceAll('中房房大厦', '中房大厦');
+        dirty = true;
+      }
+    }
+    if (_list.isEmpty) {
+      _seedDefault();
+      return;
+    }
+    if (dirty) _save();
+  }
+
+  /// 内置地址：对齐用户真实淘宝地址簿（淄博 中房大厦 等）
   void _seedDefault() {
     _list
       ..clear()
       ..addAll([
         _Address(
-            name: '张晓',
-            phone: '13812348888',
-            region: '浙江省 杭州市 西湖区',
-            detail: '文三路 100 号 3 幢 2 单元 501 室',
+            name: '黑山灰',
+            phone: '18653385652',
+            region: '山东省 淄博市 张店区 科苑街道',
+            detail: '中房大厦C座1001',
             isDefault: true),
         _Address(
-            name: '李婷',
-            phone: '13998766666',
-            region: '上海市 上海市 浦东新区',
-            detail: '世纪大道 200 号 写字楼 15 层'),
+            name: '王广霞',
+            phone: '17669764365',
+            region: '山东省 淄博市 张店区 马尚街道',
+            detail: '新村西路电业局第四宿舍区放丰巢柜就行'),
         _Address(
-            name: '张晓',
-            phone: '13812348888',
-            region: '北京市 北京市 海淀区',
-            detail: '中关村大街 1 号 院 8 号楼'),
+            name: '辉',
+            phone: '18653385652',
+            region: '江西省 九江市 修水县 义宁镇',
+            detail: '城北古茗店内'),
+        _Address(
+            name: '辉',
+            phone: '18653385652',
+            region: '山东省 淄博市 张店区 公园街道',
+            detail: '中央公园(人民西路) 华润中央公园9号楼803'),
+        _Address(
+            name: '黑山灰',
+            phone: '18653385652',
+            region: '江苏省 宿迁市 宿城区 埠子镇',
+            detail: '蔡桥庄'),
       ]);
     _save();
   }
