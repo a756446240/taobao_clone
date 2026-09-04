@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -33,6 +37,105 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
     if (mounted) {
       _toast(count > 0 ? '已导入 $count 张素材图' : '未选择图片');
     }
+  }
+
+  /// 长按标题触发：导入电脑抓包脚本生成的 taobao_materials_*.json
+  Future<void> _importJson() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('导入抓包素材', style: TextStyle(fontSize: 16)),
+        content: const Text(
+          '电脑抓单时同目录会生成 taobao_materials_*.json\n（订单里所有商品的图+名称），微信发到手机后导入。',
+          style: TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, 'cancel'),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, 'paste'),
+              child: const Text('粘贴文本')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, 'file'),
+              child: const Text('选择文件',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    );
+    if (choice == null || choice == 'cancel') return;
+    String? raw;
+    if (choice == 'file') {
+      try {
+        final res = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['json', 'txt'],
+        );
+        final path = res?.files.single.path;
+        if (path == null) return;
+        raw = await File(path).readAsString();
+      } catch (e) {
+        _toast('读取文件失败：$e');
+        return;
+      }
+    } else {
+      final clip = await Clipboard.getData(Clipboard.kTextPlain);
+      if (!mounted) return;
+      final ctl = TextEditingController(text: clip?.text ?? '');
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('粘贴素材 JSON', style: TextStyle(fontSize: 16)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: TextField(
+              controller: ctl,
+              maxLines: 8,
+              style: const TextStyle(fontSize: 11),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('导入',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
+        ),
+      );
+      if (ok != true || ctl.text.trim().isEmpty) return;
+      raw = ctl.text.trim();
+    }
+    // 导入中提示（图片要逐张下载，可能几十秒）
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 14),
+            Text('正在下载商品图素材…', style: TextStyle(fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+    final pool = context.read<MaterialPoolProvider>();
+    final (added, skipped, err) = await pool.importFromJson(raw);
+    if (!mounted) return;
+    Navigator.of(context).pop(); // 关掉进度框
+    _toast('素材导入完成：新增 $added 件，跳过 $skipped 件'
+        '${added == 0 && err.isNotEmpty ? '（$err）' : ''}');
   }
 
   void _toast(String msg) {
@@ -267,7 +370,11 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('商品素材库'),
+        title: GestureDetector(
+          // 隐藏入口：长按标题 → 导入电脑抓包生成的素材 JSON
+          onLongPress: _importJson,
+          child: const Text('商品素材库'),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -350,7 +457,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                 if (pool.aiProgress != null)
                   Container(
                     width: double.infinity,
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppColors.primary.withOpacity(0.1),
                     padding:
                         const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     child: Row(
@@ -401,7 +508,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 4, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.45),
+                                    color: Colors.black.withOpacity(0.45),
                                     borderRadius:
                                         const BorderRadius.vertical(
                                             bottom: Radius.circular(8)),
@@ -438,7 +545,7 @@ class _MaterialPoolScreenState extends State<MaterialPoolScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 4, vertical: 1),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.4),
+                                        color: Colors.black.withOpacity(0.4),
                                         borderRadius:
                                             BorderRadius.circular(4),
                                       ),
