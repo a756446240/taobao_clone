@@ -346,6 +346,46 @@ class MaterialPoolProvider extends ChangeNotifier {
   /// 品牌词（对外暴露：我的淘宝-我的收藏列表等复用）
   static String brandOf(String title) => _brandOf(title);
 
+  /// 按商品标题估计合理市场价区间（v1.9.75：替换原纯随机 0~1200 的离谱价格）。
+  /// 返回 (最低价, 最高价)，按品类关键词匹配，都不命中给日百常见区间。
+  static (double, double) _priceRangeOf(String title) {
+    final t = title.toLowerCase();
+    bool has(List<String> kws) => kws.any((k) => t.contains(k));
+    if (has(['手帕纸', '抽纸', '纸巾', '湿巾', '卷纸', '棉柔巾'])) return (9.9, 39.9);
+    if (has(['牙膏', '牙刷', '漱口水', '牙线'])) return (15, 69);
+    if (has(['口罩', '消毒', '洗手'])) return (15, 69);
+    if (has(['面膜'])) return (39, 129);
+    if (has(['面霜', '乳液', '精华', '爽肤水', '喷雾', '保湿', '护肤', '防晒', '眼霜', '洁面', '洗面奶'])) return (49, 229);
+    if (has(['洗发水', '洗发露', '护发', '沐浴', '身体乳', '发膜', '精油'])) return (39, 139);
+    if (has(['洗衣液', '洗洁精', '清洁剂', '洗衣凝珠'])) return (19.9, 79.9);
+    if (has(['奶粉'])) return (158, 398);
+    if (has(['纸尿裤', '尿不湿', '拉拉裤'])) return (69, 189);
+    if (has(['香水'])) return (159, 599);
+    if (has(['口红', '唇膏', '唇釉', '粉底', '气垫', '眼影', '腮红', '彩妆'])) return (49, 329);
+    if (has(['褪黑素', '睡眠'])) return (69, 169);
+    if (has(['辅酶', 'q10'])) return (99, 299);
+    if (has(['鱼油', 'dha'])) return (89, 269);
+    if (has(['益生菌', '活菌'])) return (69, 199);
+    if (has(['维生素', '钙片', '维c', '维b', '甲钴胺', '叶黄素', '胶囊', '片剂', '保健', '酵素', '酵母', '蛋白粉', '氨糖', '软糖'])) return (59, 259);
+    if (has(['咖啡', '奶茶', '茶饮', '零食', '饼干', '巧克力', '坚果', '麦片'])) return (19.9, 99);
+    if (has(['眼镜', '隐形眼镜', '美瞳', '滴眼液', '人工泪液'])) return (39, 199);
+    if (has(['净化器', '挂脖'])) return (199, 399);
+    if (has(['膏', '贴'])) return (29, 89);
+    return (29, 159);
+  }
+
+  /// 推荐价：按标题哈希确定性取区间内的价格（同一商品各处展示一致），
+  /// 尾数用 .9 / .9x 电商常见定价
+  static String marketPriceOf(String title) {
+    final (lo, hi) = _priceRangeOf(title);
+    final h = title.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
+    final base = lo + (hi - lo) * (h % 1000) / 1000;
+    // 取整到个位再减 0.1，得到 x9 / x9.9 风格定价
+    final whole = base.floor();
+    final price = base < 100 ? whole + 0.9 * ((h ~/ 7) % 2 == 0 ? 1 : 0.9) : whole.toDouble();
+    return price < 100 ? price.toStringAsFixed(2) : price.toStringAsFixed(0);
+  }
+
   /// 推荐区商品流：优先用素材池（图+名严格对应，按名称去重），不足时用内置 mock 补齐
   List<SearchResultItem> recommendGoods(int count, {Random? rand}) {
     final r = rand ?? Random();
@@ -366,12 +406,11 @@ class MaterialPoolProvider extends ChangeNotifier {
     for (var i = 0; i < count; i++) {
       if (i < unique.length) {
         final e = unique[i];
-        final price = (3 + r.nextInt(3000)) / 10 + r.nextInt(900);
         result.add(SearchResultItem(
           imageUrl: e.imagePath,
           title: e.title,
           shopName: '${_brandOf(e.title)}${_shopSuffixes[r.nextInt(_shopSuffixes.length)]}',
-          price: price.toStringAsFixed(price < 100 ? 2 : 1),
+          price: marketPriceOf(e.title),
           commentCount: _sales[r.nextInt(_sales.length)],
           goodRate: '${96 + r.nextInt(4)}%好评',
         ));
