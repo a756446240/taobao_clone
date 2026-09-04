@@ -883,6 +883,87 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
+  /// 抓包真实按钮序列（orderOps："再买一单*|加入购物车|评价|查看物流"，*=高亮）
+  List<(String, bool)> get _capturedOps {
+    if (shop.orderOps.isEmpty) return const [];
+    return shop.orderOps
+        .split('|')
+        .where((s) => s.isNotEmpty)
+        .map((s) => s.endsWith('*')
+            ? (s.substring(0, s.length - 1), true)
+            : (s, false))
+        .toList();
+  }
+
+  /// 抓包真实按钮行（v1.9.75 起）：顺序与高亮完全照搬淘宝下发数据
+  Widget _buildCapturedOpsButtons(BuildContext context) {
+    const gap = SizedBox(width: 8);
+    return Row(
+      children: [
+        // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
+        _moreBtn('更多', onDoubleTap: () => onEditItem(items.first)),
+        const Spacer(),
+        for (var i = 0; i < _capturedOps.length; i++) ...[
+          if (i > 0) gap,
+          _capturedOps[i].$2
+              ? _primaryBtn(_capturedOps[i].$1,
+                  onTap: () => _onOpTap(context, _capturedOps[i].$1))
+              : _outlineBtn(_capturedOps[i].$1,
+                  onTap: () => _onOpTap(context, _capturedOps[i].$1)),
+        ],
+      ],
+    );
+  }
+
+  /// 抓包按钮点击：已知按钮映射真实动作，平台功能类按钮仅提示
+  void _onOpTap(BuildContext context, String name) {
+    if (name == '评价' || name == '追加评价') {
+      _onRateTap(context);
+    } else if (name == '查看物流') {
+      _gotoLogistics(context, items.first);
+    } else if (name == '加入购物车' || name == '再买一单') {
+      _reAddToCart(context);
+    } else if (name == '闲鱼转卖') {
+      _xianyuToast(context);
+    } else if (name == '删除订单') {
+      _confirmDeleteOrder(context);
+    } else {
+      // 申请开票/延长收货/确认收货/修改地址等平台功能：演示样式仅提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$name为演示样式按钮'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// 「删除订单」：确认后移除该店铺卡片（与真实淘宝一致的二次确认）
+  void _confirmDeleteOrder(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('删除订单？', style: TextStyle(fontSize: 16)),
+        content: const Text('删除后不可恢复，确定要删除这笔订单吗？',
+            style: TextStyle(fontSize: 13)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('删除',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    ).then((ok) {
+      if (ok != true) return;
+      if (!context.mounted) return;
+      context.read<CartProvider>().removeShop(shop);
+    });
+  }
+
   /// 待评价 Tab 底部按钮行（对齐真实淘宝评价列表的 4 种组合，按店名哈希稳定随机）：
   /// 0：更多 + 闲鱼转卖 + 再买一单 + 评价（高亮）
   /// 1：更多 + 加入购物车 + 查看物流 + 评价（高亮）
@@ -1086,9 +1167,13 @@ class _OrderCard extends StatelessWidget {
                     ],
                   )
                 : rateTab
-                    ? _buildRateButtons(context)
+                    ? (shop.orderOps.isNotEmpty
+                        ? _buildCapturedOpsButtons(context)
+                        : _buildRateButtons(context))
                     : _isTradeSuccess
-                    ? _buildSuccessButtons(context)
+                    ? (shop.orderOps.isNotEmpty
+                        ? _buildCapturedOpsButtons(context)
+                        : _buildSuccessButtons(context))
                     : Row(
                     children: [
                       // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
