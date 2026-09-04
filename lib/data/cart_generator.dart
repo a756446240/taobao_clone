@@ -166,7 +166,7 @@ class CartGenerator {
         createTime: _formatTime(today),
         payTime: payTime,
         shipTime: _formatTime(today.add(const Duration(hours: 4))),
-        address: '中房房大厦C座1001室\n黑山灰 86-186****5652',
+        address: '中房大厦C座1001室\n黑山灰 86-186****5652',
         receiver: '黑山灰',
         isSigned: false,
         returnText: '7天无理由退货',
