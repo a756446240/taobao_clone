@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -87,14 +88,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     }
   }
 
-  /// 生成 4 开头 17 位退款编号（按订单号确定性派生，同一订单恒定）
+  /// 生成 4 开头 17 位退款编号
   String _genRefundNumber() {
-    final src = _item.orderNo.isNotEmpty ? _item.orderNo : _item.title;
-    var h = 0x9e3779b9;
+    final rand = Random();
     final sb = StringBuffer('4');
     for (var i = 0; i < 16; i++) {
-      h = (h * 31 + src.codeUnitAt(i % src.length)) & 0x7fffffff;
-      sb.write(h % 10);
+      sb.write(rand.nextInt(10));
     }
     return sb.toString();
   }
@@ -102,20 +101,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   bool get _isPending =>
       _item.refundStatus == '待商家退款' || _item.refundStatus == '退款中';
   bool get _isDone => !_isPending;
-
-  /// 寄件人（退货时即买家本人）：姓名脱敏 + 按订单号确定性派生的脱敏手机号
-  String get _senderDesc {
-    final name = _item.receiver.isNotEmpty ? _item.receiver : '淘小宝';
-    final masked = '${name.substring(0, 1)}*';
-    final digits = _item.orderNo.replaceAll(RegExp(r'\D'), '');
-    final tail = digits.length >= 4 ? digits.substring(digits.length - 4) : '6688';
-    return '$masked 138****$tail';
-  }
-
-  /// 寄件地址：取订单收货地址（买家从哪里寄回）
-  String get _senderAddress => _item.address.isNotEmpty
-      ? _item.address
-      : '浙江省杭州市西湖区文三路 100 号';
 
   void _startTimerIfPending() {
     _timer?.cancel();
@@ -169,6 +154,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         _isDone)
                       _buildInstantRefundBanner(),
                     _buildAmountCard(),
+                    if (_isPending && _item.showPickupCard)
+                      _buildPickupCard(),
                     if (_isPending && _item.refundLogistics.isNotEmpty)
                       _buildLogisticsCard(),
                     _buildShopRow(),
@@ -277,15 +264,122 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       );
     }
 
+    // 步骤文字可编辑（refundSteps 逗号分隔 3 段，空=默认）
+    final parts = _item.refundSteps.isEmpty
+        ? const ['申请退款', '商家处理', '退款结束']
+        : _item.refundSteps.split(',').map((e) => e.trim()).toList();
+    while (parts.length < 3) {
+      parts.add(['申请退款', '商家处理', '退款结束'][parts.length]);
+    }
     final done = _isDone;
-    return Row(
-      children: [
-        node('申请退款', true, false),
-        line(true),
-        node('商家处理', done, _isPending),
-        line(done),
-        node('退款结束', done, false),
-      ],
+    return GestureDetector(
+      onDoubleTap: _editSteps,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          node(parts[0], true, false),
+          line(true),
+          node(parts[1], done, _isPending),
+          line(done),
+          node(parts[2], done, false),
+        ],
+      ),
+    );
+  }
+
+  // ============ 寄回商品卡（退款进行中；取件码/保障/时间/退货宝均可双击编辑） ============
+  String get _pickupCode => _item.pickupCode.isEmpty ? '6033' : _item.pickupCode;
+  String get _pickupGuarantee => _item.pickupGuarantee.isEmpty
+      ? '主动保障 本单享主动保障服务，平台同意退货'
+      : _item.pickupGuarantee;
+  String get _pickupTime => _item.pickupTimeText.isEmpty
+      ? '今天 17:00-19:00 上门取件'
+      : _item.pickupTimeText;
+  String get _pickupInsurance => _item.pickupInsuranceText.isEmpty
+      ? '退货宝最高可抵 ¥6.02，88VIP可继续抵'
+      : _item.pickupInsuranceText;
+
+  Widget _buildPickupCard() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 取件码（双击编辑）
+          GestureDetector(
+            onDoubleTap: _editPickupCode,
+            child: Center(
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1A1A1A)),
+                  children: [
+                    const TextSpan(
+                        text: '取件码 ',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w600)),
+                    TextSpan(text: _pickupCode),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          // 主动保障（双击编辑）
+          GestureDetector(
+            onDoubleTap: _editPickupGuarantee,
+            child: Center(
+              child: Text(_pickupGuarantee,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFFFF5000))),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
+          const SizedBox(height: 10),
+          // 等待快递员上门时间（双击编辑）
+          GestureDetector(
+            onDoubleTap: _editPickupTime,
+            child: Row(
+              children: [
+                const Icon(Icons.schedule,
+                    size: 15, color: Color(0xFFFF5000)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('等待快递员 $_pickupTime',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A))),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 退货宝抵扣（双击编辑）
+          GestureDetector(
+            onDoubleTap: _editPickupInsurance,
+            child: Row(
+              children: [
+                const Icon(Icons.local_shipping_outlined,
+                    size: 15, color: Color(0xFF999999)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(_pickupInsurance,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF999999))),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -849,19 +943,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 推荐商品（确定性选取） ============
+  // ============ 推荐商品（AI 随机） ============
   Widget _buildRecommendCard() {
-    // 按订单号确定性轮换取 6 个：同一订单每次 build 结果一致，不再滚动闪烁
-    const allGoods = MockData.guessLikeGoods;
-    final seedSrc = _item.orderNo.isNotEmpty ? _item.orderNo : _item.title;
-    var seed = 0;
-    for (final c in seedSrc.codeUnits) {
-      seed = (seed * 31 + c) & 0x7fffffff;
-    }
-    final goods = <SearchResultItem>[
-      for (var i = 0; i < 6 && allGoods.isNotEmpty; i++)
-        allGoods[(seed + i * 5) % allGoods.length],
-    ];
+    // AI 随机：每次 build 都从 MockData 随机抽 6 个（实际产品可加缓存避免每次滚动都换）
+    final allGoods = MockData.guessLikeGoods.toList();
+    allGoods.shuffle(Random());
+    final goods = allGoods.take(6).toList();
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -1073,8 +1160,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 const SizedBox(width: 8),
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
                 const SizedBox(width: 8),
-                _bigBtn('催处理',
-                    onTap: () => _toast('已提醒商家尽快处理，请耐心等待')),
+                _bigBtn('关闭退货', onTap: _confirmCloseReturn),
               ] else ...[
                 // 寄件详情（参考图 9 红框）
                 if (_item.showShipDetailBtn) ...[
@@ -1183,8 +1269,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               ),
               const SizedBox(height: 14),
               _shipRow('物流信息', _item.refundLogistics),
-              _shipRow('寄件人', _senderDesc),
-              _shipRow('寄件地址', _senderAddress),
+              _shipRow('寄件人', '张* 138****8888'),
+              _shipRow('寄件地址', '江苏省南京市江宁区诚信大道 88 号'),
               _shipRow('收件人', '${_shop.shopName}（退货仓）'),
               _shipRow('申请时间', _item.refundApplyTime),
               const SizedBox(height: 6),
@@ -1250,12 +1336,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                       backgroundColor: const Color(0xFFFF5000)),
                   onPressed: () {
                     Navigator.pop(ctx);
-                    setState(() {
-                      _item.refundStatus = '平台介入处理中';
-                      _item.refundTitle = '平台介入处理中';
-                      _item.refundSubtitle = '客服将在 48 小时内根据双方凭证做出判定';
-                    });
-                    context.read<CartProvider>().updateOrderItem(_item);
                     _toast('平台介入申请已提交，客服将在 48 小时内处理');
                   },
                   child: const Text('提交申请'),
@@ -1374,7 +1454,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改大标题', initial: _item.refundTitle)
         .then((v) {
-      if (!mounted) return;
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, refundTitle: v);
         setState(() {});
@@ -1383,11 +1462,107 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     });
   }
 
+  /// 关闭退货（进行中 → 退款结束，模拟撤销退货申请）
+  void _confirmCloseReturn() {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('关闭退货？', style: TextStyle(fontSize: 16)),
+        content: const Text('关闭后本次退货申请将结束，订单恢复正常。',
+            style: TextStyle(fontSize: 13, height: 1.5)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: const Text('再想想')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(c);
+              context.read<CartProvider>().updateOrderItem(
+                  _item, refundStatus: '退款结束');
+              setState(() {});
+              _toast('退货已关闭');
+            },
+            child: const Text('关闭退货',
+                style: TextStyle(color: Color(0xFFA32D2D))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 编辑步骤条文字（逗号分隔 3 段）
+  void _editSteps() {
+    DialogHelpers.showTextInput(context,
+            title: '修改步骤条（逗号分隔 3 段）',
+            initial: _item.refundSteps.isEmpty
+                ? '申请退款,商家处理,退款结束'
+                : _item.refundSteps)
+        .then((v) {
+      if (v != null && v.isNotEmpty) {
+        context.read<CartProvider>().updateOrderItem(_item, refundSteps: v);
+        setState(() {});
+        _toast('步骤条已修改');
+      }
+    });
+  }
+
+  void _editPickupCode() {
+    DialogHelpers.showTextInput(context,
+            title: '修改取件码', initial: _pickupCode)
+        .then((v) {
+      if (v != null && v.isNotEmpty) {
+        context.read<CartProvider>().updateOrderItem(_item, pickupCode: v);
+        setState(() {});
+        _toast('取件码已修改：$v');
+      }
+    });
+  }
+
+  void _editPickupGuarantee() {
+    DialogHelpers.showTextInput(context,
+            title: '修改主动保障文案', initial: _pickupGuarantee)
+        .then((v) {
+      if (v != null) {
+        context
+            .read<CartProvider>()
+            .updateOrderItem(_item, pickupGuarantee: v);
+        setState(() {});
+        _toast('主动保障文案已修改');
+      }
+    });
+  }
+
+  void _editPickupTime() {
+    DialogHelpers.showTextInput(context,
+            title: '修改上门取件时间', initial: _pickupTime)
+        .then((v) {
+      if (v != null) {
+        context
+            .read<CartProvider>()
+            .updateOrderItem(_item, pickupTimeText: v);
+        setState(() {});
+        _toast('取件时间已修改');
+      }
+    });
+  }
+
+  void _editPickupInsurance() {
+    DialogHelpers.showTextInput(context,
+            title: '修改退货宝抵扣文案', initial: _pickupInsurance)
+        .then((v) {
+      if (v != null) {
+        context
+            .read<CartProvider>()
+            .updateOrderItem(_item, pickupInsuranceText: v);
+        setState(() {});
+        _toast('退货宝文案已修改');
+      }
+    });
+  }
+
   void _editSubtitle() {
     DialogHelpers.showTextInput(context,
             title: '修改副标题（留空=自动生成）', initial: _item.refundSubtitle)
         .then((v) {
-      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderItem(_item, refundSubtitle: v);
         setState(() {});
@@ -1401,7 +1576,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             title: '修改退款金额',
             initial: _item.refundAmount.toStringAsFixed(2))
         .then((v) {
-      if (!mounted) return;
       final n = double.tryParse(v ?? '');
       if (n != null && n > 0) {
         context
@@ -1420,7 +1594,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       options: const ['支付宝', '银行卡', '微信支付', '花呗'],
       currentValue: _item.refundMethod,
     ).then((v) {
-      if (!mounted) return;
       if (v != null) {
         context.read<CartProvider>().updateOrderItem(_item, refundMethod: v);
         setState(() {});
@@ -1433,7 +1606,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改退款物流（留空=不显示）', initial: _item.refundLogistics)
         .then((v) {
-      if (!mounted) return;
       if (v != null) {
         context
             .read<CartProvider>()
@@ -1448,7 +1620,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   void _pickRefundReason() {
     showRefundReasonPicker(context, currentReason: _item.refundReason)
         .then((v) {
-      if (!mounted) return;
       if (v != null) {
         setState(() {
           _item.refundReason = v;
@@ -1573,6 +1744,22 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                           ? '寄件详情已显示'
                           : '寄件详情已隐藏');
                     }),
+                    _menuTile(ctx, Icons.linear_scale, '修改步骤条文字', _editSteps),
+                    _menuTile(ctx, Icons.pin_outlined, '修改取件码', _editPickupCode),
+                    _menuTile(ctx, Icons.verified_user_outlined, '修改主动保障文案',
+                        _editPickupGuarantee),
+                    _menuTile(ctx, Icons.schedule, '修改上门取件时间', _editPickupTime),
+                    _menuTile(ctx, Icons.savings_outlined, '修改退货宝抵扣文案',
+                        _editPickupInsurance),
+                    _menuTile(ctx, Icons.inventory_2_outlined, '切换"寄回商品卡"', () {
+                      setState(() {
+                        _item.showPickupCard = !_item.showPickupCard;
+                      });
+                      context.read<CartProvider>().updateOrderItem(_item);
+                      _toast(_item.showPickupCard
+                          ? '寄回商品卡已显示'
+                          : '寄回商品卡已隐藏');
+                    }),
                     ListTile(
                       leading: const Icon(Icons.delete_outline,
                           color: Color(0xFFA32D2D)),
@@ -1597,7 +1784,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     DialogHelpers.showTextInput(context,
             title: '修改退款编号（留空=重新生成）', initial: _item.refundNumber)
         .then((v) {
-      if (!mounted) return;
       if (v != null) {
         setState(() {
           _item.refundNumber = v.isEmpty ? _genRefundNumber() : v;
@@ -1618,10 +1804,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           : _item.refundStatus,
     ).then((v) {
       if (v == null) return;
-      if (!mounted) return;
       final provider = context.read<CartProvider>();
       provider.updateOrderStatus(_shop, _item, v);
       final isRefund = CartProvider.statusCategory(v) == '退款/售后';
+      if (!mounted) return;
       if (isRefund) {
         setState(() {});
         _startTimerIfPending();
