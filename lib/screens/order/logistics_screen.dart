@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -322,60 +324,83 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     );
   }
 
-  /// 可缩放地图（双指缩放/拖动）：自绘风格化地图 + 货车标记 + 预计送达气泡
+  /// 真实地图（v1.9.78 起，对齐手机淘宝 1:1）：高德在线瓦片 + 可缩放拖动，
+  /// 中心 = 淄博中房大厦（华光路）。瓦片加载失败时底层自绘地图兜底。
+  static const _ziboCenter = LatLng(36.8135, 118.0548);
+
   Widget _buildMap() {
-    return LayoutBuilder(
-      builder: (_, c) => InteractiveViewer(
-        minScale: 1,
-        maxScale: 3.5,
-        boundaryMargin: const EdgeInsets.all(120),
-        child: SizedBox(
-          width: c.maxWidth * 1.25,
-          height: c.maxHeight * 1.25,
-          child: Stack(
+    return Stack(
+      children: [
+        // 兜底：自绘风格化地图（瓦片无网/加载慢时可见）
+        Positioned.fill(child: CustomPaint(painter: _ZiboMapPainter())),
+        // 真实高德瓦片地图（缩放手感与淘宝一致）
+        Positioned.fill(
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: _ziboCenter,
+              initialZoom: 16,
+              minZoom: 10,
+              maxZoom: 18,
+              interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom |
+                      InteractiveFlag.drag |
+                      InteractiveFlag.doubleTapZoom),
+            ),
             children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _ZiboMapPainter()),
+              TileLayer(
+                urlTemplate:
+                    'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+                subdomains: const ['1', '2', '3', '4'],
+                userAgentPackageName: 'com.taobao.clone',
               ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(_etaBubble,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                    Container(width: 2, height: 8, color: AppColors.primary),
-                    const Icon(Icons.local_shipping,
-                        color: Color(0xFF5B3A29), size: 30),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFDDDDDD)),
-                      ),
-                      child: const Text('收  淄博市',
-                          style: TextStyle(
-                              fontSize: 10, color: Color(0xFF333333))),
-                    ),
-                  ],
-                ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _ziboCenter,
+                    width: 120,
+                    height: 110,
+                    alignment: Alignment.topCenter,
+                    child: _mapMarker(),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      ),
+      ],
+    );
+  }
+
+  /// 地图中心标记：预计送达气泡 + 货车 + 收货地（对齐真实淘宝）
+  Widget _mapMarker() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(_etaBubble,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600)),
+        ),
+        Container(width: 2, height: 8, color: AppColors.primary),
+        const Icon(Icons.local_shipping, color: Color(0xFF5B3A29), size: 30),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: const Color(0xFFDDDDDD)),
+          ),
+          child: const Text('收  淄博市',
+              style: TextStyle(fontSize: 10, color: Color(0xFF333333))),
+        ),
+      ],
     );
   }
 
