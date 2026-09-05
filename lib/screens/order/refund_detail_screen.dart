@@ -58,11 +58,28 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// 补齐退款字段默认值
   void _ensureDefaults() {
+    // v1.9.81：退款状态始终按订单状态标题纠正——
+    // 之前仅在 refundStatus 为空时推断，若订单经「修改状态标题」改成
+    // 待商家退款/退款中，refundStatus 仍是默认的「退款成功」，导致退款页状态不对
+    final st = _item.statusTitle;
+    if (st.contains('待商家退款') || st.contains('退款中')) {
+      _item.refundStatus = '待商家退款';
+    } else if (st.contains('退款成功')) {
+      _item.refundStatus = '退款成功';
+    } else if (st.contains('退款结束')) {
+      _item.refundStatus = '退款结束';
+    }
     if (_item.refundStatus.isEmpty) {
       _item.refundStatus =
-          _item.statusTitle.contains('待商家退款') ? '待商家退款' : '退款成功';
+          st.contains('待商家退款') ? '待商家退款' : '退款成功';
     }
-    if (_item.refundTitle.isEmpty) _item.refundTitle = _item.refundStatus;
+    // 标题未自定义过时跟随状态（修正旧数据里标题与状态不一致）
+    if (_item.refundTitle.isEmpty ||
+        _item.refundTitle == '退款成功' ||
+        _item.refundTitle == '退款结束' ||
+        _item.refundTitle == '待商家退款') {
+      _item.refundTitle = _item.refundStatus;
+    }
     if (_item.refundMethod.isEmpty) {
       _item.refundMethod =
           _item.paymentMethod.contains('微信') ? '微信支付' : '支付宝';
@@ -232,7 +249,23 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           const SizedBox(height: 6),
           GestureDetector(
             onDoubleTap: _editSubtitle,
-            child: _subtitleIsGuarantee
+            child: _isPending
+                // v1.9.81：待商家退款倒计时对齐真实淘宝——橙框横幅样式
+                ? Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7F2),
+                      border: Border.all(
+                          color: const Color(0xFFFF5000), width: 0.8),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(_subtitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFFFF5000))),
+                  )
+                : _subtitleIsGuarantee
                 // 主动保障：橙色加粗标签 + 橙色正文（照搬真实淘宝退款成功页）
                 ? Text.rich(
                     const TextSpan(children: [
