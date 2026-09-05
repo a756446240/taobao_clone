@@ -1574,14 +1574,12 @@ class _OrderItemTile extends StatelessWidget {
                         .copyWith(color: AppColors.subText),
                   ),
                   const SizedBox(height: 6),
-                  // 保障标签：与详情页 detailTags 同一份数据，编辑后两边同步
+                  // 保障标签（v1.9.81）：displayTags 合并去重——
+                  // 「7天无理由」与「7天无理由退货」只保留后者；抓包无标签自动补默认
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children: [
-                      ...item.detailTags.map(_greenTag),
-                      _greenTag(item.returnText),
-                    ],
+                    children: item.displayTags.map(_greenTag).toList(),
                   ),
                   const SizedBox(height: 8),
                   // "平台加补后 / 领消费券后约" 价格行已按需求删除
