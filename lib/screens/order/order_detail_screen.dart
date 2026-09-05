@@ -760,13 +760,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Wrap(
                       spacing: 4,
                       runSpacing: 4,
-                      // v1.9.80：与订单列表卡片绿标签同源同步——
-                      // detailTags + 退货标签（7天无理由退货），两处显示一致
-                      children: [
-                        ..._item.detailTags.map(_redTag),
-                        if (!_item.detailTags.contains(_item.returnText))
-                          _redTag(_item.returnText),
-                      ],
+                      // v1.9.81：displayTags 合并去重——「7天无理由」与
+                      // 「7天无理由退货」只保留后者；抓包无标签自动补默认
+                      children: _item.displayTags.map(_redTag).toList(),
                     ),
                     const SizedBox(height: 8),
                     Row(
