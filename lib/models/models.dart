@@ -158,6 +158,27 @@ class OrderItem {
   bool isSigned; // 是否已签收
   String returnText; // 7天无理由/15天退货 文字
   String deliveryText; // 签收/派送文字
+
+  /// 展示用服务标签（v1.9.81：列表绿标签/详情红标签同源）
+  /// detailTags + returnText 合并后按"包含关系"去重——
+  /// 如「7天无理由」被「7天无理由退货」覆盖时只保留更具体的后者；
+  /// 全部为空时自动补默认标签（抓包订单无标签信息也能对齐真实淘宝）
+  List<String> get displayTags {
+    final raw = <String>[
+      ...detailTags,
+      if (returnText.trim().isNotEmpty) returnText.trim(),
+    ];
+    final result = <String>[];
+    for (final t in raw) {
+      final tag = t.trim();
+      if (tag.isEmpty) continue;
+      final covered = raw.any((o) => o.trim() != tag && o.trim().contains(tag));
+      if (!covered && !result.contains(tag)) result.add(tag);
+    }
+    if (result.isEmpty) return const ['极速退款', '7天无理由退货'];
+    return result;
+  }
+
   bool showOnTime; // 是否显示"准时送达"行
   String onTimeText; // 准时送达文字
   int onTimeStyle; // 准时送达卡片样式：0单排"预计送达"/1双排"承诺+送货上门"（-1=随机）
