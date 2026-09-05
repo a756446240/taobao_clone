@@ -11,7 +11,6 @@ import '../../providers/favorites_provider.dart';
 import '../../providers/footprints_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../widgets/app_image.dart';
-import '../../widgets/dialog_helpers.dart';
 import '../../widgets/product_card.dart';
 import 'qa_screen.dart';
 import 'reviews_screen.dart';
@@ -57,6 +56,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return (p * 1.4).toStringAsFixed(0);
   }
 
+  /// 标题哈希（同一商品稳定）：用于已售/标签/发货地等展示值
+  int get _hash {
+    var h = 0;
+    for (final c in widget.item.title.codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    return h;
+  }
+
+  /// 已售件数（v1.9.80，对齐真实淘宝价格区右侧"已售 xx"）
+  String get _soldText {
+    final n = _hash % 9000 + 56;
+    return n >= 10000 ? '已售 ${(n / 10000).toStringAsFixed(1)}万+' : '已售 $n';
+  }
+
   @override
   Widget build(BuildContext context) {
     final overrideUrl =
@@ -74,10 +88,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 _buildGallery(imageUrl),
                 _buildPriceBanner(),
+                _buildPromoRows(),
                 _buildTitleBlock(),
+                _buildTagPills(),
                 const SizedBox(height: 8),
+                _buildShipRow(),
                 _buildServiceRow(),
                 _buildSelectRow(),
+                const SizedBox(height: 8),
+                _buildHighlightBox(),
                 const SizedBox(height: 8),
                 _buildReviewBlock(),
                 const SizedBox(height: 8),
@@ -167,23 +186,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               final now = _toggleCollect();
               _toast(now ? '已加入收藏' : '已取消收藏');
             }),
-            _moreAction(ctx, Icons.flag_outlined, '举报商品', () async {
-              final reason = await DialogHelpers.showOptionPicker(
-                context,
-                title: '选择举报原因',
-                options: const [
-                  '假冒伪劣',
-                  '虚假宣传',
-                  '价格欺诈',
-                  '违禁商品',
-                  '侵犯知识产权',
-                  '其他问题',
-                ],
-                currentValue: '',
-              );
-              if (reason != null) {
-                _toast('已提交「$reason」举报，平台将尽快核实');
-              }
+            _moreAction(ctx, Icons.flag_outlined, '举报商品', () {
+              _toast('已收到举报，平台将尽快核实');
             }),
             _moreAction(ctx, Icons.home_outlined, '返回首页', () {
               Navigator.of(context).popUntil((r) => r.isFirst);
@@ -357,16 +361,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (widget.item.commentCount.isNotEmpty)
-                Text(widget.item.commentCount,
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 12)),
+              Text(_soldText,
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 12)),
               const SizedBox(height: 2),
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(3),
                 ),
                 child: const Text('大促价保',
@@ -374,6 +377,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 已享受/可再享 优惠行（v1.9.80，对齐真实淘宝） ============
+  Widget _buildPromoRows() {
+    final p = double.tryParse(widget.item.price) ?? 0;
+    final coinBack = (p * 0.02).clamp(0.1, 9.9);
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+      child: Column(
+        children: [
+          _promoRow('已享受', '淘金币已抵${coinBack.toStringAsFixed(2)}元'),
+          const Divider(height: 1, color: Color(0xFFF5F5F5)),
+          _promoRow('可再享', '券满70减20 · 淘金币再抵2%'),
+        ],
+      ),
+    );
+  }
+
+  Widget _promoRow(String label, String content) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Text('$label：',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+          Expanded(
+            child: Text(content,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFFFF5000))),
+          ),
+          const Icon(Icons.chevron_right,
+              color: Color(0xFFC4C4C4), size: 16),
         ],
       ),
     );
@@ -408,6 +449,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         fontWeight: FontWeight.bold,
                         height: 1.35)),
               ),
+              // 送礼入口（对齐真实淘宝标题右侧）
+              Container(
+                margin: const EdgeInsets.only(left: 8, top: 2),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.card_giftcard,
+                        size: 12, color: Color(0xFF666666)),
+                    SizedBox(width: 2),
+                    Text('送礼',
+                        style: TextStyle(
+                            fontSize: 11, color: Color(0xFF666666))),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -431,12 +493,136 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ============ 标题下方标签胶囊（v1.9.80，对齐真实淘宝"我买过的宝贝"等） ============
+  Widget _buildTagPills() {
+    const pool = [
+      '我买过的宝贝',
+      '一管多用',
+      '深层激活',
+      '植物精粹',
+      '海外原装',
+      '正品保障',
+      '回头客多',
+      '顺丰包邮',
+    ];
+    final picks = <String>[];
+    for (var i = 0; i < pool.length; i++) {
+      if ((_hash >> i) & 1 == 1) picks.add(pool[i]);
+    }
+    if (picks.length < 3) {
+      picks
+        ..clear()
+        ..addAll(pool.take(4));
+    }
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final t in picks.take(5))
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(color: const Color(0xFFEEEEEE)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(t,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF666666))),
+                  if (t == '我买过的宝贝')
+                    const Icon(Icons.chevron_right,
+                        size: 12, color: Color(0xFF999999)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ============ 发货行（v1.9.80：48小时内发货 · 发货地 · 免运费） ============
+  Widget _buildShipRow() {
+    final from = widget.item.shipFrom.isNotEmpty
+        ? widget.item.shipFrom
+        : const ['广东广州', '辽宁沈阳', '浙江杭州', '上海'][_hash % 4];
+    final hours = const [24, 48, 48, 72][_hash % 4];
+    return _whiteRow(
+      title: '',
+      titleWidget: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_shipping_outlined,
+              size: 15, color: Color(0xFF999999)),
+          const SizedBox(width: 6),
+          Text('$hours小时内发货',
+              style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(width: 8),
+          Text(from,
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF999999))),
+          const SizedBox(width: 8),
+          const Text('快递: 免运费',
+              style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+        ],
+      ),
+      onTap: () {},
+    );
+  }
+
+  // ============ 划重点 粉色提示框（v1.9.80，对齐真实淘宝） ============
+  Widget _buildHighlightBox() {
+    const texts = [
+      '进口原装正品，支持专柜验货。批次新鲜，保质期充足，放心囤货。',
+      '海外直邮商品，下单后按批次清关发出，物流时效以页面展示为准。',
+      '本店热销款，回购率高。建议按周期囤货，组合装更划算。',
+    ];
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('划重点：',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF2E4D))),
+            Expanded(
+              child: Text(texts[_hash % texts.length],
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF666666),
+                      height: 1.4)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   // ============ 服务行 ============
   Widget _buildServiceRow() {
     return _whiteRow(
       title: '服务',
       child: Expanded(
-        child: Text('7天无理由 · 运费险 · 极速退款',
+        child: Text('退货宝 · 88VIP退货包运费 · 7天无理由退货 · 极速退款',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.small),
@@ -462,7 +648,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _whiteRow({
     required String title,
-    required Widget child,
+    Widget? child,
+    Widget? titleWidget,
     VoidCallback? onTap,
   }) {
     return GestureDetector(
@@ -473,11 +660,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            Text(title,
-                style: AppTextStyles.small
-                    .copyWith(color: AppColors.subText)),
-            const SizedBox(width: 16),
-            child,
+            if (title.isNotEmpty) ...[
+              Text(title,
+                  style: AppTextStyles.small
+                      .copyWith(color: AppColors.subText)),
+              const SizedBox(width: 16),
+            ],
+            if (titleWidget != null) Expanded(child: titleWidget),
+            if (child != null) child,
             const Icon(Icons.chevron_right,
                 color: Color(0xFFC4C4C4), size: 18),
           ],
@@ -530,7 +720,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     CircleAvatar(
                       radius: 12,
                       backgroundColor:
-                          AppColors.primary.withValues(alpha: 0.12),
+                          AppColors.primary.withOpacity(0.12),
                       child: Text(r.$1[0],
                           style: const TextStyle(
                               color: AppColors.primary, fontSize: 10)),
@@ -540,9 +730,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(r.$1,
-                              style: AppTextStyles.min
-                                  .copyWith(color: AppColors.subText)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(r.$1,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.min.copyWith(
+                                        color: AppColors.subText)),
+                              ),
+                              if (r.$1.startsWith('匿名') ||
+                                  _hash % 2 == 0) ...[
+                                const SizedBox(width: 3),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 2, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1A1A1A),
+                                    borderRadius:
+                                        BorderRadius.circular(2),
+                                  ),
+                                  child: const Text('88VIP',
+                                      style: TextStyle(
+                                          color: Color(0xFFFFD89E),
+                                          fontSize: 7,
+                                          fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Text(r.$2,
                               maxLines: 2,
@@ -747,7 +964,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               }),
               _bottomIcon(
                 _collected ? Icons.star : Icons.star_border,
-                '收藏',
+                // 收藏数展示（对齐真实淘宝底部收藏计数）
+                '${100 + _hash % 900}',
                 () {
                   final now = _toggleCollect();
                   _toast(now ? '已加入收藏' : '已取消收藏');
