@@ -309,30 +309,45 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     'cainiao': '菜鸟速递',
   };
 
-  /// 联网查询实时物流轨迹（快递100 移动端查询接口，失败返回 null）
+  /// 模拟手机浏览器请求头（快递100 对无 UA/Referer 的请求会拦截返回非 JSON）
+  static void _applyBrowserHeaders(HttpClientRequest req, String referer) {
+    req.headers.set(HttpHeaders.userAgentHeader,
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1');
+    req.headers.set(HttpHeaders.refererHeader, referer);
+    req.headers.set(HttpHeaders.acceptHeader,
+        'application/json, text/javascript, */*; q=0.01');
+  }
+
+  /// 联网查询实时物流轨迹（快递100 双接口尝试，失败返回 null）
   Future<List<Map<String, String>>?> _fetchTracesOnline(
       String comCode, String waybill) async {
-    try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 8);
-      final req = await client.getUrl(Uri.parse(
-          'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill'));
-      final resp = await req.close().timeout(const Duration(seconds: 8));
-      final body = await resp.transform(utf8.decoder).join();
-      client.close();
-      final j = jsonDecode(body);
-      if (j['status'] != '200') return null;
-      final data = j['data'];
-      if (data is! List || data.isEmpty) return null;
-      return [
-        for (final e in data)
-          {
-            'time': (e['time'] ?? '').toString(),
-            'tag': '',
-            'text': (e['context'] ?? '').toString(),
-          }
-      ];
-    } catch (_) {}
+    final urls = [
+      'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill',
+      'https://www.kuaidi100.com/query?type=$comCode&postid=$waybill&temp=${DateTime.now().millisecondsSinceEpoch / 1000}',
+    ];
+    for (final url in urls) {
+      try {
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 8);
+        final req = await client.getUrl(Uri.parse(url));
+        _applyBrowserHeaders(req, 'https://m.kuaidi100.com/');
+        final resp = await req.close().timeout(const Duration(seconds: 8));
+        final body = await resp.transform(utf8.decoder).join();
+        client.close();
+        final j = jsonDecode(body);
+        if (j is! Map || j['status']?.toString() != '200') continue;
+        final data = j['data'];
+        if (data is! List || data.isEmpty) continue;
+        return [
+          for (final e in data)
+            {
+              'time': (e['time'] ?? '').toString(),
+              'tag': '',
+              'text': (e['context'] ?? '').toString(),
+            }
+        ];
+      } catch (_) {}
+    }
     return null;
   }
 
@@ -391,6 +406,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                           ..connectionTimeout = const Duration(seconds: 8);
                         final req = await client.getUrl(Uri.parse(
                             'https://www.kuaidi100.com/autonumber/autoComNum?text=$no'));
+                        _applyBrowserHeaders(
+                            req, 'https://www.kuaidi100.com/');
                         final resp = await req
                             .close()
                             .timeout(const Duration(seconds: 8));
@@ -429,11 +446,15 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                       if (!mounted) return;
                       Navigator.of(ctx).pop();
                       setState(() {});
+                      // v1.9.81：失败原因明示，不再静默保留假物流
+                      final msg = gotReal
+                          ? '单号已更新，已联网拉取实时物流'
+                          : (comCode == null || comCode.isEmpty)
+                              ? '已改用「$company」，但联网识别失败（请检查网络），保留原轨迹'
+                              : '已识别「$company」，实时轨迹拉取失败（快递100接口限流），保留原轨迹';
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(gotReal
-                            ? '单号已更新，已联网拉取实时物流'
-                            : '单号已更新（实时物流拉取失败，保留原轨迹）'),
-                        duration: const Duration(seconds: 2),
+                        content: Text(msg),
+                        duration: const Duration(seconds: 3),
                       ));
                     },
               child: const Text('保存'),
