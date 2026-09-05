@@ -257,34 +257,39 @@ class _AddressScreenState extends State<AddressScreen> {
   /// v1.9.74：弃用 Dismissible（松手立即回弹点不到按钮），
   /// 改为自绘滑动容器——滑开停住、点卡片或再右滑收回
   Widget _buildSwipeCard(_Address a, int index) {
-    return _SwipeReveal(
-      key: ObjectKey(a),
-      actionsWidth: 192, // 3 × 64
-      actions: [
-        _swipeAction(
-          label: '设为默认',
-          icon: Icons.check_circle_outline,
-          color: const Color(0xFFFF8C00),
-          onTap: () => _setDefault(a),
-        ),
-        _swipeAction(
-          label: '复制',
-          icon: Icons.copy_outlined,
-          color: const Color(0xFF3B82F6),
-          onTap: () => _copyAddress(a),
-        ),
-        _swipeAction(
-          label: '删除',
-          icon: Icons.delete_outline,
-          color: const Color(0xFFFF3B30),
-          onTap: () => _deleteAt(index),
-          radius: const BorderRadius.only(
-            topRight: Radius.circular(8),
-            bottomRight: Radius.circular(8),
+    // v1.9.80：卡片间距移到滑容器外——原来 margin 在卡片内部，
+    // 两卡片之间的 8px 空白会漏出底层「设为默认/复制/删除」按钮颜色
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _SwipeReveal(
+        key: ObjectKey(a),
+        actionsWidth: 192, // 3 × 64
+        actions: [
+          _swipeAction(
+            label: '设为默认',
+            icon: Icons.check_circle_outline,
+            color: const Color(0xFFFF8C00),
+            onTap: () => _setDefault(a),
           ),
-        ),
-      ],
-      child: _buildCard(a),
+          _swipeAction(
+            label: '复制',
+            icon: Icons.copy_outlined,
+            color: const Color(0xFF3B82F6),
+            onTap: () => _copyAddress(a),
+          ),
+          _swipeAction(
+            label: '删除',
+            icon: Icons.delete_outline,
+            color: const Color(0xFFFF3B30),
+            onTap: () => _deleteAt(index),
+            radius: const BorderRadius.only(
+              topRight: Radius.circular(8),
+              bottomRight: Radius.circular(8),
+            ),
+          ),
+        ],
+        child: _buildCard(a),
+      ),
     );
   }
 
@@ -315,7 +320,6 @@ class _AddressScreenState extends State<AddressScreen> {
 
   Widget _buildCard(_Address a) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
