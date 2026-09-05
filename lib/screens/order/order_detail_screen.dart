@@ -19,6 +19,8 @@ import '../../widgets/image_picker_helper.dart';
 import 'refund_detail_screen.dart';
 import 'rate_order_screen.dart';
 import 'logistics_screen.dart';
+import 'complaint_screen.dart';
+import '../message/chat_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
 class OrderDetailScreen extends StatefulWidget {
@@ -758,7 +760,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     Wrap(
                       spacing: 4,
                       runSpacing: 4,
-                      children: _item.detailTags.map(_redTag).toList(),
+                      // v1.9.80：与订单列表卡片绿标签同源同步——
+                      // detailTags + 退货标签（7天无理由退货），两处显示一致
+                      children: [
+                        ..._item.detailTags.map(_redTag),
+                        if (!_item.detailTags.contains(_item.returnText))
+                          _redTag(_item.returnText),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -1405,56 +1413,202 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 底部栏 ============
+  // ============ 底部栏（v1.9.80 按状态照搬真实淘宝） ============
+  // 待发货：客服/投诉 + 催发货 + 修改地址
+  // 已发货/运输中：客服/投诉 + 查看详情
+  // 已签收待确认：客服/更多 + 延长收货 + 查看物流 + 确认收货
+  // 待评价：客服/更多 + 评价 + 加入购物车 + 再买一单
   Widget _buildBottomBar() {
+    final category = CartProvider.statusCategory(
+        _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
+    final isSignedPending = category == '待收货' &&
+        (_item.statusTitle.contains('签收') ||
+            _item.statusTitle.contains('待确认收货'));
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        children: [
-          _bottomAction(Icons.headset_mic_outlined, '客服'),
-          _bottomAction(Icons.report_problem_outlined,
-              _isWaitRate ? '更多' : '投诉'),
-          const Spacer(),
-          if (_isPendingShip) ...[
-            _primaryBtn('催发货', color: const Color(0xFFff5000)),
-            const SizedBox(width: 8),
-            _primaryBtn('修改地址', color: const Color(0xFFff0036)),
-          ] else if (_isWaitRate) ...[
-            // 待评价（交易成功）订单底栏对齐真实淘宝：评价 + 加入购物车 + 再买一单
-            _outlineBtn('评价', onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      RateOrderScreen(shop: _shop, item: _item),
-                ),
-              );
-            }),
-            const SizedBox(width: 8),
-            _outlineBtn('加入购物车', onTap: _reAddToCart),
-            const SizedBox(width: 8),
-            _primaryBtn('再买一单',
-                color: const Color(0xFFff5000), onTap: _reAddToCart),
-          ] else
-            Expanded(
-              child: _primaryBtn('查看详情', color: const Color(0xFFff5000)),
-            ),
-        ],
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              _bottomAction(Icons.headset_mic_outlined, '客服',
+                  onTap: _gotoServiceChat),
+              _bottomAction(
+                  _isWaitRate || isSignedPending
+                      ? Icons.more_horiz
+                      : Icons.report_problem_outlined,
+                  _isWaitRate || isSignedPending ? '更多' : '投诉',
+                  onTap: _isWaitRate || isSignedPending
+                      ? _showMoreSheet
+                      : _gotoComplaint),
+              const Spacer(),
+              if (_isPendingShip) ...[
+                _outlineBtn('催发货', onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('已提醒商家尽快发货'),
+                    duration: Duration(seconds: 1),
+                  ));
+                }),
+                const SizedBox(width: 8),
+                _primaryBtn('修改地址',
+                    color: const Color(0xFFff5000), onTap: _editAddress),
+              ] else if (_isWaitRate) ...[
+                // 待评价（交易成功）订单底栏对齐真实淘宝：评价 + 加入购物车 + 再买一单
+                _outlineBtn('评价', onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RateOrderScreen(shop: _shop, item: _item),
+                    ),
+                  );
+                }),
+                const SizedBox(width: 8),
+                _outlineBtn('加入购物车', onTap: _reAddToCart),
+                const SizedBox(width: 8),
+                _primaryBtn('再买一单',
+                    color: const Color(0xFFff5000), onTap: _reAddToCart),
+              ] else if (isSignedPending) ...[
+                // 已签收待确认收货（对齐真实淘宝）
+                _outlineBtn('延长收货', onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('已延长收货时间 3 天'),
+                    duration: Duration(seconds: 1),
+                  ));
+                }),
+                const SizedBox(width: 8),
+                _outlineBtn('查看物流', onTap: _gotoLogistics),
+                const SizedBox(width: 8),
+                _primaryBtn('确认收货', color: const Color(0xFFff5000),
+                    onTap: () {
+                  context.read<CartProvider>().markSigned(_shop, _item);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('已确认收货'),
+                    duration: Duration(seconds: 1),
+                  ));
+                }),
+              ] else
+                _primaryBtn('查看详情',
+                    color: const Color(0xFFff5000), onTap: () {}),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _bottomAction(IconData icon, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: const Color(0xFF666666), size: 22),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(color: Color(0xFF666666), fontSize: 10)),
-        ],
+  /// 底部「客服」→ 旺旺聊天页（照搬真实淘宝店铺客服会话）
+  void _gotoServiceChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          conversation: Conversation(
+            avatar: '',
+            title: _shop.shopName,
+            description: '店铺客服在线',
+            createAt: '',
+          ),
+          accentColor: const Color(0xFFFF5000),
+        ),
+      ),
+    );
+  }
+
+  /// 底部「投诉」→ 投诉商家页
+  void _gotoComplaint() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ComplaintScreen(shop: _shop, item: _item),
+      ),
+    );
+  }
+
+  /// 底部「更多」→ 更多操作弹层
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.local_shipping_outlined, size: 22),
+              title: const Text('查看物流', style: TextStyle(fontSize: 14)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _gotoLogistics();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline,
+                  size: 22, color: Color(0xFFff0036)),
+              title: const Text('删除订单',
+                  style: TextStyle(fontSize: 14, color: Color(0xFFff0036))),
+              onTap: () {
+                context.read<CartProvider>().removeItem(_item);
+                Navigator.of(ctx).pop();
+                Navigator.of(context).pop();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _gotoLogistics() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            LogisticsScreen(item: _item, shopName: _shop.shopName),
+      ),
+    );
+  }
+
+  /// 修改地址（底部按钮与地址区双击共用）
+  void _editAddress() {
+    final provider = context.read<CartProvider>();
+    _editText('修改地址（第一行收件人，第二行起地址）',
+        '${_item.receiver}\n${_item.address}', (v) {
+      final lines = v
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      if (lines.isNotEmpty) {
+        provider.updateOrderItem(_item, receiver: lines.first);
+      }
+      if (lines.length > 1) {
+        provider.updateOrderItem(_item, address: lines.sublist(1).join('\n'));
+      }
+    }, maxLines: 3);
+  }
+
+  Widget _bottomAction(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: const Color(0xFF666666), size: 22),
+            const SizedBox(height: 2),
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFF666666), fontSize: 10)),
+          ],
+        ),
       ),
     );
   }
@@ -1734,9 +1888,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _editTile(Icons.title, '修改状态标题', () {
                         _showStatusPicker();
                       }),
-                      _editTile(Icons.timelapse, '修改倒计时', () {
-                        _editCountdown();
-                      }),
+                      // 倒计时只在待收货类状态可见，其它状态下修改无效（不显示该入口）
+                      if (CartProvider.statusCategory(_item.statusTitle) ==
+                          '待收货')
+                        _editTile(Icons.timelapse, '修改倒计时', () {
+                          _editCountdown();
+                        }),
                       _editTile(Icons.local_shipping, '修改物流状态', () {
                         _showOptionPicker(
                           title: '修改物流状态',
@@ -1808,16 +1965,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               onTimeStyle: options.indexOf(v) - 1);
                         });
                       }),
-                      _switchTile(Icons.visibility_off, '隐藏"平台加补后"价',
-                          value: !_item.showPlatformPriceRow, onChanged: (v) {
-                        provider.updateOrderItem(_item, showPlatformPriceRow: !v);
-                        setSheetState(() {});
-                      }),
-                      _switchTile(Icons.visibility_off, '隐藏"领券后"价',
-                          value: !_item.showCouponPriceRow, onChanged: (v) {
-                        provider.updateOrderItem(_item, showCouponPriceRow: !v);
-                        setSheetState(() {});
-                      }),
+                      // v1.9.80：「平台加补后/领券后」价格行已从列表卡片删除，
+                      // 对应的两个隐藏开关无效，移除避免误导
                       _switchTile(Icons.visibility_off, '隐藏"进口税"行',
                           value: !_item.showTaxInfoLine, onChanged: (v) {
                         provider.updateOrderItem(_item, showTaxInfoLine: !v);
