@@ -1263,7 +1263,9 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 底部栏 ============
+  // ============ 底部栏（v1.9.80 照搬真实淘宝） ============
+  // 退款成功/结束：卖家 + 钱款去向（橙色实心）
+  // 退款进行中：卖家 + 平台介入 + 关闭退货（白底描边）
   Widget _buildBottomBar() {
     return Container(
       decoration: BoxDecoration(
@@ -1276,25 +1278,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _bottomIcon(Icons.support_agent, '客服',
+              _bottomIcon(Icons.tag_faces, '卖家',
                   onTap: _gotoServiceChat),
-              _bottomIcon(Icons.help_outline, '帮助中心',
-                  onTap: _showHelpSheet),
               const Spacer(),
               if (_isPending) ...[
-                _smallBtn('寄件详情', onTap: _showShipDetailSheet),
-                const SizedBox(width: 8),
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
                 const SizedBox(width: 8),
-                _bigBtn('关闭退货', onTap: _confirmCloseReturn),
+                _smallBtn('关闭退货', onTap: _confirmCloseReturn),
               ] else ...[
-                // 寄件详情（参考图 9 红框）
-                if (_item.showShipDetailBtn) ...[
-                  _smallBtn('寄件详情', onTap: _showShipDetailSheet),
-                  const SizedBox(width: 8),
-                ],
-                _smallBtn('删除记录', onTap: _confirmDelete),
-                const SizedBox(width: 8),
                 _bigBtn('钱款去向', onTap: _showMoneyFlowSheet),
               ],
             ],
