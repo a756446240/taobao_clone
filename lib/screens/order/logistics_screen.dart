@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/cart_provider.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
@@ -168,7 +170,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     final create = _parseT(it?.createTime ?? '') ?? DateTime.now();
     final pay = _parseT(it?.payTime ?? '');
     final ship = _parseT(it?.shipTime ?? '') ??
-        (pay ?? create).add(const Duration(hours: 8));
+        (pay ?? create).add(const Duration(hours: 24));
     final traces = <_TraceNode>[];
     if (it != null && it.logistics.isNotEmpty) {
       traces.add(_TraceNode(it.logistics, '最新',
@@ -234,7 +236,31 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return '95338';
   }
 
-  /// 快递公司 logo：抓包官方 logo 优先（v1.9.79），缺省首字色块
+  /// 快递公司品牌色（对齐真实淘宝物流页圆形头像底色）
+  static const _brandColors = {
+    '顺丰': Color(0xFF7B5AA6),
+    '圆通': Color(0xFF5B6ABF),
+    '中通': Color(0xFF4A90D9),
+    '申通': Color(0xFFE8541E),
+    '韵达': Color(0xFFF7B500),
+    '京东': Color(0xFFE1251B),
+    '邮政': Color(0xFF2E8B57),
+    'EMS': Color(0xFF2E8B57),
+    '极兔': Color(0xFFE1251B),
+    '百世': Color(0xFF3B82F6),
+    '德邦': Color(0xFF1E50A2),
+    '丹鸟': Color(0xFFFF8C00),
+    '菜鸟': Color(0xFF4A90D9),
+  };
+
+  Color get _brandColor {
+    for (final e in _brandColors.entries) {
+      if (_company.contains(e.key)) return e.value;
+    }
+    return const Color(0xFF7B5AA6);
+  }
+
+  /// 快递公司 logo：抓包官方 logo 优先（v1.9.79），缺省品牌色首字圆标
   Widget _courierLogo(double size) {
     final logo = item?.shipLogo ?? '';
     if (logo.isNotEmpty) {
@@ -243,8 +269,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        color: Color(0xFF7B5AA6),
+      decoration: BoxDecoration(
+        color: _brandColor,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -260,6 +286,265 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         content: Text('$label已复制'),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ============ v1.9.80：双击公司行改单号（可联网识别公司+实时物流） ============
+
+  /// 快递100 comCode → 中文公司名
+  static const _comCodeNames = {
+    'shunfeng': '顺丰速运',
+    'yuantong': '圆通速递',
+    'zhongtong': '中通快递',
+    'shentong': '申通快递',
+    'yunda': '韵达快递',
+    'jd': '京东物流',
+    'youzhengguonei': '邮政快递包裹',
+    'ems': 'EMS',
+    'jtexpress': '极兔速递',
+    'huitongkuaidi': '百世快递',
+    'debangwuliu': '德邦快递',
+    'danniao': '丹鸟',
+    'cainiao': '菜鸟速递',
+  };
+
+  /// 联网查询实时物流轨迹（快递100 移动端查询接口，失败返回 null）
+  Future<List<Map<String, String>>?> _fetchTracesOnline(
+      String comCode, String waybill) async {
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 8);
+      final req = await client.getUrl(Uri.parse(
+          'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill'));
+      final resp = await req.close().timeout(const Duration(seconds: 8));
+      final body = await resp.transform(utf8.decoder).join();
+      client.close();
+      final j = jsonDecode(body);
+      if (j['status'] != '200') return null;
+      final data = j['data'];
+      if (data is! List || data.isEmpty) return null;
+      return [
+        for (final e in data)
+          {
+            'time': (e['time'] ?? '').toString(),
+            'tag': '',
+            'text': (e['context'] ?? '').toString(),
+          }
+      ];
+    } catch (_) {}
+    return null;
+  }
+
+  /// 双击公司/单号行：修改快递单号（可选联网识别公司并拉取实时物流）
+  void _editWaybill() {
+    final it = item;
+    if (it == null) return;
+    final ctrl = TextEditingController(text: _waybillNo);
+    var detecting = false;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('修改快递单号', style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                decoration: const InputDecoration(
+                  labelText: '快递单号',
+                  hintText: '输入新单号，自动识别快递公司',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                detecting ? '正在联网识别…' : '保存时自动识别公司并尝试拉取实时物流',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: detecting
+                  ? null
+                  : () async {
+                      final no = ctrl.text.trim();
+                      if (no.isEmpty) return;
+                      setDlg(() => detecting = true);
+                      final provider = context.read<CartProvider>();
+                      // 1) 本地按前缀推断，再联网识别覆盖
+                      var company = no.startsWith('YT')
+                          ? '圆通速递'
+                          : no.startsWith('SF')
+                              ? '顺丰速运'
+                              : (no.startsWith('ZTO') || no.startsWith('7'))
+                                  ? '中通快递'
+                                  : it.shipCompany;
+                      String? comCode;
+                      try {
+                        final client = HttpClient()
+                          ..connectionTimeout = const Duration(seconds: 8);
+                        final req = await client.getUrl(Uri.parse(
+                            'https://www.kuaidi100.com/autonumber/autoComNum?text=$no'));
+                        final resp = await req
+                            .close()
+                            .timeout(const Duration(seconds: 8));
+                        final body =
+                            await resp.transform(utf8.decoder).join();
+                        client.close();
+                        final auto = jsonDecode(body)['auto'];
+                        if (auto is List && auto.isNotEmpty) {
+                          comCode = (auto.first['comCode'] ?? '').toString();
+                          final named = _comCodeNames[comCode];
+                          if (named != null) company = named;
+                        }
+                      } catch (_) {}
+                      // 2) 尝试拉取实时物流轨迹
+                      String traces = it.logisticsTraces;
+                      var gotReal = false;
+                      if (comCode != null && comCode.isNotEmpty) {
+                        final list = await _fetchTracesOnline(comCode, no);
+                        if (list != null && list.isNotEmpty) {
+                          traces = jsonEncode(list);
+                          gotReal = true;
+                        }
+                      }
+                      if (!mounted) return;
+                      provider.updateOrderItem(
+                        it,
+                        waybillNo: no,
+                        shipCompany: company,
+                        shipLogo: '', // 公司变了，清掉旧 logo 走品牌色圆标
+                        logisticsTraces: traces,
+                        logistics: gotReal
+                            ? (jsonDecode(traces).first['text'] ?? '')
+                                .toString()
+                            : it.logistics,
+                      );
+                      if (!mounted) return;
+                      Navigator.of(ctx).pop();
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(gotReal
+                            ? '单号已更新，已联网拉取实时物流'
+                            : '单号已更新（实时物流拉取失败，保留原轨迹）'),
+                        duration: const Duration(seconds: 2),
+                      ));
+                    },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ v1.9.80：双击「包裹」选抓包物流覆盖当前页 ============
+  void _showCapturedLogisticsPicker() {
+    final it = item;
+    if (it == null) return;
+    final provider = context.read<CartProvider>();
+    // 收集所有带抓包真实物流时间线的订单（排除当前单）
+    final candidates = <OrderItem>[];
+    for (final shop in provider.shops) {
+      for (final e in shop.items) {
+        if (identical(e, it)) continue;
+        if (e.logisticsTraces.isNotEmpty) candidates.add(e);
+      }
+    }
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('暂无抓包物流可用：请先用同步脚本抓取真实订单物流'),
+        duration: Duration(seconds: 2),
+      ));
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (sheetCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, ctrl) => Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Text('选择抓包物流覆盖当前订单',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: ctrl,
+                itemCount: candidates.length,
+                itemBuilder: (_, i) {
+                  final e = candidates[i];
+                  String latest = '';
+                  try {
+                    final list = jsonDecode(e.logisticsTraces) as List;
+                    if (list.isNotEmpty) {
+                      latest = (list.first['text'] ?? '').toString();
+                    }
+                  } catch (_) {}
+                  return ListTile(
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: const Color(0xFF7B5AA6),
+                      child: Text(
+                        e.shipCompany.isNotEmpty
+                            ? e.shipCompany.characters.first
+                            : '递',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                    title: Text(
+                      '${e.shipCompany.isNotEmpty ? e.shipCompany : '快递'} '
+                      '${e.waybillNo}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(latest,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF999999))),
+                    onTap: () {
+                      // 覆盖：公司/单号/logo/电话/全量时间线/横幅最新一条
+                      provider.updateOrderItem(
+                        it,
+                        shipCompany: e.shipCompany,
+                        waybillNo: e.waybillNo,
+                        shipLogo: e.shipLogo,
+                        shipPhone: e.shipPhone,
+                        logisticsTraces: e.logisticsTraces,
+                        logistics: latest.isNotEmpty ? latest : e.logistics,
+                      );
+                      Navigator.of(sheetCtx).pop();
+                      setState(() {});
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('已用抓包真实物流覆盖当前订单'),
+                        duration: Duration(seconds: 1),
+                      ));
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -346,23 +631,30 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         ),
         _headerAction(Icons.headset_mic_outlined, '客服'),
         const SizedBox(width: 12),
-        _headerAction(Icons.inventory_2_outlined, '包裹'),
+        // 双击「包裹」：选择抓包订单的真实物流覆盖当前页（v1.9.80）
+        _headerAction(Icons.inventory_2_outlined, '包裹',
+            onDoubleTap: _showCapturedLogisticsPicker),
         const SizedBox(width: 12),
         _headerAction(Icons.more_horiz, ''),
       ],
     );
   }
 
-  Widget _headerAction(IconData icon, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: const Color(0xFF333333)),
-        if (label.isNotEmpty)
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 9, color: Color(0xFF333333))),
-      ],
+  Widget _headerAction(IconData icon, String label,
+      {VoidCallback? onDoubleTap}) {
+    return GestureDetector(
+      onDoubleTap: onDoubleTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF333333)),
+          if (label.isNotEmpty)
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 9, color: Color(0xFF333333))),
+        ],
+      ),
     );
   }
 
@@ -454,32 +746,48 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Column(
         children: [
-          // 公司行
+          // 公司行（双击公司/单号区域：修改单号，联网识别公司/拉取实时物流）
           Row(
             children: [
-              _courierLogo(26),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text('$_company $_waybillNo',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A))),
+                child: GestureDetector(
+                  onDoubleTap: _editWaybill,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      _courierLogo(26),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('$_company $_waybillNo',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A))),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               GestureDetector(
                 onTap: () => _copy(_waybillNo, '运单号'),
-                child: const Text('复制',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('复制',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                ),
               ),
               const SizedBox(width: 14),
               GestureDetector(
                 onTap: () => _copy(_shipPhone, '快递客服电话'),
-                child: const Text('打电话',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('打电话',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                ),
               ),
             ],
           ),
