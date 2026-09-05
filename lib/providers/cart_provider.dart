@@ -635,6 +635,11 @@ class CartProvider extends ChangeNotifier {
     String? pickupTimeText,
     String? pickupInsuranceText,
     bool? showPickupCard,
+    String? shipCompany,
+    String? waybillNo,
+    String? shipLogo,
+    String? shipPhone,
+    String? logisticsTraces,
   }) {
     if (title != null) item.title = title;
     if (configuration != null) item.configuration = configuration;
@@ -722,6 +727,11 @@ class CartProvider extends ChangeNotifier {
       item.pickupInsuranceText = pickupInsuranceText;
     }
     if (showPickupCard != null) item.showPickupCard = showPickupCard;
+    if (shipCompany != null) item.shipCompany = shipCompany;
+    if (waybillNo != null) item.waybillNo = waybillNo;
+    if (shipLogo != null) item.shipLogo = shipLogo;
+    if (shipPhone != null) item.shipPhone = shipPhone;
+    if (logisticsTraces != null) item.logisticsTraces = logisticsTraces;
     // 实付款规则：
     // 1) 直接修改实付价（price）时，以录入值为准，绝不再用其它字段重算覆盖
     // 2) 修改商品总价/运费/优惠等组成项时，才自动重算实付款
@@ -735,8 +745,27 @@ class CartProvider extends ChangeNotifier {
     if (price == null && priceComposingChanged) {
       _recalcPaidAmount(item);
     }
+    // 实付款全局联动（v1.9.80）：直接改实付价或组成项重算后，
+    // 同步刷新所在店铺的整单实付 actualTotal，
+    // 详情页下方实付款 + 订单列表合计立即跟随变化
+    if (price != null || priceComposingChanged) {
+      _syncShopActualTotal(item);
+    }
     _persist();
     notifyListeners();
+  }
+
+  /// 把 item 所在店铺的 actualTotal 重算为各商品实付价之和
+  void _syncShopActualTotal(OrderItem item) {
+    for (final shop in _shops) {
+      if (shop.items.contains(item)) {
+        if (shop.actualTotal > 0) {
+          final sum = shop.items.fold<double>(0, (s, e) => s + e.price);
+          shop.actualTotal = double.parse(sum.toStringAsFixed(2));
+        }
+        return;
+      }
+    }
   }
 
   /// 实付款 = 商品总价 + 运费（显示中） - 所有（显示中的）优惠
