@@ -796,8 +796,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   onTap: _gotoRefund),
             ],
           ),
-          // 价格明细与上方商品处于同一栏目（无空白虚框分隔）
-          const Divider(height: 24, color: Color(0xFFf0f0f0)),
+          // v1.9.83：删除商品卡「加入购物车/申请售后」按钮下方那条空白虚线分隔线
           ..._priceSectionChildren(),
         ],
       ),
@@ -1413,15 +1412,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ============ 底部栏（v1.9.80 按状态照搬真实淘宝） ============
   // 待发货：客服/投诉 + 催发货 + 修改地址
-  // 已发货/运输中：客服/投诉 + 查看详情
-  // 已签收待确认：客服/更多 + 延长收货 + 查看物流 + 确认收货
+  // 已发货/运输中/待确认收货：客服/更多 + 催物流 + 查看物流 + 确认收货
   // 待评价：客服/更多 + 评价 + 加入购物车 + 再买一单
   Widget _buildBottomBar() {
     final category = CartProvider.statusCategory(
         _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
-    final isSignedPending = category == '待收货' &&
-        (_item.statusTitle.contains('签收') ||
-            _item.statusTitle.contains('待确认收货'));
+    // v1.9.83：放宽判断——整个"待收货"分类（已发货/运输中/派送中/已签收/待确认收货）
+    // 都显示「催物流 + 查看物流 + 确认收货」，避免"已发货"状态落到"查看详情"兜底
+    final isSignedPending = category == '待收货';
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1433,7 +1431,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(
             children: [
-              _bottomAction(Icons.headset_mic_outlined, '客服',
+              _bottomAction(Icons.chat_bubble_outline, '客服',
                   onTap: _gotoServiceChat),
               _bottomAction(
                   _isWaitRate || isSignedPending
@@ -1470,10 +1468,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _primaryBtn('再买一单',
                     color: const Color(0xFFff5000), onTap: _reAddToCart),
               ] else if (isSignedPending) ...[
-                // 已签收待确认收货（对齐真实淘宝）
-                _outlineBtn('延长收货', onTap: () {
+                // 已发货/运输中/待确认收货（对齐真实淘宝）：催物流 + 查看物流 + 确认收货
+                _outlineBtn('催物流', onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('已延长收货时间 3 天'),
+                    content: Text('已提醒商家尽快发货'),
                     duration: Duration(seconds: 1),
                   ));
                 }),
@@ -1611,17 +1609,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  // v1.9.83：底部按钮高保真化——参照真实淘宝截图样式（灰底更柔、圆角更大、字号 13）
   Widget _outlineBtn(String text, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        constraints: const BoxConstraints(minWidth: 80, minHeight: 30),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFdddddd)),
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFFF2F2F4),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(text,
-            style: const TextStyle(color: Colors.black87, fontSize: 12)),
+        child: Center(
+          child: Text(text,
+              style: const TextStyle(color: Color(0xFF333333), fontSize: 13)),
+        ),
       ),
     );
   }
@@ -1630,13 +1632,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        constraints: const BoxConstraints(minWidth: 80, minHeight: 30),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFff5000)),
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFFF2F2F4),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(text,
-            style: const TextStyle(color: Color(0xFFff5000), fontSize: 12)),
+        child: Center(
+          child: Text(text,
+              style: const TextStyle(color: Color(0xFFff5000), fontSize: 13)),
+        ),
       ),
     );
   }
@@ -1645,16 +1650,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+        constraints: const BoxConstraints(minWidth: 88, minHeight: 32),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(22),
         ),
-        child: Text(text,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500)),
+        child: Center(
+          child: Text(text,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600)),
+        ),
       ),
     );
   }
