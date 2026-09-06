@@ -893,9 +893,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (_item.showShippingFee)
         _priceRow('运费', '', '¥${_item.shippingFee.toStringAsFixed(2)}',
             valueColor: const Color(0xFF1A1A1A)),
-      // 分割线：商品总价/运费下方、进口税上方
-      const Divider(height: 16, color: Color(0xFFf0f0f0)),
+      // 对齐真实淘宝：商品总价与进口税同处一个矩阵、之间无分割线
       if (_item.showTax) _taxRow(),
+      // 分割线：进口税下方、店铺优惠上方（对齐真实淘宝）
+      if (_item.showTax)
+        const Divider(height: 16, color: Color(0xFFf0f0f0)),
       if (_item.showShopDiscount)
         _priceRow('店铺优惠', '', '-¥${_item.shopDiscount.toStringAsFixed(2)}',
             valueColor: const Color(0xFFff5000),
