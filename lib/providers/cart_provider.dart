@@ -176,7 +176,7 @@ class CartProvider extends ChangeNotifier {
           it.alipayTradeNo = _composeTradeNo(_timePrefix(it.payTime));
         }
         if (it.wechatTradeNo.length != 28) {
-          it.wechatTradeNo = _composeTradeNo(_timePrefix(it.payTime));
+          it.wechatTradeNo = _composeWechatTradeNo();
         }
       }
       shop.items
@@ -656,7 +656,7 @@ class CartProvider extends ChangeNotifier {
       // 交易号前 8 位跟随付款时间（yyyyMMdd）+ 20 位随机 = 28 位
       final first8 = _timePrefix(payTime);
       item.alipayTradeNo = _composeTradeNo(first8);
-      item.wechatTradeNo = _composeTradeNo(first8);
+      item.wechatTradeNo = _composeWechatTradeNo();
     }
     if (shipTime != null) item.shipTime = shipTime;
     if (showShipTime != null) item.showShipTime = showShipTime;
@@ -678,7 +678,7 @@ class CartProvider extends ChangeNotifier {
       // 切换支付方式时确保交易号同步呈现（保留之前的具体值，避免覆盖用户手动改的）
       // 但若账户对应的交易号是空的则生成
       if (paymentMethod.contains('微信') && item.wechatTradeNo.isEmpty) {
-        item.wechatTradeNo = _composeTradeNo(_timePrefix(item.payTime));
+        item.wechatTradeNo = _composeWechatTradeNo();
       } else if (paymentMethod.contains('支付宝') && item.alipayTradeNo.isEmpty) {
         item.alipayTradeNo = _composeTradeNo(_timePrefix(item.payTime));
       }
@@ -873,7 +873,7 @@ class CartProvider extends ChangeNotifier {
           changed = true;
         }
         if (needTradeNo(item.wechatTradeNo)) {
-          item.wechatTradeNo = _composeTradeNo(_timePrefix(item.payTime));
+          item.wechatTradeNo = _composeWechatTradeNo();
           changed = true;
         }
       }
@@ -986,6 +986,15 @@ class CartProvider extends ChangeNotifier {
     final tail =
         List.generate(20, (_) => rand.nextInt(10).toString()).join();
     return '$p$tail';
+  }
+
+  /// 拼接微信交易号：420000 固定前缀 + 22 位随机数字 = 28 位
+  /// （对齐真实微信支付 transaction_id 格式：420000 开头 28 位纯数字）
+  String _composeWechatTradeNo() {
+    final rand = Random();
+    final tail =
+        List.generate(22, (_) => rand.nextInt(10).toString()).join();
+    return '420000$tail';
   }
 
   /// 从 OrderItem 中根据支付方式获取应展示的交易号
