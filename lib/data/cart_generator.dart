@@ -176,7 +176,7 @@ class CartGenerator {
         onTimeText: '准时送达 | 8月26日',
         // 3.4 订单详情字段默认值
         deliveryPromise: '承诺48小时内发货',
-        paymentMethod: '支付宝支付',
+        paymentMethod: '微信支付',
         orderNo: orderNo,
         alipayTradeNo: alipayNo,
         wechatTradeNo: wechatNo,
