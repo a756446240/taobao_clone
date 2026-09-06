@@ -216,6 +216,29 @@ class _AddressScreenState extends State<AddressScreen> {
         elevation: 0.5,
         title: const Text('收货地址',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        actions: [
+          // 对齐真实淘宝：搜索图标
+          IconButton(
+            icon: const Icon(Icons.search, size: 22),
+            onPressed: () {},
+            tooltip: '搜索',
+          ),
+          // 对齐真实淘宝：管理
+          TextButton(
+            onPressed: () {},
+            child: const Text('管理',
+                style: TextStyle(fontSize: 14, color: Colors.black87)),
+          ),
+          // 对齐真实淘宝：新增地址（橙色）
+          TextButton(
+            onPressed: () => _openEditor(),
+            child: const Text('新增地址',
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFFF5000),
+                    fontWeight: FontWeight.w500)),
+          ),
+        ],
       ),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
