@@ -170,14 +170,13 @@ class CartProvider extends ChangeNotifier {
         }
       }
       if (newItems.isEmpty) continue;
-      // 补全交易号（订单号保留抓取的真实单号）
+      // v1.9.84：导入订单统一「微信支付」+ 微信交易号（清空支付宝交易号）
       for (final it in newItems) {
-        if (it.alipayTradeNo.length != 28) {
-          it.alipayTradeNo = _composeTradeNo(_timePrefix(it.payTime));
-        }
+        it.paymentMethod = '微信支付';
         if (it.wechatTradeNo.length != 28) {
           it.wechatTradeNo = _composeWechatTradeNo();
         }
+        it.alipayTradeNo = '';
       }
       shop.items
         ..clear()
