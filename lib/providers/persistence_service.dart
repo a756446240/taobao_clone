@@ -227,7 +227,7 @@ class PersistenceService {
       deliveryPromise: j['deliveryPromise'] ?? '承诺48小时内发货',
       showDeliveryPromise: j['showDeliveryPromise'] ?? true,
       shipPromise: j['shipPromise'] ?? '',
-      paymentMethod: j['paymentMethod'] ?? '支付宝支付',
+      paymentMethod: j['paymentMethod'] ?? '微信支付',
       orderNo: j['orderNo'] ?? '',
       alipayTradeNo: j['alipayTradeNo'] ?? '',
       wechatTradeNo: j['wechatTradeNo'] ?? '',
