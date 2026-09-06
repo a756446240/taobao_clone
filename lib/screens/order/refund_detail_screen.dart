@@ -745,14 +745,21 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: const BoxDecoration(
-                color: Color(0xFFFF5000), shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: const Text('淘',
-                style: TextStyle(fontSize: 10, color: Colors.white)),
+          // 店铺头像：优先抓包真实头像（shopAvatar），空则默认红圆"淘"图标
+          ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: _shop.shopAvatar.isNotEmpty
+                ? AppImage(url: _shop.shopAvatar, width: 22, height: 22,
+                    fit: BoxFit.cover)
+                : Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFFF5000), shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: const Text('淘',
+                        style: TextStyle(fontSize: 10, color: Colors.white)),
+                  ),
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -807,21 +814,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 const SizedBox(height: 4),
                 Text(_item.configuration,
                     style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Text('实付价 ',
-                        style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    Text('¥${_item.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFFFF5000),
-                            fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right,
-                        size: 14, color: Colors.grey),
-                  ],
-                ),
               ],
             ),
           ),
