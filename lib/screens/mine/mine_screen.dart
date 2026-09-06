@@ -221,23 +221,24 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  /// 88VIP 徽章：照搬真实淘宝——深棕近黑底 + 金棕色字样
+  /// 88VIP 徽章：黑底金字（照搬真实淘宝）
   Widget _vipTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
       decoration: BoxDecoration(
-        color: const Color(0xFF3B2F2A),
+        color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(text,
           style: const TextStyle(
-              color: Color(0xFFE3C9A8),
+              color: Color(0xFFE6C89E),
               fontSize: 10,
-              fontWeight: FontWeight.w600)),
+              fontWeight: FontWeight.w600,
+              height: 1.1)),
     );
   }
 
-  /// 会员等级徽章（钻石会员等）：与 88VIP 同款深底金字（照搬真实淘宝）
+  /// 会员等级徽章（钻石会员等）：蓝底白字（照搬真实淘宝）
   Widget _levelTag(String level) {
     // 避免和 88VIP 重复显示
     final display = level == '88VIP' ? '钻石会员' : level;
@@ -246,14 +247,15 @@ class _MineScreenState extends State<MineScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
         decoration: BoxDecoration(
-          color: const Color(0xFF3B2F2A),
+          color: const Color(0xFF4A6FA5),
           borderRadius: BorderRadius.circular(3),
         ),
         child: Text(display,
             style: const TextStyle(
-                color: Color(0xFFE3C9A8),
+                color: Colors.white,
                 fontSize: 10,
-                fontWeight: FontWeight.w600)),
+                fontWeight: FontWeight.w600,
+                height: 1.1)),
       ),
     );
   }
