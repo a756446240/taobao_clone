@@ -285,7 +285,7 @@ class OrderItem {
     this.deliveryPromise = '承诺48小时内发货',
     this.showDeliveryPromise = true,
     this.shipPromise = '',
-    this.paymentMethod = '支付宝支付',
+    this.paymentMethod = '微信支付',
     this.orderNo = '',
     this.alipayTradeNo = '',
     this.wechatTradeNo = '',
