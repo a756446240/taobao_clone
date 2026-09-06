@@ -289,6 +289,18 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           ),
           const SizedBox(height: 14),
           _stepRow(),
+          // v1.9.83：待商家退款页新增说明文字（对齐真实淘宝"如果商家收到货..."）
+          if (_isPending) ...[
+            const SizedBox(height: 14),
+            Text(
+              '如果商家收到货并验货无误，将操作退款给您\n如果商家拒绝退款，需要您修改退货申请\n如果商家超时未处理，将自动退款给您。',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: Color(0xFF999999)),
+            ),
+          ],
         ],
       ),
     );
