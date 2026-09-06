@@ -947,7 +947,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             children: [
               _bottomIcon(Icons.storefront_outlined, '店铺',
                   () => _gotoShop(widget.item.shopName)),
-              _bottomIcon(Icons.headset_mic_outlined, '客服', () {
+              _bottomIcon(Icons.chat_bubble_outline, '客服', () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => ChatScreen(
