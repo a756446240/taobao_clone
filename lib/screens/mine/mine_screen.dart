@@ -205,7 +205,7 @@ class _MineScreenState extends State<MineScreen> {
                 const SizedBox(width: 16),
                 GestureDetector(
                   onTap: _openOfficialService,
-                  child: _headerIcon(Icons.headset_mic_outlined, '官方客服'),
+                  child: _headerIcon(Icons.chat_bubble_outline, '官方客服'),
                 ),
                 const SizedBox(width: 16),
                 GestureDetector(
