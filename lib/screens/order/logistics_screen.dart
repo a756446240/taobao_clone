@@ -650,7 +650,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
             ],
           ),
         ),
-        _headerAction(Icons.headset_mic_outlined, '客服'),
+        _headerAction(Icons.chat_bubble_outline, '客服'),
         const SizedBox(width: 12),
         // 双击「包裹」：选择抓包订单的真实物流覆盖当前页（v1.9.80）
         _headerAction(Icons.inventory_2_outlined, '包裹',
