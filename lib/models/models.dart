@@ -314,7 +314,7 @@ class OrderItem {
     this.showPlatformPriceRow = true,
     this.showCouponPriceRow = true,
     this.showTaxInfoLine = true,
-    this.refundStatus = '退款成功',
+    this.refundStatus = '', // v1.9.86：默认空——只有退款单才有退款状态（原默认"退款成功"会污染普通订单）
     this.refundTitle = '',
     this.refundSubtitle = '',
     this.refundAmount = 0,
