@@ -2214,6 +2214,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _editTile(Icons.card_giftcard, '修改天猫积分', () {
                         _editTmallPoints(provider);
                       }),
+                      // v1.9.87：赠品栏开关——没有赠品数据的订单也能手动调出来
+                      _editTile(
+                          Icons.redeem,
+                          _item.giftCount > 0 ? '隐藏赠品栏' : '显示赠品栏', () {
+                        if (_item.giftCount > 0) {
+                          provider.updateOrderItem(_item, giftCount: 0);
+                        } else {
+                          provider.updateOrderItem(_item,
+                              giftCount: 1,
+                              giftTitle: _item.giftTitle.isEmpty
+                                  ? '赠品'
+                                  : _item.giftTitle);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('赠品栏已显示：单击改件数，双击换图，长按改名'),
+                                  duration: Duration(seconds: 2)));
+                        }
+                        Navigator.of(ctx).pop();
+                      }),
                       const Divider(height: 1),
                       _editTile(Icons.edit, '编辑商品', () {
                         _editProductFields(provider);
