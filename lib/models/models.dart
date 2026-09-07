@@ -205,6 +205,11 @@ class OrderItem {
   bool showTax; // 是否显示进口税
   List<String> detailTags; // 详情页红色标签（极速退款/7天无理由等）
 
+  // ===== 赠品栏（v1.9.85 起，抓包/手动编辑；0=不显示赠品行） =====
+  int giftCount; // 赠品件数
+  String giftImage; // 赠品缩略图（URL 或本地路径，空=灰色占位）
+  String giftTitle; // 赠品名称（展开/提示用）
+
   // 列表页价格行显示/隐藏（image#2 红框区域）
   bool showPlatformPriceRow; // 平台加补后
   bool showCouponPriceRow; // 领消费券后约
@@ -301,6 +306,9 @@ class OrderItem {
     this.taxContent = '价格已含税',
     this.showTax = true,
     this.detailTags = const ['极速退款', '7天无理由'],
+    this.giftCount = 0,
+    this.giftImage = '',
+    this.giftTitle = '',
     this.tmallPoints = 35,
     this.showTmallPoints = false,
     this.showPlatformPriceRow = true,
