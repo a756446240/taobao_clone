@@ -720,14 +720,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============ 商品卡片 ============
-  /// 商品卡"实付价"行的单价：抓包新数据 _item.price 本就是单价；
-  /// 但旧数据/手动录入的订单 _item.price 可能存的是整单总价（≈productTotal 且数量>1），
-  /// 此时自动 ÷quantity 还原单价，对齐真实淘宝"¥33×3"而非"¥99×3"。
+  /// 商品卡"实付价"行的单价：抓包新数据 _item.price 本就是单价（如 32×2）；
+  /// 但旧数据/手动录入的订单 _item.price 可能存的是整单总价（如 99×2），
+  /// 此时自动 ÷quantity 还原单价，对齐真实淘宝"¥32×2"而非"¥99×2"。
+  ///
+  /// 判断依据：_item.price 接近 _shop.actualTotal（整单实付，含运费）→ price 是总价；
+  /// 或 _item.price × quantity 接近 _shop.actualTotal → price 是单价。
+  /// （productTotal 是原价×数量，不含运费，不能当总价参照——VD3 单 productTotal=64
+  ///  但 actualTotal=99（含 35 运费），若用 productTotal 判断会误判 price=99 为单价）
   double get _unitPrice {
-    if (_item.quantity > 1 && _item.productTotal > 0) {
-      // price 接近 productTotal（误差 1 元内）→ 判定 price 存的是总价
-      if ((_item.price - _item.productTotal).abs() < 1.0) {
-        return _item.price / _item.quantity;
+    if (_item.quantity > 1) {
+      // 优先用 actualTotal 判断（整单实付，含运费，最准）
+      if (_shop.actualTotal > 0) {
+        // price ≈ actualTotal → price 是总价，需 ÷quantity
+        if ((_item.price - _shop.actualTotal).abs() < 1.0) {
+          return _item.price / _item.quantity;
+        }
+        // price × qty ≈ actualTotal → price 是单价，直接用
+        if ((_item.price * _item.quantity - _shop.actualTotal).abs() < 1.0) {
+          return _item.price;
+        }
+      }
+      // actualTotal 缺失时退而用 productTotal（原价×数量，不含运费）
+      if (_item.productTotal > 0) {
+        if ((_item.price - _item.productTotal).abs() < 1.0) {
+          return _item.price / _item.quantity;
+        }
       }
     }
     return _item.price;
