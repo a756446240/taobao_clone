@@ -50,6 +50,92 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
   static const _addrFull = '山东省 淄博市 张店区 科苑街道 中房大厦C座1001';
 
   List<SearchResultItem>? _recPicks;
+  bool _refreshingOnline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 假订单先分配抓包真实单号，再联网刷新（v1.9.88）
+      _assignCapturedWaybill();
+      _autoRefreshOnline();
+    });
+  }
+
+  /// 无单号的假订单：从抓包运单池按订单号哈希稳定分配一个真实单号，
+  /// 连带快递公司/官方头像/客服电话，之后即可联网实时跟踪
+  void _assignCapturedWaybill() {
+    final it = item;
+    if (it == null || it.waybillNo.isNotEmpty) return;
+    final provider = context.read<CartProvider>();
+    final pool = <OrderItem>[
+      for (final s in provider.shops)
+        for (final e in s.items)
+          if (!identical(e, it) && e.waybillNo.isNotEmpty) e,
+    ];
+    if (pool.isEmpty) return;
+    final seed = it.orderNo.isEmpty ? it.title.hashCode : it.orderNo.hashCode;
+    final donor = pool[seed.abs() % pool.length];
+    provider.updateOrderItem(
+      it,
+      waybillNo: donor.waybillNo,
+      shipCompany: donor.shipCompany.isNotEmpty ? donor.shipCompany : null,
+      shipLogo: donor.shipLogo.isNotEmpty ? donor.shipLogo : null,
+      shipPhone: donor.shipPhone.isNotEmpty ? donor.shipPhone : null,
+    );
+    if (mounted) setState(() {});
+  }
+
+  /// 打开物流页自动联网更新：
+  /// - 最新轨迹 6 小时内不重复拉（apizero 匿名额度 30 次/天）
+  /// - 拉到已签收 → 订单自动跳「待确认收货」
+  Future<void> _autoRefreshOnline() async {
+    final it = item;
+    if (it == null || _refreshingOnline) return;
+    // 只跟踪真实/手动覆盖的单号；空单号（派生假号）不联网
+    final waybill = it.waybillNo.trim();
+    if (waybill.isEmpty) return;
+    final real = _realTraces;
+    if (real != null) {
+      final t = _parseT(real.first.time);
+      if (t != null && DateTime.now().difference(t).inHours < 6) return;
+    }
+    _refreshingOnline = true;
+    try {
+      final detected = await _detectCompany(waybill);
+      final list = await _fetchTracesOnline(detected.$1, waybill);
+      if (!mounted || list == null || list.isEmpty) return;
+      final provider = context.read<CartProvider>();
+      provider.updateOrderItem(
+        it,
+        logisticsTraces: jsonEncode(list),
+        logistics: list.first['text'] ?? it.logistics,
+        // 公司/头像只在缺省时补，用户手动改过的绝不覆盖
+        shipCompany:
+            it.shipCompany.isEmpty && detected.$2.isNotEmpty ? detected.$2 : null,
+        shipLogo: it.shipLogo.isEmpty && detected.$1.isNotEmpty
+            ? _logoForComCode(detected.$1)
+            : null,
+      );
+      // 已签收 → 自动转「待确认收货」
+      final firstTag = (list.first['tag'] ?? '').toString();
+      if (firstTag.contains('签收') &&
+          CartProvider.statusCategory(it.statusTitle) == '待收货') {
+        final shop = provider.shops.firstWhere((s) => s.items.contains(it),
+            orElse: () => provider.shops.first);
+        provider.updateOrderStatus(shop, it, '待确认收货');
+      }
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(firstTag.contains('签收') ? '物流已联网更新：快递已签收' : '物流已联网更新'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      _refreshingOnline = false;
+    }
+  }
 
   // ============ 数据：抓包真实时间线优先，本地生成兜底 ============
 
@@ -318,9 +404,92 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         'application/json, text/javascript, */*; q=0.01');
   }
 
-  /// 联网查询实时物流轨迹（快递100 双接口尝试，失败返回 null）
+  /// 快递公司官方 logo（快递100 图床，实测长期有效）
+  static String _logoForComCode(String comCode) =>
+      'https://cdn.kuaidi100.com/images/all/56/$comCode.png';
+
+  /// 联网识别快递公司（快递100 autonumber，全公司覆盖，实测可用）
+  /// 返回 (comCode, 中文公司名)，失败返回 ('','')
+  static Future<(String, String)> _detectCompany(String waybill) async {
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 8);
+      final req = await client.getUrl(Uri.parse(
+          'https://www.kuaidi100.com/autonumber/autoComNum?text=$waybill'));
+      _applyBrowserHeaders(req, 'https://www.kuaidi100.com/');
+      final resp = await req.close().timeout(const Duration(seconds: 8));
+      final body = await resp.transform(utf8.decoder).join();
+      client.close();
+      final auto = jsonDecode(body)['auto'];
+      if (auto is List && auto.isNotEmpty) {
+        final code = (auto.first['comCode'] ?? '').toString();
+        final named = _comCodeNames[code] ??
+            (auto.first['name'] ?? '').toString();
+        return (code, named);
+      }
+    } catch (_) {}
+    return ('', '');
+  }
+
+  /// apizero 免费物流接口（2026 实测匿名可用，30 次/天）：
+  /// /api/express 覆盖 申通/圆通/顺丰/中通/百世/极兔；
+  /// /api/express-pro 覆盖 京东/韵达/EMS 及其余公司
+  Future<Map<String, dynamic>?> _fetchApizero(String waybill,
+      {bool pro = false}) async {
+    final path = pro ? '/api/express-pro' : '/api/express';
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 8);
+      final req = await client.getUrl(
+          Uri.parse('https://v1.apizero.cn$path?number=$waybill'));
+      _applyBrowserHeaders(req, 'https://apizero.cn/');
+      final resp = await req.close().timeout(const Duration(seconds: 8));
+      final body = await resp.transform(utf8.decoder).join();
+      client.close();
+      final j = jsonDecode(body);
+      if (j is! Map) return null;
+      if (j['code'] == 4000) return {'upgrade': true}; // 免费版不支持→换 pro
+      if (j['code'] != 0) return null;
+      final data = j['data'];
+      if (data is! Map) return null;
+      final traces = data['traces'];
+      if (traces is! List || traces.isEmpty) return null;
+      final statusDesc = (data['status_desc'] ?? '').toString();
+      return {
+        'com': (data['com'] ?? '').toString(),
+        'comName': (data['com_name'] ?? '').toString(),
+        'traces': [
+          for (var i = 0; i < traces.length; i++)
+            {
+              'time': (traces[i]['time'] ?? '').toString(),
+              // 首条挂状态标签（已签收/派送中/运输中），驱动页面阶段展示
+              'tag': i == 0 ? statusDesc : '',
+              'text': (traces[i]['content'] ?? '').toString(),
+            }
+        ],
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 联网查询实时物流轨迹：apizero 双通道优先，快递100 严格判失败兜底
   Future<List<Map<String, String>>?> _fetchTracesOnline(
       String comCode, String waybill) async {
+    // 1) apizero（匿名免费，自动识别公司）
+    var r = await _fetchApizero(waybill);
+    if (r != null && r['upgrade'] == true) {
+      r = await _fetchApizero(waybill, pro: true);
+    }
+    if (r != null && r['traces'] is List) {
+      return [
+        for (final e in (r['traces'] as List))
+          Map<String, String>.from((e as Map)
+              .map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
+      ];
+    }
+    // 2) 快递100 兜底（免费通道常返「查无结果」，必须严格判失败）
+    if (comCode.isEmpty) return null;
     final urls = [
       'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill',
       'https://www.kuaidi100.com/query?type=$comCode&postid=$waybill&temp=${DateTime.now().millisecondsSinceEpoch / 1000}',
@@ -338,6 +507,10 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         if (j is! Map || j['status']?.toString() != '200') continue;
         final data = j['data'];
         if (data is! List || data.isEmpty) continue;
+        // 「查无结果」是假轨迹，判失败（v1.9.88 修复：此前会被当成成功）
+        if ((data.first['context'] ?? '').toString().contains('查无结果')) {
+          continue;
+        }
         return [
           for (final e in data)
             {
@@ -392,7 +565,7 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                       if (no.isEmpty) return;
                       setDlg(() => detecting = true);
                       final provider = context.read<CartProvider>();
-                      // 1) 本地按前缀推断，再联网识别覆盖
+                      // 1) 本地按前缀推断，再联网识别覆盖（v1.9.88 起用共享识别）
                       var company = no.startsWith('YT')
                           ? '圆通速递'
                           : no.startsWith('SF')
@@ -400,58 +573,57 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                               : (no.startsWith('ZTO') || no.startsWith('7'))
                                   ? '中通快递'
                                   : it.shipCompany;
-                      String? comCode;
-                      try {
-                        final client = HttpClient()
-                          ..connectionTimeout = const Duration(seconds: 8);
-                        final req = await client.getUrl(Uri.parse(
-                            'https://www.kuaidi100.com/autonumber/autoComNum?text=$no'));
-                        _applyBrowserHeaders(
-                            req, 'https://www.kuaidi100.com/');
-                        final resp = await req
-                            .close()
-                            .timeout(const Duration(seconds: 8));
-                        final body =
-                            await resp.transform(utf8.decoder).join();
-                        client.close();
-                        final auto = jsonDecode(body)['auto'];
-                        if (auto is List && auto.isNotEmpty) {
-                          comCode = (auto.first['comCode'] ?? '').toString();
-                          final named = _comCodeNames[comCode];
-                          if (named != null) company = named;
-                        }
-                      } catch (_) {}
-                      // 2) 尝试拉取实时物流轨迹
+                      final detected = await _detectCompany(no);
+                      final comCode = detected.$1;
+                      if (detected.$2.isNotEmpty) company = detected.$2;
+                      // 2) 拉取实时物流轨迹（apizero 优先，快递100 兜底）
                       String traces = it.logisticsTraces;
                       var gotReal = false;
-                      if (comCode != null && comCode.isNotEmpty) {
-                        final list = await _fetchTracesOnline(comCode, no);
-                        if (list != null && list.isNotEmpty) {
-                          traces = jsonEncode(list);
-                          gotReal = true;
-                        }
+                      final list = await _fetchTracesOnline(comCode, no);
+                      if (list != null && list.isNotEmpty) {
+                        traces = jsonEncode(list);
+                        gotReal = true;
                       }
                       if (!mounted) return;
                       provider.updateOrderItem(
                         it,
                         waybillNo: no,
                         shipCompany: company,
-                        shipLogo: '', // 公司变了，清掉旧 logo 走品牌色圆标
+                        // 自动匹配快递公司官方头像（快递100 图床）
+                        shipLogo: comCode.isNotEmpty
+                            ? _logoForComCode(comCode)
+                            : '',
                         logisticsTraces: traces,
                         logistics: gotReal
                             ? (jsonDecode(traces).first['text'] ?? '')
                                 .toString()
                             : it.logistics,
                       );
+                      // 3) 实时轨迹已签收 → 订单自动跳「待确认收货」（v1.9.88）
+                      var signed = false;
+                      if (gotReal) {
+                        final firstTag =
+                            (jsonDecode(traces).first['tag'] ?? '').toString();
+                        if (firstTag.contains('签收') &&
+                            CartProvider.statusCategory(it.statusTitle) ==
+                                '待收货') {
+                          final shop = provider.shops.firstWhere(
+                              (s) => s.items.contains(it),
+                              orElse: () => provider.shops.first);
+                          provider.updateOrderStatus(shop, it, '待确认收货');
+                          signed = true;
+                        }
+                      }
                       if (!mounted) return;
                       Navigator.of(ctx).pop();
                       setState(() {});
-                      // v1.9.81：失败原因明示，不再静默保留假物流
                       final msg = gotReal
-                          ? '单号已更新，已联网拉取实时物流'
-                          : (comCode == null || comCode.isEmpty)
+                          ? (signed
+                              ? '单号已更新，快递已签收，订单已自动转为待确认收货'
+                              : '单号已更新，已联网拉取实时物流')
+                          : (comCode.isEmpty)
                               ? '已改用「$company」，但联网识别失败（请检查网络），保留原轨迹'
-                              : '已识别「$company」，实时轨迹拉取失败（快递100接口限流），保留原轨迹';
+                              : '已识别「$company」并匹配官方头像，实时轨迹拉取失败（免费接口限流），保留原轨迹';
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(msg),
                         duration: const Duration(seconds: 3),
