@@ -478,11 +478,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 状态头物流条文字：待评价订单对齐真实淘宝交易成功单
-  /// （"已签收  黑山灰 86-186****5652 送至 中房…"），其余状态沿用原逻辑
+  /// 状态头物流条文字：交易成功/待评价对齐真实淘宝（"已签收  黑山灰 送至 …"），
+  /// 待发货=备货文案，其余状态沿用物流文字
   String get _bannerLogisticsText {
     final l = _item.logistics;
-    if (_isWaitRate) {
+    final category = CartProvider.statusCategory(
+        _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
+    if (_isWaitRate || category == '已完成') {
       if (l.contains('签收')) return l;
       final recv = _item.receiver.isEmpty ? '黑山灰' : _item.receiver;
       final addr = _item.address.isEmpty
@@ -490,15 +492,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           : _item.address.replaceAll('\n', ' ');
       return '$recv 86-186****5652 送至 $addr';
     }
-    return l.isEmpty ? '您的快件已领取，收件人在[代收点](...)' : l;
+    if (category == '待发货' || category == '待付款') {
+      // 未发货不展示物流（对齐真实淘宝），备货文案
+      return '商家正在备货，将在承诺时间内尽快发货';
+    }
+    return l.isEmpty ? '包裹正在运输途中，请耐心等待' : l;
   }
 
   /// 根据物流文字推断阶段标签和图标
   (String, IconData) _logisticsStage() {
     final l = _item.logistics;
     final t = _item.statusTitle;
-    // 待评价订单物流条固定为已签收（对齐真实淘宝交易成功单）
-    if (_isWaitRate) return ('已签收', Icons.check_circle);
+    final category = CartProvider.statusCategory(
+        t.isEmpty ? _shop.orderSubStatus : t);
+    // 交易成功/待评价订单物流条固定为已签收（对齐真实淘宝交易成功单）
+    // v1.9.86：不再只看待评价——退款等状态改成交易成功后同样是已签收
+    if (_isWaitRate || category == '已完成') {
+      return ('已签收', Icons.check_circle);
+    }
+    // 待发货/待付款：固定等待发货（v1.9.86 修复：'待发货'含'发货'曾被误判成运输中）
+    if (category == '待发货' || category == '待付款') {
+      return ('等待发货', Icons.access_time);
+    }
     if (l.contains('揽件')) {
       return ('已揽件', Icons.inventory_2_outlined);
     }
@@ -511,13 +526,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (l.contains('异常')) {
       return ('物流异常', Icons.error_outline);
     }
-    if (l.contains('运输') ||
-        t.contains('发货') ||
-        t.contains('收货') ||
-        t.contains('签收')) {
-      return ('运输中', Icons.local_shipping_outlined);
-    }
-    return ('等待发货', Icons.access_time);
+    return ('运输中', Icons.local_shipping_outlined);
   }
 
   // ============ 店铺卡片 ============
@@ -1583,6 +1592,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(width: 8),
                 _primaryBtn('联系商家',
                     color: const Color(0xFFff5000), onTap: _gotoServiceChat),
+              ] else if (category == '待付款') ...[
+                // v1.9.86：待付款对齐真实淘宝——取消订单 + 立即付款
+                _outlineBtn('取消订单', onTap: () => _demoToast('取消订单')),
+                const SizedBox(width: 8),
+                _primaryBtn('立即付款',
+                    color: const Color(0xFFff5000),
+                    onTap: () => _demoToast('立即付款')),
               ] else
                 _primaryBtn('查看详情',
                     color: const Color(0xFFff5000), onTap: () {}),
