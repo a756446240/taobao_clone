@@ -72,31 +72,64 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
         if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) dup++;
       }
     }
+    var forceRefresh = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('确认导入？', style: TextStyle(fontSize: 16)),
-        content: Text(
-          '来源：$sourceDesc\n'
-          '解析到 ${shops.length} 家店铺 / $total 条订单\n\n'
-          '✅ 新增导入：${total - dup} 条\n'
-          '⏭ 已存在跳过：$dup 条\n\n'
-          '已有订单（含你修改过的）不会被覆盖。',
-          style: const TextStyle(fontSize: 13, height: 1.6),
+      builder: (c) => StatefulBuilder(
+        builder: (c2, setState2) => AlertDialog(
+          title: const Text('确认导入？', style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '来源：$sourceDesc\n'
+                '解析到 ${shops.length} 家店铺 / $total 条订单\n\n'
+                '✅ 新增导入：${total - dup} 条\n'
+                '⏭ 已存在跳过：$dup 条',
+                style: const TextStyle(fontSize: 13, height: 1.6),
+              ),
+              const SizedBox(height: 12),
+              // v1.9.91：强制刷新选项——覆盖已有订单的抓包字段
+              // （标签/价格/物流等），但保留用户手动改过的字段
+              CheckboxListTile(
+                value: forceRefresh,
+                onChanged: (v) => setState2(() => forceRefresh = v ?? false),
+                title: const Text('强制刷新已有订单',
+                    style: TextStyle(fontSize: 13)),
+                subtitle: const Text('用新数据覆盖已有订单（保留手动改过的字段）',
+                    style: TextStyle(fontSize: 11)),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                forceRefresh
+                    ? '⚠️ 已有订单将被新数据覆盖（标签/价格/物流等）'
+                    : '已有订单（含你修改过的）不会被覆盖。',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: forceRefresh
+                        ? const Color(0xFFFF5000)
+                        : Colors.black54),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('导入',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(c, true),
-              child: const Text('导入',
-                  style: TextStyle(color: Color(0xFFFF5000)))),
-        ],
       ),
     );
     if (confirmed != true) return;
-    final result = provider.importSyncedShops(shops);
+    final result = provider.importSyncedShops(shops, forceRefresh: forceRefresh);
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
     if (result.added > 0) {
       _toast('已导入 ${result.added} 条新订单（跳过重复 ${result.skipped} 条$tail）');
