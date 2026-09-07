@@ -827,14 +827,13 @@ class _OrderCard extends StatelessWidget {
   /// 是否交易成功订单（下方无物流框架，底部按钮为 3 种样式组合）
   bool get _isTradeSuccess => shop.orderSubStatus.contains('交易成功');
 
-  /// 交易成功底部按钮样式：shop.orderBtnStyle 指定（0/1/2），-1 时按店名哈希稳定随机
+  /// 交易成功底部按钮样式：v1.9.87 起固定样式0（追加评价+查看物流+再买一单浅橙高亮，
+  /// 对齐真实淘宝截图）；仅当编辑菜单手动指定 orderBtnStyle 时才用其它组合
   int get _successBtnStyle {
     if (shop.orderBtnStyle >= 0 && shop.orderBtnStyle <= 2) {
       return shop.orderBtnStyle;
     }
-    final h = shop.shopName.codeUnits
-        .fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
-    return h % 3;
+    return 0;
   }
 
   /// 交易成功订单底部按钮行（v1.9.85 对齐真实淘宝截图，编辑菜单可切换/随机）：
@@ -906,9 +905,10 @@ class _OrderCard extends StatelessWidget {
         const Spacer(),
         for (var i = 0; i < _capturedOps.length; i++) ...[
           if (i > 0) gap,
+          // v1.9.87：高亮位改浅橙底橙字胶囊（真实淘宝高亮是浅橙，不是实心橙）
           _capturedOps[i].$2
-              ? _primaryBtn(_capturedOps[i].$1,
-                  onTap: () => _onOpTap(context, _capturedOps[i].$1))
+              ? _capsuleBtn(_capturedOps[i].$1,
+                  highlight: true, onTap: () => _onOpTap(context, _capturedOps[i].$1))
               : _outlineBtn(_capturedOps[i].$1,
                   onTap: () => _onOpTap(context, _capturedOps[i].$1)),
         ],
@@ -1172,9 +1172,10 @@ class _OrderCard extends StatelessWidget {
                         ? _buildCapturedOpsButtons(context)
                         : _buildRateButtons(context))
                     : _isTradeSuccess
-                    ? (shop.orderOps.isNotEmpty
-                        ? _buildCapturedOpsButtons(context)
-                        : _buildSuccessButtons(context))
+                    // v1.9.87：交易成功卡片固定用截图款组合（追加评价+查看物流+
+                    // 再买一单浅橙高亮），不再走抓包按钮序列（用户反馈抓包款的
+                    // 实心橙再买一单+申请开票+删除订单与真实淘宝截图不符）
+                    ? _buildSuccessButtons(context)
                     : Row(
                     children: [
                       // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
