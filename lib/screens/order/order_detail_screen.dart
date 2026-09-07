@@ -720,6 +720,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============ 商品卡片 ============
+  /// 商品卡"实付价"行的单价：抓包新数据 _item.price 本就是单价；
+  /// 但旧数据/手动录入的订单 _item.price 可能存的是整单总价（≈productTotal 且数量>1），
+  /// 此时自动 ÷quantity 还原单价，对齐真实淘宝"¥33×3"而非"¥99×3"。
+  double get _unitPrice {
+    if (_item.quantity > 1 && _item.productTotal > 0) {
+      // price 接近 productTotal（误差 1 元内）→ 判定 price 存的是总价
+      if ((_item.price - _item.productTotal).abs() < 1.0) {
+        return _item.price / _item.quantity;
+      }
+    }
+    return _item.price;
+  }
+
   Widget _buildProductCard() {
     final override = context.watch<ProductImageProvider>().imageFor(_item.title);
     final imageUrl = override ?? _item.imageUrl;
@@ -782,7 +795,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Text('¥',
                             style: AppTextStyles.price
                                 .copyWith(fontSize: 12)),
-                        Text(_item.price.toStringAsFixed(2),
+                        // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
+                        // 抓包新数据 _item.price 本就是单价（33）；但旧数据/手动改过的
+                        // 订单 _item.price 可能存的是整单总价（99）——检测 price≈productTotal
+                        // 且数量>1 时自动 ÷数量 还原单价显示。
+                        Text(_unitPrice.toStringAsFixed(2),
                             style: AppTextStyles.price
                                 .copyWith(fontSize: 18)),
                         const Spacer(),
