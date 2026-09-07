@@ -112,6 +112,10 @@ class _OrderListScreenState extends State<OrderListScreen>
         });
       }
     });
+    // v1.9.88：付款满 10 天的待收货订单自动确认收货（对齐真实淘宝倒计时结束）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<CartProvider>().sweepAutoConfirm();
+    });
   }
 
   int _initialSubIndex(String type) {
