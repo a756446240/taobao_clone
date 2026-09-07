@@ -255,7 +255,7 @@ class PersistenceService {
       showPlatformPriceRow: j['showPlatformPriceRow'] ?? true,
       showCouponPriceRow: j['showCouponPriceRow'] ?? true,
       showTaxInfoLine: j['showTaxInfoLine'] ?? true,
-      refundStatus: j['refundStatus'] ?? '退款成功',
+      refundStatus: j['refundStatus'] ?? '',
       refundTitle: j['refundTitle'] ?? '',
       refundSubtitle: j['refundSubtitle'] ?? '',
       refundAmount: (j['refundAmount'] as num?)?.toDouble() ?? 0,
