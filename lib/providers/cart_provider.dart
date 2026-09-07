@@ -835,6 +835,24 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 自动确认收货（对齐真实淘宝 10 天倒计时结束）：
+  /// 「待收货」分类订单付款（无付款时间用创建时间）满 10 天 → 自动跳「交易成功」。
+  /// 在订单列表页打开时扫描一次（v1.9.88）。
+  void sweepAutoConfirm() {
+    final now = DateTime.now();
+    for (final shop in shops) {
+      for (final it in shop.items) {
+        if (statusCategory(it.statusTitle) != '待收货') continue;
+        final raw = it.payTime.isNotEmpty ? it.payTime : it.createTime;
+        final base = DateTime.tryParse(raw.replaceAll(' ', 'T'));
+        if (base == null) continue;
+        if (now.difference(base).inDays >= 10) {
+          updateOrderStatus(shop, it, '交易成功');
+        }
+      }
+    }
+  }
+
   /// 生成当天发货时间：创建时间之后、限当天 23:59 前随机（按订单号哈希确定性）
   String _autoShipTimeSameDay(OrderItem item) {
     final base = _parseCreateTime(item.createTime) ??
