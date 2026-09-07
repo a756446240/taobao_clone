@@ -837,40 +837,41 @@ class _OrderCard extends StatelessWidget {
     return h % 3;
   }
 
-  /// 交易成功订单底部按钮行（对齐真实淘宝的 3 种组合，编辑菜单可切换/随机）：
-  /// 0：评价 + 加入购物车 + 再买一单（高亮）
-  /// 1：闲鱼转卖 + 评价 + 加入购物车（高亮）
-  /// 2：加入购物车 + 查看物流 + 评价（高亮）
+  /// 交易成功订单底部按钮行（v1.9.85 对齐真实淘宝截图，编辑菜单可切换/随机）：
+  /// 0：追加评价 + 查看物流 + 再买一单（浅橙底橙字高亮）—— Chocola BB 截图款
+  /// 1：再买一单（橙实心）+ 加入购物车 + 删除订单 —— 小福星代购截图款
+  /// 2：评价 + 加入购物车 + 再买一单（橙实心）
   Widget _buildSuccessButtons(BuildContext context) {
     const gap = SizedBox(width: 8);
     final List<Widget> btns;
     switch (_successBtnStyle) {
       case 0:
         btns = [
+          _outlineBtn('追加评价', onTap: () => _onRateTap(context)),
+          gap,
+          _outlineBtn('查看物流',
+              onTap: () => _gotoLogistics(context, items.first)),
+          gap,
+          _capsuleBtn('再买一单',
+              highlight: true, onTap: () => _reAddToCart(context)),
+        ];
+        break;
+      case 1:
+        btns = [
+          _primaryBtn('再买一单', onTap: () => _reAddToCart(context)),
+          gap,
+          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
+          gap,
+          _outlineBtn('删除订单', onTap: () => _confirmDeleteOrder(context)),
+        ];
+        break;
+      default:
+        btns = [
           _outlineBtn('评价', onTap: () => _onRateTap(context)),
           gap,
           _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
           gap,
           _primaryBtn('再买一单', onTap: () => _reAddToCart(context)),
-        ];
-        break;
-      case 1:
-        btns = [
-          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
-          gap,
-          _outlineBtn('评价', onTap: () => _onRateTap(context)),
-          gap,
-          _primaryBtn('加入购物车', onTap: () => _reAddToCart(context)),
-        ];
-        break;
-      default:
-        btns = [
-          _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
-          gap,
-          _outlineBtn('查看物流',
-              onTap: () => _gotoLogistics(context, items.first)),
-          gap,
-          _primaryBtn('评价', onTap: () => _onRateTap(context)),
         ];
     }
     return Row(
@@ -1296,13 +1297,15 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
+  /// 次按钮：v1.9.85 起统一灰底胶囊（真实淘宝退款/待收货卡片同款灰框，
+  /// 不再用白底描边），内容不变只改框颜色
   Widget _outlineBtn(String text, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFdddddd)),
+          color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(text,
@@ -2159,9 +2162,9 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
       Navigator.of(context).pop();
       const styles = [
         '随机（每单自动分配）',
-        '样式1：评价 + 加入购物车 + 再买一单',
-        '样式2：闲鱼转卖 + 评价 + 加入购物车',
-        '样式3：加入购物车 + 查看物流 + 评价',
+        '样式1：追加评价 + 查看物流 + 再买一单',
+        '样式2：再买一单 + 加入购物车 + 删除订单',
+        '样式3：评价 + 加入购物车 + 再买一单',
       ];
       const values = [-1, 0, 1, 2];
       final cur = values.indexOf(widget.shop.orderBtnStyle);
