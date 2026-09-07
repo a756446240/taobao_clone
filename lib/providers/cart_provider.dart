@@ -84,7 +84,8 @@ class CartProvider extends ChangeNotifier {
   /// 用户删除过的订单（黑名单）永久跳过、不会复活。
   /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数)。
   ({int added, int skipped, int blocked}) importSyncedShops(
-      List<ShoppingCartShop> incoming) {
+      List<ShoppingCartShop> incoming,
+      {bool forceRefresh = false}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -163,6 +164,21 @@ class CartProvider extends ChangeNotifier {
               oldItem.giftTitle = it.giftTitle;
               opsBackfilled = true;
             }
+            // 服务标签（v1.9.91）：抓包 detailTags 只补空值——
+            // 旧数据默认是 ['极速退款','7天无理由']（模型默认值），
+            // 抓包有真实标签时替换；用户手动改过的（非默认值）绝不覆盖
+            if (it.detailTags.isNotEmpty) {
+              final isDefault = oldItem.detailTags.length == 2 &&
+                  oldItem.detailTags.contains('极速退款') &&
+                  (oldItem.detailTags.contains('7天无理由') ||
+                      oldItem.detailTags.contains('7天无理由退货'));
+              if (oldItem.detailTags.isEmpty || isDefault) {
+                oldItem.detailTags = it.detailTags;
+                // 抓包有真实标签时清空 returnText，避免 displayTags 合并重复
+                oldItem.returnText = '';
+                opsBackfilled = true;
+              }
+            }
           }
         }
       }
@@ -171,7 +187,18 @@ class CartProvider extends ChangeNotifier {
         if (it.orderNo.isNotEmpty && _deletedTradeNos.contains(it.orderNo)) {
           blocked++;
         } else if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
-          skipped++;
+          // v1.9.91：强制刷新模式——已有订单号不跳过，先从 _shops 删掉旧项，
+          // 新项加入 newItems（用新数据替换旧数据，保留用户手动改过的字段）
+          if (forceRefresh) {
+            for (final oldShop in _shops) {
+              oldShop.items.removeWhere((e) => e.orderNo == it.orderNo);
+            }
+            // 删掉空店铺（所有商品都被替换走的）
+            _shops.removeWhere((s) => s.items.isEmpty);
+            newItems.add(it);
+          } else {
+            skipped++;
+          }
         } else {
           newItems.add(it);
         }
