@@ -177,6 +177,14 @@ class CartProvider extends ChangeNotifier {
           it.wechatTradeNo = _composeWechatTradeNo();
         }
         it.alipayTradeNo = '';
+        // v1.9.85：非待发货/待付款订单缺发货时间时，按创建时间当天随机补齐
+        final cat = statusCategory(
+            it.statusTitle.isEmpty ? shop.orderSubStatus : it.statusTitle);
+        if (cat != '待发货' &&
+            cat != '待付款' &&
+            it.shipTime.trim().isEmpty) {
+          it.shipTime = _autoShipTimeSameDay(it);
+        }
       }
       shop.items
         ..clear()
@@ -639,6 +647,9 @@ class CartProvider extends ChangeNotifier {
     String? shipLogo,
     String? shipPhone,
     String? logisticsTraces,
+    int? giftCount,
+    String? giftImage,
+    String? giftTitle,
   }) {
     if (title != null) item.title = title;
     if (configuration != null) item.configuration = configuration;
@@ -731,6 +742,9 @@ class CartProvider extends ChangeNotifier {
     if (shipLogo != null) item.shipLogo = shipLogo;
     if (shipPhone != null) item.shipPhone = shipPhone;
     if (logisticsTraces != null) item.logisticsTraces = logisticsTraces;
+    if (giftCount != null) item.giftCount = giftCount;
+    if (giftImage != null) item.giftImage = giftImage;
+    if (giftTitle != null) item.giftTitle = giftTitle;
     // 实付款规则：
     // 1) 直接修改实付价（price）时，以录入值为准，绝不再用其它字段重算覆盖
     // 2) 修改商品总价/运费/优惠等组成项时，才自动重算实付款
@@ -785,6 +799,13 @@ class CartProvider extends ChangeNotifier {
     shop.orderSubStatus = status;
     final category = statusCategory(status);
     shop.orderStatus = category == '退款/售后' ? '退款/售后' : category;
+    // v1.9.85：状态切换到已发货/待收货/交易成功/退款类时自动补发货时间
+    // （创建时间当天往后随机、限当天）；切回待发货/待付款则清空（对齐真实淘宝）
+    if (category == '待发货' || category == '待付款') {
+      item.shipTime = '';
+    } else if (item.shipTime.trim().isEmpty) {
+      item.shipTime = _autoShipTimeSameDay(item);
+    }
     // 退款类状态同步退款详情页字段（三个退款状态互斥且都可逆）
     if (category == '退款/售后') {
       if (status.contains('成功')) {
@@ -798,6 +819,25 @@ class CartProvider extends ChangeNotifier {
     }
     _persist();
     notifyListeners();
+  }
+
+  /// 生成当天发货时间：创建时间之后、限当天 23:59 前随机（按订单号哈希确定性）
+  String _autoShipTimeSameDay(OrderItem item) {
+    final base = _parseCreateTime(item.createTime) ??
+        _parseCreateTime(item.payTime) ??
+        DateTime.now();
+    final seed = item.orderNo.isNotEmpty
+        ? item.orderNo.hashCode
+        : (item.title + item.createTime).hashCode;
+    final rand = Random(seed);
+    final endOfDay = DateTime(base.year, base.month, base.day, 23, 59, 59);
+    final spanSec = endOfDay.difference(base).inSeconds;
+    final t = spanSec > 120
+        ? base.add(Duration(seconds: 60 + rand.nextInt(spanSec - 60)))
+        : base.add(const Duration(minutes: 30));
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} '
+        '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
   }
 
   void removeItem(OrderItem item) {
