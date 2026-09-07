@@ -41,6 +41,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late OrderItem _item;
   late ShoppingCartShop _shop;
   bool _addressExpanded = false; // 地址区单击展开查看完整信息
+  bool _orderInfoExpanded = false; // 订单信息折叠（v1.9.85 恢复：默认折叠，点标题展开）
 
   @override
   void initState() {
@@ -797,6 +798,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           ),
           // v1.9.83：删除商品卡「加入购物车/申请售后」按钮下方那条空白虚线分隔线
+          // v1.9.85：赠品栏（对齐真实淘宝：赠品 | 1件 + 缩略图 + >；双击编辑件数，0=隐藏）
+          if (_item.giftCount > 0) _giftRow(),
           ..._priceSectionChildren(),
         ],
       ),
@@ -859,6 +862,83 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  /// 赠品栏（v1.9.85）：对齐真实淘宝——左"赠品"，右"N件 + 缩略图 + >"
+  /// 单击=编辑赠品件数（输入 0 隐藏），双击=换赠品图，长按=编辑赠品名
+  Widget _giftRow() {
+    return GestureDetector(
+      onTap: () =>
+          _editNumber('修改赠品件数（0=隐藏赠品栏）', _item.giftCount.toDouble(),
+              (v) {
+        context
+            .read<CartProvider>()
+            .updateOrderItem(_item, giftCount: v.round());
+      }),
+      onDoubleTap: _pickGiftImage,
+      onLongPress: () =>
+          _editText('修改赠品名称', _item.giftTitle, (v) {
+        context.read<CartProvider>().updateOrderItem(_item, giftTitle: v);
+      }),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 12),
+        child: Row(
+          children: [
+            const Text('赠品',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87)),
+            const Spacer(),
+            Text('${_item.giftCount}件',
+                style: const TextStyle(
+                    fontSize: 13, color: Color(0xFF666666))),
+            const SizedBox(width: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: _item.giftImage.isNotEmpty
+                  ? AppImage(url: _item.giftImage, width: 26, height: 26)
+                  : Container(
+                      width: 26,
+                      height: 26,
+                      color: const Color(0xFFF2F2F4),
+                      child: const Icon(Icons.card_giftcard,
+                          size: 16, color: Color(0xFFbbbbbb)),
+                    ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: Color(0xFFcccccc), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 换赠品缩略图（双击赠品行触发）
+  Future<void> _pickGiftImage() async {
+    try {
+      final picked =
+          await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+      final dir = await getApplicationDocumentsDirectory();
+      final saveDir = Directory('${dir.path}/gift_images');
+      if (!saveDir.existsSync()) saveDir.createSync(recursive: true);
+      final ext = picked.path.contains('.')
+          ? picked.path.substring(picked.path.lastIndexOf('.'))
+          : '.jpg';
+      final fileName = 'gift_${DateTime.now().millisecondsSinceEpoch}$ext';
+      final saved = await File(picked.path).copy('${saveDir.path}/$fileName');
+      if (!mounted) return;
+      context
+          .read<CartProvider>()
+          .updateOrderItem(_item, giftImage: saved.path);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('图片选择失败')),
+      );
+    }
+  }
+
   Widget _redTag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -894,9 +974,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             valueColor: const Color(0xFF1A1A1A)),
       // 对齐真实淘宝：商品总价与进口税同处一个矩阵、之间无分割线
       if (_item.showTax) _taxRow(),
-      // 分割线：进口税下方、店铺优惠上方（对齐真实淘宝）
-      if (_item.showTax)
-        const Divider(height: 16, color: Color(0xFFf0f0f0)),
+      // v1.9.85：分割线固定在商品总价（矩阵）下方——不随进口税行隐藏而消失
+      const Divider(height: 16, color: Color(0xFFf0f0f0)),
       if (_item.showShopDiscount)
         _priceRow('店铺优惠', '', '-¥${_item.shopDiscount.toStringAsFixed(2)}',
             valueColor: const Color(0xFFff5000),
@@ -1061,36 +1140,48 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Text('订单信息',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87)),
-              Text('  共${entries.length}项',
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF999999))),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => _copy(_orderNo, '订单编号已复制'),
-                child: Row(
-                  children: [
-                    Text(_orderNo,
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF666666))),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.content_copy,
-                        color: Color(0xFF999999), size: 14),
-                  ],
+          // v1.9.85：恢复折叠——点标题行展开/收起明细（对齐真实淘宝"共N项 ⌄"）
+          GestureDetector(
+            onTap: () =>
+                setState(() => _orderInfoExpanded = !_orderInfoExpanded),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                const Text('订单信息',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
+                Text('  共${entries.length}项',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF999999))),
+                Icon(
+                    _orderInfoExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: const Color(0xFF999999),
+                    size: 18),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _copy(_orderNo, '订单编号已复制'),
+                  child: Row(
+                    children: [
+                      Text(_orderNo,
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF666666))),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.content_copy,
+                          color: Color(0xFF999999), size: 14),
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right,
-                  color: Color(0xFFcccccc), size: 18),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ...entries,
+          if (_orderInfoExpanded) ...[
+            const SizedBox(height: 12),
+            ...entries,
+          ],
         ],
       ),
     );
@@ -1410,16 +1501,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 底部栏（v1.9.80 按状态照搬真实淘宝） ============
-  // 待发货：客服/投诉 + 催发货 + 修改地址
-  // 已发货/运输中/待确认收货：客服/更多 + 催物流 + 查看物流 + 确认收货
-  // 待评价：客服/更多 + 评价 + 加入购物车 + 再买一单
+  // ============ 底部栏（v1.9.85 按状态照搬真实淘宝截图，图标用贴图） ============
+  // 待发货（多数）：客服/投诉 + 催发货（橙）
+  // 待发货（少数）：客服/投诉 + 申请开票 + 催发货 + 修改地址（橙）
+  // 已发货/运输中/待确认收货：客服/更多 + 延长收货 + 查看物流 + 确认收货（橙）
+  // 交易成功/待评价：客服/更多 + 追加评价 + 查看物流 + 再买一单（橙）
+  // 退款/售后：客服/更多 + 加入购物车 + 钱款去向 + 联系商家（橙）
   Widget _buildBottomBar() {
     final category = CartProvider.statusCategory(
         _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
-    // v1.9.83：放宽判断——整个"待收货"分类（已发货/运输中/派送中/已签收/待确认收货）
-    // 都显示「催物流 + 查看物流 + 确认收货」，避免"已发货"状态落到"查看详情"兜底
     final isSignedPending = category == '待收货';
+    final isTradeSuccess = _isWaitRate || category == '已完成';
+    final isRefund = category == '退款/售后';
+    // 待发货两种框架：多数=仅催发货；约 1/4（按订单号哈希）=申请开票+催发货+修改地址
+    final pendingShipFull =
+        _orderNo.isNotEmpty && _orderNo.hashCode.abs() % 4 == 0;
+    // 左侧图标位：待发货=客服+投诉，其余=客服+更多
+    final secondIsMore = !_isPendingShip;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -1431,30 +1529,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(
             children: [
-              _bottomAction(Icons.chat_bubble_outline, '客服',
+              _bottomAction('assets/images/icons/order_kefu.png', '客服',
                   onTap: _gotoServiceChat),
               _bottomAction(
-                  _isWaitRate || isSignedPending
-                      ? Icons.more_horiz
-                      : Icons.report_problem_outlined,
-                  _isWaitRate || isSignedPending ? '更多' : '投诉',
-                  onTap: _isWaitRate || isSignedPending
-                      ? _showMoreSheet
-                      : _gotoComplaint),
+                  secondIsMore
+                      ? 'assets/images/icons/order_gengduo.png'
+                      : 'assets/images/icons/order_tousu.png',
+                  secondIsMore ? '更多' : '投诉',
+                  onTap: secondIsMore ? _showMoreSheet : _gotoComplaint),
               const Spacer(),
               if (_isPendingShip) ...[
-                _outlineBtn('催发货', onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('已提醒商家尽快发货'),
-                    duration: Duration(seconds: 1),
-                  ));
-                }),
-                const SizedBox(width: 8),
-                _primaryBtn('修改地址',
-                    color: const Color(0xFFff5000), onTap: _editAddress),
-              ] else if (_isWaitRate) ...[
-                // 待评价（交易成功）订单底栏对齐真实淘宝：评价 + 加入购物车 + 再买一单
-                _outlineBtn('评价', onTap: () {
+                if (pendingShipFull) ...[
+                  _outlineBtn('申请开票', onTap: () => _demoToast('申请开票')),
+                  const SizedBox(width: 8),
+                  _outlineBtn('催发货', onTap: _urgeShip),
+                  const SizedBox(width: 8),
+                  _primaryBtn('修改地址',
+                      color: const Color(0xFFff5000), onTap: _editAddress),
+                ] else
+                  _primaryBtn('催发货',
+                      color: const Color(0xFFff5000), onTap: _urgeShip),
+              ] else if (isTradeSuccess) ...[
+                _outlineBtn('追加评价', onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) =>
@@ -1463,18 +1559,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   );
                 }),
                 const SizedBox(width: 8),
-                _outlineBtn('加入购物车', onTap: _reAddToCart),
+                _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
                 _primaryBtn('再买一单',
                     color: const Color(0xFFff5000), onTap: _reAddToCart),
               ] else if (isSignedPending) ...[
-                // 已发货/运输中/待确认收货（对齐真实淘宝）：催物流 + 查看物流 + 确认收货
-                _outlineBtn('催物流', onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('已提醒商家尽快发货'),
-                    duration: Duration(seconds: 1),
-                  ));
-                }),
+                _outlineBtn('延长收货', onTap: () => _demoToast('已延长收货时间')),
                 const SizedBox(width: 8),
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
@@ -1486,6 +1576,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     duration: Duration(seconds: 1),
                   ));
                 }),
+              ] else if (isRefund) ...[
+                _outlineBtn('加入购物车', onTap: _reAddToCart),
+                const SizedBox(width: 8),
+                _outlineBtn('钱款去向', onTap: _gotoRefund),
+                const SizedBox(width: 8),
+                _primaryBtn('联系商家',
+                    color: const Color(0xFFff5000), onTap: _gotoServiceChat),
               ] else
                 _primaryBtn('查看详情',
                     color: const Color(0xFFff5000), onTap: () {}),
@@ -1494,6 +1591,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// 「催发货」提醒
+  void _urgeShip() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('已提醒商家尽快发货'),
+      duration: Duration(seconds: 1),
+    ));
+  }
+
+  /// 平台功能类按钮：演示样式仅提示
+  void _demoToast(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text),
+      duration: const Duration(seconds: 1),
+    ));
   }
 
   /// 底部「客服」→ 旺旺聊天页（照搬真实淘宝店铺客服会话）
@@ -1589,7 +1702,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }, maxLines: 3);
   }
 
-  Widget _bottomAction(IconData icon, String label, {VoidCallback? onTap}) {
+  /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
+  Widget _bottomAction(String asset, String label, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -1598,7 +1712,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: const Color(0xFF666666), size: 22),
+            Image.asset(asset, width: 22, height: 22),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
@@ -1609,16 +1723,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // v1.9.83：底部按钮高保真化——参照真实淘宝截图样式（灰底更柔、圆角更大、字号 13）
+  // 底部次按钮：灰底圆角矩形（对齐真实淘宝切图：#F2F2F4 底、圆角约 10、字号 13）
   Widget _outlineBtn(String text, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        constraints: const BoxConstraints(minWidth: 80, minHeight: 30),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        constraints: const BoxConstraints(minWidth: 72, minHeight: 30),
         decoration: BoxDecoration(
           color: const Color(0xFFF2F2F4),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
           child: Text(text,
@@ -1632,11 +1746,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        constraints: const BoxConstraints(minWidth: 80, minHeight: 30),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        constraints: const BoxConstraints(minWidth: 72, minHeight: 30),
         decoration: BoxDecoration(
-          color: const Color(0xFFF2F2F4),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFFFFF1E8),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
           child: Text(text,
@@ -1646,15 +1760,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  // 底部主按钮：橙底白字圆角矩形（对齐真实淘宝切图）
   Widget _primaryBtn(String text, {required Color color, VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
-        constraints: const BoxConstraints(minWidth: 88, minHeight: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        constraints: const BoxConstraints(minWidth: 80, minHeight: 32),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
           child: Text(text,
