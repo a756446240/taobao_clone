@@ -156,6 +156,13 @@ class CartProvider extends ChangeNotifier {
               oldItem.shipPhone = it.shipPhone;
               opsBackfilled = true;
             }
+            // 赠品（v1.9.85）：抓包赠品信息只补零值，手动改过的绝不覆盖
+            if (oldItem.giftCount == 0 && it.giftCount > 0) {
+              oldItem.giftCount = it.giftCount;
+              oldItem.giftImage = it.giftImage;
+              oldItem.giftTitle = it.giftTitle;
+              opsBackfilled = true;
+            }
           }
         }
       }
@@ -803,6 +810,8 @@ class CartProvider extends ChangeNotifier {
     // （创建时间当天往后随机、限当天）；切回待发货/待付款则清空（对齐真实淘宝）
     if (category == '待发货' || category == '待付款') {
       item.shipTime = '';
+      // 未发货无物流信息（对齐真实淘宝），清掉切换前的残留物流文字
+      item.logistics = '';
     } else if (item.shipTime.trim().isEmpty) {
       item.shipTime = _autoShipTimeSameDay(item);
     }
@@ -816,6 +825,11 @@ class CartProvider extends ChangeNotifier {
         item.refundStatus = '待商家退款';
       }
       item.refundTitle = item.refundStatus;
+    } else {
+      // v1.9.86：切出退款类时清掉退款残留字段——
+      // 否则退款单改成交易成功后，审核页/退款条仍按退款单误判
+      item.refundStatus = '';
+      item.refundTitle = '';
     }
     _persist();
     notifyListeners();
