@@ -815,6 +815,16 @@ class CartProvider extends ChangeNotifier {
     } else if (item.shipTime.trim().isEmpty) {
       item.shipTime = _autoShipTimeSameDay(item);
     }
+    // v1.9.89：切入发货类状态时，物流小窗无文字的自动生成在途文案
+    // + 从抓包运单池分配真实单号（否则列表卡片物流条空白，且无法联网跟踪）
+    if (category == '待收货') {
+      if (item.logistics.trim().isEmpty) {
+        item.logistics = _autoTransitText(item);
+      }
+      if (item.waybillNo.trim().isEmpty) {
+        _assignWaybillFromPool(item);
+      }
+    }
     // 退款类状态同步退款详情页字段（三个退款状态互斥且都可逆）
     if (category == '退款/售后') {
       if (status.contains('成功')) {
@@ -840,9 +850,19 @@ class CartProvider extends ChangeNotifier {
   /// 在订单列表页打开时扫描一次（v1.9.88）。
   void sweepAutoConfirm() {
     final now = DateTime.now();
+    var backfilled = false;
     for (final shop in shops) {
       for (final it in shop.items) {
         if (statusCategory(it.statusTitle) != '待收货') continue;
+        // v1.9.89：顺带回填存量订单——待收货但物流条空白/无单号的补齐
+        if (it.logistics.trim().isEmpty) {
+          it.logistics = _autoTransitText(it);
+          backfilled = true;
+        }
+        if (it.waybillNo.trim().isEmpty) {
+          _assignWaybillFromPool(it);
+          backfilled = true;
+        }
         final raw = it.payTime.isNotEmpty ? it.payTime : it.createTime;
         final base = DateTime.tryParse(raw.replaceAll(' ', 'T'));
         if (base == null) continue;
@@ -851,6 +871,41 @@ class CartProvider extends ChangeNotifier {
         }
       }
     }
+    if (backfilled) {
+      _persist();
+      notifyListeners();
+    }
+  }
+
+  /// 生成在途物流文案（按订单号哈希确定性，对齐真实淘宝列表物流条格式）
+  String _autoTransitText(OrderItem item) {
+    const origins = ['长沙', '杭州', '广州', '金华', '武汉', '上海', '郑州', '义乌'];
+    const dests = ['济南', '淄博', '青岛', '潍坊', '烟台', '临沂'];
+    final seed = (item.orderNo.isEmpty ? item.title : item.orderNo)
+        .hashCode
+        .abs();
+    final o = origins[seed % origins.length];
+    final d = dests[(seed ~/ 7) % dests.length];
+    return '您的快件离开【$o转运中心】，已发往【$d】';
+  }
+
+  /// 无单号订单：从抓包运单池按订单号哈希稳定分配一个真实单号，
+  /// 连带快递公司/官方头像/客服电话（与物流页 v1.9.88 逻辑同源）
+  void _assignWaybillFromPool(OrderItem item) {
+    final pool = <OrderItem>[
+      for (final s in _shops)
+        for (final e in s.items)
+          if (!identical(e, item) && e.waybillNo.isNotEmpty) e,
+    ];
+    if (pool.isEmpty) return;
+    final seed = (item.orderNo.isEmpty ? item.title : item.orderNo)
+        .hashCode
+        .abs();
+    final donor = pool[seed % pool.length];
+    item.waybillNo = donor.waybillNo;
+    if (item.shipCompany.isEmpty) item.shipCompany = donor.shipCompany;
+    if (item.shipLogo.isEmpty) item.shipLogo = donor.shipLogo;
+    if (item.shipPhone.isEmpty) item.shipPhone = donor.shipPhone;
   }
 
   /// 生成当天发货时间：创建时间之后、限当天 23:59 前随机（按订单号哈希确定性）
