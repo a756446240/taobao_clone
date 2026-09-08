@@ -210,6 +210,11 @@ class OrderItem {
   String giftImage; // 赠品缩略图（URL 或本地路径，空=灰色占位）
   String giftTitle; // 赠品名称（展开/提示用）
 
+  // ===== 优惠明细（v1.9.93 起，抓包 detailv2/手动编辑） =====
+  // JSON 数组：[{"group":"shop|platform","name":"官方立减","sub":"立减优惠","amount":57.0}]
+  // 空 = 详情页按店铺优惠/平台优惠总额自动拆分展示
+  String discountDetails;
+
   // 列表页价格行显示/隐藏（image#2 红框区域）
   bool showPlatformPriceRow; // 平台加补后
   bool showCouponPriceRow; // 领消费券后约
@@ -309,6 +314,7 @@ class OrderItem {
     this.giftCount = 0,
     this.giftImage = '',
     this.giftTitle = '',
+    this.discountDetails = '',
     this.tmallPoints = 35,
     this.showTmallPoints = false,
     this.showPlatformPriceRow = true,
