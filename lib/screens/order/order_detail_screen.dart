@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -42,6 +43,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late ShoppingCartShop _shop;
   bool _addressExpanded = false; // 地址区单击展开查看完整信息
   bool _orderInfoExpanded = false; // 订单信息折叠（v1.9.85 恢复：默认折叠，点标题展开）
+  bool _shopDiscountExpanded = false; // 店铺优惠明细展开（v1.9.93）
+  bool _platformCouponExpanded = false; // 平台优惠明细展开（v1.9.93）
 
   @override
   void initState() {
@@ -1004,11 +1007,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // 实付款：抓包导入的订单带整单实付总额（单价×数量有分位差），优先用
     final total =
         _shop.actualTotal > 0 ? _shop.actualTotal : _item.price;
+    // 优惠子项（v1.9.93）：抓包/手动编辑的明细优先，空则按总额确定性自动拆分；
+    // 有明细时该组总额 = 子项之和（抓包导入的订单 shopDiscount/platformCoupon 为 0）
+    final shopSubs = _discountSubs('shop');
+    final platformSubs = _discountSubs('platform');
+    final shopTotal =
+        shopSubs.isNotEmpty ? _subsSum(shopSubs) : _item.shopDiscount;
+    final platformTotal = platformSubs.isNotEmpty
+        ? _subsSum(platformSubs)
+        : _item.platformCoupon;
     // 共减 = 店铺优惠 + 平台优惠（优先用持久化的共减字段）
     final co = _item.coDiscount > 0
         ? _item.coDiscount
-        : (_item.showShopDiscount ? _item.shopDiscount : 0) +
-            (_item.showPlatformCoupon ? _item.platformCoupon : 0);
+        : (_item.showShopDiscount ? shopTotal : 0) +
+            (_item.showPlatformCoupon ? platformTotal : 0);
     return [
       _priceRow('商品总价', '共${_item.quantity}件',
           '¥${productTotal.toStringAsFixed(2)}'),
@@ -1020,15 +1032,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (_item.showTax) _taxRow(),
       // v1.9.85：分割线固定在商品总价（矩阵）下方——不随进口税行隐藏而消失
       const Divider(height: 16, color: Color(0xFFf0f0f0)),
-      if (_item.showShopDiscount)
-        _priceRow('店铺优惠', '', '-¥${_item.shopDiscount.toStringAsFixed(2)}',
-            valueColor: const Color(0xFFff5000),
-            icon: Icons.storefront),
-      if (_item.showPlatformCoupon)
-        _priceRow('平台优惠券', _item.platformCouponLabel,
-            '-¥${_item.platformCoupon.toStringAsFixed(2)}',
-            valueColor: const Color(0xFFff5000),
-            icon: Icons.confirmation_number),
+      // 店铺优惠/平台优惠：单击展开子项明细，双击编辑（v1.9.93）
+      if (_item.showShopDiscount && shopTotal > 0)
+        _discountGroupRow(
+          group: 'shop',
+          icon: Icons.storefront,
+          label: '店铺优惠',
+          sub: '',
+          total: shopTotal,
+          subs: shopSubs,
+          expanded: _shopDiscountExpanded,
+          onToggle: () => setState(
+              () => _shopDiscountExpanded = !_shopDiscountExpanded),
+        ),
+      if (_item.showPlatformCoupon && platformTotal > 0)
+        _discountGroupRow(
+          group: 'platform',
+          icon: Icons.confirmation_number,
+          label: '平台优惠',
+          sub: _item.platformCouponLabel,
+          total: platformTotal,
+          subs: platformSubs,
+          expanded: _platformCouponExpanded,
+          onToggle: () => setState(
+              () => _platformCouponExpanded = !_platformCouponExpanded),
+        ),
       Row(
         children: [
           const Text('实付款',
@@ -1127,6 +1155,333 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  // ============ 优惠明细（v1.9.93：可展开 + 双击编辑） ============
+  static double _subsSum(List<Map<String, dynamic>> subs) {
+    var s = 0.0;
+    for (final e in subs) {
+      s += (e['amount'] as num?)?.toDouble() ?? 0;
+    }
+    return double.parse(s.toStringAsFixed(2));
+  }
+
+  /// 优惠子项：抓包/手动编辑的 discountDetails JSON 优先，
+  /// 没有时按该组总额 + 订单号哈希确定性自动拆分
+  List<Map<String, dynamic>> _discountSubs(String group) {
+    final raw = _item.discountDetails.trim();
+    if (raw.isNotEmpty) {
+      try {
+        final list = (jsonDecode(raw) as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((e) => e['group'] == group)
+            .toList();
+        if (list.isNotEmpty) return list;
+      } catch (_) {}
+    }
+    return _autoDiscountSubs(group);
+  }
+
+  /// 无抓包明细时的确定性自动拆分（对齐真实淘宝常见子项名）
+  List<Map<String, dynamic>> _autoDiscountSubs(String group) {
+    final total =
+        group == 'shop' ? _item.shopDiscount : _item.platformCoupon;
+    if (total <= 0) return const [];
+    final rnd = Random('${_item.orderNo}_$group'.hashCode);
+    double r2(double v) => double.parse(v.toStringAsFixed(2));
+    if (group == 'shop') {
+      if (total >= 40) {
+        final a = r2(total * (0.35 + rnd.nextDouble() * 0.1));
+        return [
+          {'group': group, 'name': '官方立减', 'sub': '', 'amount': a},
+          {
+            'group': group,
+            'name': '单品直降',
+            'sub': '立减优惠',
+            'amount': r2(total - a)
+          },
+        ];
+      }
+      return [
+        {'group': group, 'name': '店铺优惠', 'sub': '', 'amount': r2(total)}
+      ];
+    }
+    // 平台组：官方限时补贴/淘金币/红包/消费券
+    if (total >= 40) {
+      final coin = r2((3 + rnd.nextInt(10)).toDouble());
+      final hb = r2((1 + rnd.nextInt(4)).toDouble());
+      final subsidy = r2(total - coin - hb);
+      if (subsidy > 0) {
+        return [
+          {
+            'group': group,
+            'name': '官方限时补贴',
+            'sub': '秒杀直降',
+            'amount': subsidy
+          },
+          {
+            'group': group,
+            'name': '淘金币',
+            'sub': '已消耗${(coin * 100).round()}',
+            'amount': coin
+          },
+          {'group': group, 'name': '红包', 'sub': '', 'amount': hb},
+        ];
+      }
+    }
+    if (total >= 10) {
+      final coin = r2((2 + rnd.nextInt(6)).toDouble());
+      return [
+        {
+          'group': group,
+          'name': '淘金币',
+          'sub': '已消耗${(coin * 100).round()}',
+          'amount': coin
+        },
+        {
+          'group': group,
+          'name': '消费券',
+          'sub': '消费券已抵${r2(total - coin)}元',
+          'amount': r2(total - coin)
+        },
+      ];
+    }
+    return [
+      {
+        'group': group,
+        'name': '消费券',
+        'sub': '消费券已抵${r2(total)}元',
+        'amount': r2(total)
+      }
+    ];
+  }
+
+  /// 优惠分组行（店铺优惠/平台优惠）：单击展开/收起子项，双击编辑明细
+  Widget _discountGroupRow({
+    required String group,
+    required IconData icon,
+    required String label,
+    required String sub,
+    required double total,
+    required List<Map<String, dynamic>> subs,
+    required bool expanded,
+    required VoidCallback onToggle,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            onDoubleTap: () => _editDiscountDetails(group, label),
+            child: Row(
+              children: [
+                _discountIcon(icon),
+                Text(label, style: AppTextStyles.small),
+                if (sub.isNotEmpty)
+                  Text('  $sub', style: AppTextStyles.minSub),
+                const Spacer(),
+                Text('-¥${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 13, color: Color(0xFFff5000))),
+                Icon(
+                  expanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: const Color(0xFFff5000),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (expanded)
+          ...subs.map((s) {
+            final name = (s['name'] ?? '').toString();
+            final ssub = (s['sub'] ?? '').toString();
+            final amount = (s['amount'] as num?)?.toDouble() ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(left: 21, bottom: 8),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onDoubleTap: () => _editDiscountDetails(group, label),
+                child: Row(
+                  children: [
+                    Text(name,
+                        style: AppTextStyles.small
+                            .copyWith(color: const Color(0xFF666666))),
+                    if (ssub.isNotEmpty)
+                      Text('  $ssub', style: AppTextStyles.minSub),
+                    const Spacer(),
+                    Text('-¥${amount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF666666))),
+                    const Icon(Icons.chevron_right,
+                        size: 14, color: Colors.black26),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  /// 编辑优惠明细（双击店铺优惠/平台优惠栏触发）：
+  /// 可增删子项、改名称/副文案/金额；保存后该组总额自动 = 子项之和
+  Future<void> _editDiscountDetails(String group, String label) async {
+    // 其他组的明细原样保留
+    final others = <Map<String, dynamic>>[];
+    final raw = _item.discountDetails.trim();
+    if (raw.isNotEmpty) {
+      try {
+        others.addAll((jsonDecode(raw) as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((e) => e['group'] != group));
+      } catch (_) {}
+    }
+    final rows = _discountSubs(group)
+        .map((e) => <String, TextEditingController>{
+              'name':
+                  TextEditingController(text: (e['name'] ?? '').toString()),
+              'sub':
+                  TextEditingController(text: (e['sub'] ?? '').toString()),
+              'amount': TextEditingController(
+                  text: ((e['amount'] as num?)?.toDouble() ?? 0)
+                      .toStringAsFixed(2)),
+            })
+        .toList();
+    if (rows.isEmpty) {
+      rows.add({
+        'name': TextEditingController(text: '官方立减'),
+        'sub': TextEditingController(),
+        'amount': TextEditingController(text: '0.00'),
+      });
+    }
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c2, setState2) => AlertDialog(
+          title: Text('编辑$label明细', style: const TextStyle(fontSize: 16)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < rows.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: rows[i]['name'],
+                              style: const TextStyle(fontSize: 13),
+                              decoration: const InputDecoration(
+                                labelText: '名称',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: rows[i]['sub'],
+                              style: const TextStyle(fontSize: 13),
+                              decoration: const InputDecoration(
+                                labelText: '副文案(可空)',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: rows[i]['amount'],
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              style: const TextStyle(fontSize: 13),
+                              decoration: const InputDecoration(
+                                labelText: '金额',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline,
+                                size: 18, color: Colors.black38),
+                            onPressed: () =>
+                                setState2(() => rows.removeAt(i)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setState2(() => rows.add({
+                            'name': TextEditingController(),
+                            'sub': TextEditingController(),
+                            'amount':
+                                TextEditingController(text: '0.00'),
+                          })),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('添加一项',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('取消')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('保存',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final subs = <Map<String, dynamic>>[];
+    for (final r in rows) {
+      final name = (r['name'] as TextEditingController).text.trim();
+      final sub = (r['sub'] as TextEditingController).text.trim();
+      final amount = double.tryParse(
+              (r['amount'] as TextEditingController).text.trim()) ??
+          0;
+      if (name.isEmpty && amount <= 0) continue;
+      subs.add({
+        'group': group,
+        'name': name.isEmpty ? '优惠' : name,
+        'sub': sub,
+        'amount': double.parse(amount.abs().toStringAsFixed(2)),
+      });
+    }
+    final merged = [...others, ...subs];
+    final sum = _subsSum(subs);
+    if (!mounted) return;
+    context.read<CartProvider>().updateOrderItem(
+          _item,
+          discountDetails: jsonEncode(merged),
+          shopDiscount: group == 'shop' ? sum : null,
+          platformCoupon: group == 'platform' ? sum : null,
+        );
   }
 
   // ============ 订单信息（对齐 v3.4 image#13） ============
