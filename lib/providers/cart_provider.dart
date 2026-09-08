@@ -85,7 +85,7 @@ class CartProvider extends ChangeNotifier {
   /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数)。
   ({int added, int skipped, int blocked}) importSyncedShops(
       List<ShoppingCartShop> incoming,
-      {bool forceRefresh = false}) {
+      {bool forceRefresh = false, Set<String>? forceOrderNos}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -194,8 +194,10 @@ class CartProvider extends ChangeNotifier {
           blocked++;
         } else if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
           // v1.9.91：强制刷新模式——已有订单号不跳过，先从 _shops 删掉旧项，
-          // 新项加入 newItems（用新数据替换旧数据，保留用户手动改过的字段）
-          if (forceRefresh) {
+          // 新项加入 newItems（用新数据整单替换旧数据）
+          // v1.9.95：支持按单号覆盖（forceOrderNos），未选中的照旧跳过
+          if (forceRefresh ||
+              (forceOrderNos != null && forceOrderNos.contains(it.orderNo))) {
             for (final oldShop in _shops) {
               oldShop.items.removeWhere((e) => e.orderNo == it.orderNo);
             }
