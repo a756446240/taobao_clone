@@ -164,6 +164,12 @@ class CartProvider extends ChangeNotifier {
               oldItem.giftTitle = it.giftTitle;
               opsBackfilled = true;
             }
+            // 优惠明细（v1.9.93）：抓包优惠子项只补空值，手动改过的绝不覆盖
+            if (oldItem.discountDetails.isEmpty &&
+                it.discountDetails.isNotEmpty) {
+              oldItem.discountDetails = it.discountDetails;
+              opsBackfilled = true;
+            }
             // 服务标签（v1.9.91）：抓包 detailTags 只补空值——
             // 旧数据默认是 ['极速退款','7天无理由']（模型默认值），
             // 抓包有真实标签时替换；用户手动改过的（非默认值）绝不覆盖
@@ -684,6 +690,7 @@ class CartProvider extends ChangeNotifier {
     int? giftCount,
     String? giftImage,
     String? giftTitle,
+    String? discountDetails,
   }) {
     if (title != null) item.title = title;
     if (configuration != null) item.configuration = configuration;
@@ -779,6 +786,7 @@ class CartProvider extends ChangeNotifier {
     if (giftCount != null) item.giftCount = giftCount;
     if (giftImage != null) item.giftImage = giftImage;
     if (giftTitle != null) item.giftTitle = giftTitle;
+    if (discountDetails != null) item.discountDetails = discountDetails;
     // 实付款规则：
     // 1) 直接修改实付价（price）时，以录入值为准，绝不再用其它字段重算覆盖
     // 2) 修改商品总价/运费/优惠等组成项时，才自动重算实付款
