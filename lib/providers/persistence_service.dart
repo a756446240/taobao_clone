@@ -163,6 +163,7 @@ class PersistenceService {
       'giftCount': item.giftCount,
       'giftImage': item.giftImage,
       'giftTitle': item.giftTitle,
+      'discountDetails': item.discountDetails,
       'detailTags': item.detailTags,
       'tmallPoints': item.tmallPoints,
       'showTmallPoints': item.showTmallPoints,
@@ -248,6 +249,7 @@ class PersistenceService {
       giftCount: j['giftCount'] ?? 0,
       giftImage: j['giftImage'] ?? '',
       giftTitle: j['giftTitle'] ?? '',
+      discountDetails: j['discountDetails'] ?? '',
       detailTags: (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
           const ['极速退款', '7天无理由'],
       tmallPoints: j['tmallPoints'] ?? 0,
