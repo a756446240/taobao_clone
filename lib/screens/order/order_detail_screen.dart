@@ -1032,8 +1032,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (_item.showTax) _taxRow(),
       // v1.9.85：分割线固定在商品总价（矩阵）下方——不随进口税行隐藏而消失
       const Divider(height: 16, color: Color(0xFFf0f0f0)),
-      // 店铺优惠/平台优惠：单击展开子项明细，双击编辑（v1.9.93）
-      if (_item.showShopDiscount && shopTotal > 0)
+      // 店铺优惠/平台优惠：单击展开子项明细，双击编辑（v1.9.93）；
+      // v1.9.94：不再要求金额>0——开关打开就显示（0 值也显示），双击可编辑
+      if (_item.showShopDiscount)
         _discountGroupRow(
           group: 'shop',
           icon: Icons.storefront,
@@ -1045,7 +1046,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           onToggle: () => setState(
               () => _shopDiscountExpanded = !_shopDiscountExpanded),
         ),
-      if (_item.showPlatformCoupon && platformTotal > 0)
+      if (_item.showPlatformCoupon)
         _discountGroupRow(
           group: 'platform',
           icon: Icons.confirmation_number,
@@ -1297,6 +1298,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
         ),
+        if (expanded && subs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 21, bottom: 8),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: () => _editDiscountDetails(group, label),
+              child: const Row(
+                children: [
+                  Text('暂无子项，双击添加',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.black26)),
+                ],
+              ),
+            ),
+          ),
         if (expanded)
           ...subs.map((s) {
             final name = (s['name'] ?? '').toString();
