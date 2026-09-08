@@ -65,14 +65,92 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
         for (final it in s.items) it.orderNo,
     };
     var total = 0;
-    var dup = 0;
+    final dupItems = <Map<String, String>>[];
     for (final s in shops) {
       for (final it in s.items) {
         total++;
-        if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) dup++;
+        if (it.orderNo.isNotEmpty && existingNos.contains(it.orderNo)) {
+          dupItems.add({
+            'no': it.orderNo,
+            'shop': s.shopName,
+            'title': it.title,
+          });
+        }
       }
     }
-    var forceRefresh = false;
+    final dup = dupItems.length;
+    // v1.9.95：按单选择要覆盖的已有订单（替代旧的整批强制刷新开关）
+    final selected = <String>{};
+
+    Future<void> pickOverwrite() async {
+      await showDialog<void>(
+        context: context,
+        builder: (c) => StatefulBuilder(
+          builder: (c2, setState2) => AlertDialog(
+            title: Text('选择要覆盖的订单（${selected.length}/$dup）',
+                style: const TextStyle(fontSize: 16)),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 380,
+              child: Column(
+                children: [
+                  CheckboxListTile(
+                    value: dup > 0 && selected.length == dup,
+                    onChanged: (v) => setState2(() {
+                      selected.clear();
+                      if (v == true) {
+                        selected.addAll(dupItems.map((e) => e['no']!));
+                      }
+                    }),
+                    title: const Text('全选', style: TextStyle(fontSize: 13)),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const Divider(height: 8),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: dupItems.length,
+                      itemBuilder: (_, i) {
+                        final d = dupItems[i];
+                        final no = d['no']!;
+                        final tail = no.length > 6
+                            ? no.substring(no.length - 6)
+                            : no;
+                        return CheckboxListTile(
+                          value: selected.contains(no),
+                          onChanged: (v) => setState2(() {
+                            v == true
+                                ? selected.add(no)
+                                : selected.remove(no);
+                          }),
+                          title: Text(d['title']!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12)),
+                          subtitle: Text('${d['shop']} · 单号…$tail',
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.black45)),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('完成')),
+            ],
+          ),
+        ),
+      );
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
@@ -86,34 +164,40 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                 '来源：$sourceDesc\n'
                 '解析到 ${shops.length} 家店铺 / $total 条订单\n\n'
                 '✅ 新增导入：${total - dup} 条\n'
-                '⏭ 已存在跳过：$dup 条',
+                '⏭ 已存在：$dup 条（默认跳过，只补空字段）',
                 style: const TextStyle(fontSize: 13, height: 1.6),
               ),
-              const SizedBox(height: 12),
-              // v1.9.91：强制刷新选项——覆盖已有订单的抓包字段
-              // （标签/价格/物流等），但保留用户手动改过的字段
-              CheckboxListTile(
-                value: forceRefresh,
-                onChanged: (v) => setState2(() => forceRefresh = v ?? false),
-                title: const Text('强制刷新已有订单',
-                    style: TextStyle(fontSize: 13)),
-                subtitle: const Text('用新数据覆盖已有订单（保留手动改过的字段）',
-                    style: TextStyle(fontSize: 11)),
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                forceRefresh
-                    ? '⚠️ 已有订单将被新数据覆盖（标签/价格/物流等）'
-                    : '已有订单（含你修改过的）不会被覆盖。',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: forceRefresh
-                        ? const Color(0xFFFF5000)
-                        : Colors.black54),
-              ),
+              if (dup > 0) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await pickOverwrite();
+                    setState2(() {});
+                  },
+                  icon: const Icon(Icons.checklist, size: 16),
+                  label: Text(
+                    selected.isEmpty
+                        ? '按单选择覆盖（$dup 条已存在）'
+                        : '已选 ${selected.length} 条覆盖',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF5000),
+                    side: const BorderSide(color: Color(0xFFFF5000)),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  selected.isEmpty
+                      ? '不选择则已有订单保持原样（你的手动修改全部保留）。'
+                      : '⚠️ 选中订单将被抓包数据整单覆盖，手动修改会丢失。',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: selected.isEmpty
+                          ? Colors.black54
+                          : const Color(0xFFFF5000)),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -129,10 +213,39 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
       ),
     );
     if (confirmed != true) return;
-    final result = provider.importSyncedShops(shops, forceRefresh: forceRefresh);
+
+    // v1.9.95：覆盖前二次确认——选中订单的手动修改将被冲掉
+    if (selected.isNotEmpty) {
+      final ok2 = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('确认覆盖选中订单？', style: TextStyle(fontSize: 16)),
+          content: Text(
+            '将用抓包数据整单覆盖 ${selected.length} 个已存在订单。\n\n'
+            '⚠️ 你在这些订单上手动改过的内容（价格/文案/优惠/赠品等）'
+            '会全部丢失，且不可恢复。',
+            style: const TextStyle(fontSize: 13, height: 1.6),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('再想想')),
+            TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('确定覆盖',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
+        ),
+      );
+      if (ok2 != true) return;
+    }
+
+    final result =
+        provider.importSyncedShops(shops, forceOrderNos: selected);
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
+    final cover = selected.isNotEmpty ? '，其中覆盖 ${selected.length} 条' : '';
     if (result.added > 0) {
-      _toast('已导入 ${result.added} 条新订单（跳过重复 ${result.skipped} 条$tail）');
+      _toast('已导入 ${result.added} 条$cover（跳过 ${result.skipped} 条$tail）');
       if (mounted) Navigator.of(context).pop();
     } else {
       _toast('没有新订单，${result.skipped} 条已存在$tail');
@@ -252,7 +365,8 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                   '1. 在电脑上运行抓单脚本（扫码登录淘宝一次）\n'
                   '2. 把生成的 JSON 文件用微信发到手机\n'
                   '3. 回到这里点「选择文件导入」\n\n'
-                  '只会新增订单：列表里已有的订单（包括你改过的）原样保留，重复单号自动跳过。',
+                  '默认只新增订单：已有订单（包括你改过的）原样保留。'
+                  '想用抓包数据覆盖某几单，导入时点「按单选择覆盖」勾选即可，覆盖前会再确认一次。',
                   style:
                       TextStyle(fontSize: 12, color: Color(0xFF0D47A1), height: 1.6),
                 ),
