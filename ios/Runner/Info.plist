@@ -4,6 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>需要从相册选择图片，用于设置头像、商品图与消息头像</string>
 	<key>NSCameraUsageDescription</key>
