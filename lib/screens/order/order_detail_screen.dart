@@ -863,8 +863,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const Icon(Icons.chevron_right,
                             size: 12, color: Color(0xFF00A870)),
                         const Spacer(),
-                        Text('x${it.quantity}',
-                            style: AppTextStyles.minSub),
+                        // v1.9.98：数量双击可改（x1、x2…）
+                        GestureDetector(
+                          onDoubleTap: () => _editNumber(
+                              '修改数量', it.quantity.toDouble(), (v) {
+                            context.read<CartProvider>().updateOrderItem(
+                                it,
+                                quantity:
+                                    v.round() < 1 ? 1 : v.round());
+                          }),
+                          child: Text('x${it.quantity}',
+                              style: AppTextStyles.minSub),
+                        ),
                       ],
                     ),
                   ],
@@ -877,7 +887,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               // v1.9.97：更换款式（对齐真实淘宝，橙色带框；点击=改规格）
-              if (it.configuration.isNotEmpty) ...[
+              // v1.9.98：默认隐藏，⋯菜单「显示更换款式」开关打开才显示
+              if (it.showStyleBtn && it.configuration.isNotEmpty) ...[
                 _orangeOutlineBtn('更换款式', onTap: () => _editText(
                     '更换款式', it.configuration, (v) {
                   context
@@ -2740,6 +2751,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           // 之后若再改实付价/优惠等组成项，会按组成项重算覆盖
                           provider.updateShop(_shop, actualTotal: v);
                         });
+                      }),
+                      // v1.9.98：更换款式按钮默认隐藏，需要时从这里打开
+                      _switchTile(Icons.swap_horiz, '显示更换款式',
+                          value: _item.showStyleBtn, onChanged: (v) {
+                        provider.updateOrderItem(_item, showStyleBtn: v);
+                        setSheetState(() {});
                       }),
                       _switchTile(Icons.local_shipping_outlined, '显示运费行',
                           value: _item.showShippingFee, onChanged: (v) {
