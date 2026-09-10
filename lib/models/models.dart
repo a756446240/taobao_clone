@@ -197,6 +197,7 @@ class OrderItem {
   bool showShopDiscount; // 是否显示店铺优惠
   double platformCoupon; // 平台优惠券金额
   String platformCouponLabel; // 平台优惠券门槛文案
+  String shopDiscountLabel; // 店铺优惠右侧标签（超级立减/官方立减等，v1.9.97）
   bool showPlatformCoupon; // 是否显示平台优惠券
   double coDiscount; // 共减金额
   double shippingFee; // 运费金额（默认 0）
@@ -304,6 +305,7 @@ class OrderItem {
     this.showShopDiscount = true,
     this.platformCoupon = 0,
     this.platformCouponLabel = '满60元可减',
+    this.shopDiscountLabel = '超级立减',
     this.showPlatformCoupon = true,
     this.coDiscount = 0,
     this.shippingFee = 0,
