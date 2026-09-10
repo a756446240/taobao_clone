@@ -655,6 +655,7 @@ class CartProvider extends ChangeNotifier {
     bool? showShopDiscount,
     double? platformCoupon,
     String? platformCouponLabel,
+    String? shopDiscountLabel,
     bool? showPlatformCoupon,
     double? coDiscount,
     double? shippingFee,
@@ -749,6 +750,7 @@ class CartProvider extends ChangeNotifier {
     if (showShopDiscount != null) item.showShopDiscount = showShopDiscount;
     if (platformCoupon != null) item.platformCoupon = platformCoupon;
     if (platformCouponLabel != null) item.platformCouponLabel = platformCouponLabel;
+    if (shopDiscountLabel != null) item.shopDiscountLabel = shopDiscountLabel;
     if (showPlatformCoupon != null) item.showPlatformCoupon = showPlatformCoupon;
     if (coDiscount != null) item.coDiscount = coDiscount;
     if (shippingFee != null) item.shippingFee = shippingFee;
