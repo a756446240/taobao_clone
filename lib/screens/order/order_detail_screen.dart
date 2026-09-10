@@ -821,11 +821,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Wrap(
-                      spacing: 4,
+                      spacing: 6,
                       runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       // v1.9.81：displayTags 合并去重——「7天无理由」与
                       // 「7天无理由退货」只保留后者；抓包无标签自动补默认
-                      children: it.displayTags.map(_redTag).toList(),
+                      // v1.9.97：对齐真实淘宝——绿色字体不带框
+                      children: [
+                        ...it.displayTags.map(_greenTag),
+                        const Icon(Icons.chevron_right,
+                            size: 13, color: Color(0xFF00A870)),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -837,9 +843,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 .copyWith(fontSize: 12)),
                         // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
                         // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
-                        Text(_unitPriceOf(it).toStringAsFixed(2),
-                            style: AppTextStyles.price
-                                .copyWith(fontSize: 18)),
+                        // v1.9.97：双击金额=直接改该商品实付价（多商品订单各改各的）
+                        GestureDetector(
+                          onDoubleTap: () => _editNumber(
+                              '修改实付价（不含运费）', it.price, (v) {
+                            context
+                                .read<CartProvider>()
+                                .updateOrderItem(it, price: v);
+                          }),
+                          child: Text(_unitPriceOf(it).toStringAsFixed(2),
+                              style: AppTextStyles.price
+                                  .copyWith(fontSize: 18)),
+                        ),
+                        const SizedBox(width: 6),
+                        // v1.9.97：价格明细入口（对齐真实淘宝，绿色文字+箭头）
+                        const Text('价格明细',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF00A870))),
+                        const Icon(Icons.chevron_right,
+                            size: 12, color: Color(0xFF00A870)),
                         const Spacer(),
                         Text('x${it.quantity}',
                             style: AppTextStyles.minSub),
@@ -854,6 +876,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // v1.9.97：更换款式（对齐真实淘宝，橙色带框；点击=改规格）
+              if (it.configuration.isNotEmpty) ...[
+                _orangeOutlineBtn('更换款式', onTap: () => _editText(
+                    '更换款式', it.configuration, (v) {
+                  context
+                      .read<CartProvider>()
+                      .updateOrderItem(it, configuration: v);
+                })),
+                const SizedBox(width: 8),
+              ],
               _outlineBtn('加入购物车', onTap: () => _reAddToCart(it)),
               const SizedBox(width: 8),
               // 对齐真实淘宝：待发货=申请退款，已发货/完成=申请售后，统一灰框黑字
@@ -1003,17 +1035,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Widget _redTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFff5000)),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(text,
-          style: const TextStyle(
-              color: Color(0xFFff5000), fontSize: 10)),
-    );
+  // v1.9.97：服务标签对齐真实淘宝——绿色字体、不带框
+  Widget _greenTag(String text) {
+    return Text(text,
+        style: const TextStyle(
+            color: Color(0xFF00A870), fontSize: 10));
   }
 
   // ============ 价格明细（与商品卡同一栏目） ============
@@ -1061,12 +1087,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           group: 'shop',
           icon: Icons.storefront,
           label: '店铺优惠',
-          sub: '',
+          sub: _item.shopDiscountLabel,
           total: shopTotal,
           subs: shopSubs,
           expanded: _shopDiscountExpanded,
           onToggle: () => setState(
               () => _shopDiscountExpanded = !_shopDiscountExpanded),
+          onEditLabel: () => _pickDiscountLabel('shop'),
         ),
       if (_item.showPlatformCoupon)
         _discountGroupRow(
@@ -1079,6 +1106,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           expanded: _platformCouponExpanded,
           onToggle: () => setState(
               () => _platformCouponExpanded = !_platformCouponExpanded),
+          onEditLabel: () => _pickDiscountLabel('platform'),
         ),
       Row(
         children: [
@@ -1290,6 +1318,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     required List<Map<String, dynamic>> subs,
     required bool expanded,
     required VoidCallback onToggle,
+    VoidCallback? onEditLabel,
   }) {
     return Column(
       children: [
@@ -1303,8 +1332,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 _discountIcon(icon),
                 Text(label, style: AppTextStyles.small),
+                // v1.9.97：优惠标签（超级立减/官方立减等）橙色字体，双击可选择
                 if (sub.isNotEmpty)
-                  Text('  $sub', style: AppTextStyles.minSub),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: onEditLabel,
+                    child: Text('  $sub',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFFff5000))),
+                  ),
                 const Spacer(),
                 Text('-¥${total.toStringAsFixed(2)}',
                     style: const TextStyle(
@@ -1369,6 +1405,101 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 编辑优惠明细（双击店铺优惠/平台优惠栏触发）：
   /// 可增删子项、改名称/副文案/金额；保存后该组总额自动 = 子项之和
+  /// 多商品订单修改实付价：先选商品（v1.9.97）
+  void _pickItemForPriceEdit(CartProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('选择要修改的商品', style: TextStyle(fontSize: 15)),
+        children: _orderItems
+            .map((e) => SimpleDialogOption(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _editNumber('修改实付价（不含运费）', e.price, (v) {
+                      provider.updateOrderItem(e, price: v);
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      '${e.title.length > 12 ? '${e.title.substring(0, 12)}…' : e.title}  ¥${e.price.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  /// 优惠标签选择（v1.9.97）：双击店铺优惠/平台优惠右侧橙色标签弹出，
+  /// 从常用标签里选，也可自定义或隐藏
+  void _pickDiscountLabel(String group) {
+    final isShop = group == 'shop';
+    final presets = isShop
+        ? const ['超级立减', '官方立减', '单品直降', '店铺满减', '会员专享价', '店铺券']
+        : const ['满60元可减', '淘金币已抵', '88VIP专享', '跨店满减', '消费券', '红包已抵'];
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(isShop ? '选择店铺优惠标签' : '选择平台优惠标签',
+            style: const TextStyle(fontSize: 15)),
+        children: [
+          ...presets.map((p) => SimpleDialogOption(
+                onPressed: () {
+                  context.read<CartProvider>().updateOrderItem(
+                        _item,
+                        shopDiscountLabel: isShop ? p : null,
+                        platformCouponLabel: isShop ? null : p,
+                      );
+                  Navigator.pop(ctx);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(p,
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFFff5000))),
+                ),
+              )),
+          const Divider(height: 1),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _editText('自定义标签', '', (v) {
+                context.read<CartProvider>().updateOrderItem(
+                      _item,
+                      shopDiscountLabel: isShop ? v : null,
+                      platformCouponLabel: isShop ? null : v,
+                    );
+              });
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text('自定义…', style: TextStyle(fontSize: 13)),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              context.read<CartProvider>().updateOrderItem(
+                    _item,
+                    shopDiscountLabel: isShop ? '' : null,
+                    platformCouponLabel: isShop ? null : '',
+                  );
+              Navigator.pop(ctx);
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text('隐藏标签',
+                  style: TextStyle(fontSize: 13, color: Colors.black45)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _editDiscountDetails(String group, String label) async {
     // 其他组的明细原样保留
     final others = <Map<String, dynamic>>[];
@@ -2186,6 +2317,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  // v1.9.97：橙色带框按钮（更换款式，对齐真实淘宝：白底+橙框+橙字）
   Widget _orangeOutlineBtn(String text, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -2193,7 +2325,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         constraints: const BoxConstraints(minWidth: 72, minHeight: 30),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF1E8),
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFff5000)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
@@ -2587,11 +2720,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         });
                       }),
                       // v1.9.96：实付价（商品卡单价行）与实付款（订单总额）分开编辑
+                      // v1.9.97：多商品订单先选要改哪个商品（也可直接双击商品卡上的金额）
                       _editTile(Icons.price_check, '修改实付价', () {
-                        _editNumber('修改实付价（不含运费）', _item.price, (v) {
-                          // 直接写入实付价，provider 不会再用组成项重算覆盖
-                          provider.updateOrderItem(_item, price: v);
-                        });
+                        if (_orderItems.length > 1) {
+                          _pickItemForPriceEdit(provider);
+                        } else {
+                          _editNumber('修改实付价（不含运费）', _item.price, (v) {
+                            // 直接写入实付价，provider 不会再用组成项重算覆盖
+                            provider.updateOrderItem(_item, price: v);
+                          });
+                        }
                       }),
                       _editTile(Icons.payments, '修改实付款', () {
                         _editNumber('修改实付款（整单总额，含运费）',
