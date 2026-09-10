@@ -99,7 +99,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     _buildShopCard(),
                     // 店铺与商品同一框架：细分隔线衔接（同下方灰线样式）
                     _lineDivider(),
-                    _buildProductCard(),
+                    // v1.9.96：合并订单（同单号多商品）逐商品一张卡
+                    ..._buildProductCards(),
                     _greyBar(),
                     _buildOrderInfoCard(),
                     _greyBar(),
@@ -723,40 +724,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============ 商品卡片 ============
-  /// 商品卡"实付价"行的单价：抓包新数据 _item.price 本就是单价（如 32×2）；
-  /// 但旧数据/手动录入的订单 _item.price 可能存的是整单总价（如 99×2），
+  /// 同订单（同单号）的全部商品（v1.9.96：合并订单详情显示全部商品卡）
+  List<OrderItem> get _orderItems {
+    final list = _shop.items
+        .where((e) => e.orderNo.isNotEmpty && e.orderNo == _item.orderNo)
+        .toList();
+    return list.isEmpty ? [_item] : list;
+  }
+
+  /// 商品卡"实付价"行的单价：抓包新数据 price 本就是单价（如 32×2）；
+  /// 但旧数据/手动录入的订单 price 可能存的是整单总价（如 99×2），
   /// 此时自动 ÷quantity 还原单价，对齐真实淘宝"¥32×2"而非"¥99×2"。
-  ///
-  /// 判断依据：_item.price 接近 _shop.actualTotal（整单实付，含运费）→ price 是总价；
-  /// 或 _item.price × quantity 接近 _shop.actualTotal → price 是单价。
-  /// （productTotal 是原价×数量，不含运费，不能当总价参照——VD3 单 productTotal=64
-  ///  但 actualTotal=99（含 35 运费），若用 productTotal 判断会误判 price=99 为单价）
-  double get _unitPrice {
-    if (_item.quantity > 1) {
+  /// v1.9.96：实付价不含运费——price≈actualTotal（整单实付，含运费）时
+  /// 先把运费剥掉再 ÷数量（旧数据 price 被运费污染过的也能显示对）。
+  double _unitPriceOf(OrderItem it) {
+    if (it.quantity > 1) {
       // 优先用 actualTotal 判断（整单实付，含运费，最准）
       if (_shop.actualTotal > 0) {
-        // price ≈ actualTotal → price 是总价，需 ÷quantity
-        if ((_item.price - _shop.actualTotal).abs() < 1.0) {
-          return _item.price / _item.quantity;
+        // price ≈ actualTotal → price 是总价（含运费）：剥运费后 ÷quantity
+        if ((it.price - _shop.actualTotal).abs() < 1.0) {
+          final ship = it.showShippingFee ? it.shippingFee : 0.0;
+          return (it.price - ship) / it.quantity;
         }
         // price × qty ≈ actualTotal → price 是单价，直接用
-        if ((_item.price * _item.quantity - _shop.actualTotal).abs() < 1.0) {
-          return _item.price;
+        if ((it.price * it.quantity - _shop.actualTotal).abs() < 1.0) {
+          return it.price;
         }
       }
       // actualTotal 缺失时退而用 productTotal（原价×数量，不含运费）
-      if (_item.productTotal > 0) {
-        if ((_item.price - _item.productTotal).abs() < 1.0) {
-          return _item.price / _item.quantity;
+      if (it.productTotal > 0) {
+        if ((it.price - it.productTotal).abs() < 1.0) {
+          return it.price / it.quantity;
         }
       }
     }
-    return _item.price;
+    return it.price;
   }
 
-  Widget _buildProductCard() {
-    final override = context.watch<ProductImageProvider>().imageFor(_item.title);
-    final imageUrl = override ?? _item.imageUrl;
+  /// 同订单全部商品卡（v1.9.96：合并订单每商品一张卡，价格区只跟最后一张）
+  List<Widget> _buildProductCards() {
+    final items = _orderItems;
+    final out = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) out.add(_lineDivider());
+      out.add(_buildProductCard(items[i],
+          withPriceSection: i == items.length - 1));
+    }
+    return out;
+  }
+
+  Widget _buildProductCard(OrderItem it, {bool withPriceSection = true}) {
+    final override = context.watch<ProductImageProvider>().imageFor(it.title);
+    final imageUrl = override ?? it.imageUrl;
 
     return Container(
       width: double.infinity,
@@ -768,7 +787,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onDoubleTap: () => _pickProductImage(),
+                onDoubleTap: () => _pickProductImage(it),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: AppImage(
@@ -784,20 +803,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onDoubleTap: () => _editText('修改商品标题', _item.title, (v) {
-                        context.read<CartProvider>().updateOrderItem(_item, title: v);
+                      onDoubleTap: () => _editText('修改商品标题', it.title, (v) {
+                        context.read<CartProvider>().updateOrderItem(it, title: v);
                       }),
-                      child: Text(_item.title,
+                      child: Text(it.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.small),
                     ),
                     const SizedBox(height: 6),
                     GestureDetector(
-                      onDoubleTap: () => _editText('修改规格', _item.configuration, (v) {
-                        context.read<CartProvider>().updateOrderItem(_item, configuration: v);
+                      onDoubleTap: () => _editText('修改规格', it.configuration, (v) {
+                        context.read<CartProvider>().updateOrderItem(it, configuration: v);
                       }),
-                      child: Text(_item.configuration,
+                      child: Text(it.configuration,
                           style: AppTextStyles.minSub),
                     ),
                     const SizedBox(height: 6),
@@ -806,7 +825,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       runSpacing: 4,
                       // v1.9.81：displayTags 合并去重——「7天无理由」与
                       // 「7天无理由退货」只保留后者；抓包无标签自动补默认
-                      children: _item.displayTags.map(_redTag).toList(),
+                      children: it.displayTags.map(_redTag).toList(),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -817,14 +836,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             style: AppTextStyles.price
                                 .copyWith(fontSize: 12)),
                         // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
-                        // 抓包新数据 _item.price 本就是单价（33）；但旧数据/手动改过的
-                        // 订单 _item.price 可能存的是整单总价（99）——检测 price≈productTotal
-                        // 且数量>1 时自动 ÷数量 还原单价显示。
-                        Text(_unitPrice.toStringAsFixed(2),
+                        // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
+                        Text(_unitPriceOf(it).toStringAsFixed(2),
                             style: AppTextStyles.price
                                 .copyWith(fontSize: 18)),
                         const Spacer(),
-                        Text('x${_item.quantity}',
+                        Text('x${it.quantity}',
                             style: AppTextStyles.minSub),
                       ],
                     ),
@@ -837,23 +854,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              _outlineBtn('加入购物车', onTap: _reAddToCart),
+              _outlineBtn('加入购物车', onTap: () => _reAddToCart(it)),
               const SizedBox(width: 8),
               // 对齐真实淘宝：待发货=申请退款，已发货/完成=申请售后，统一灰框黑字
               _outlineBtn(_isPendingShip ? '申请退款' : '申请售后',
-                  onTap: _gotoRefund),
+                  onTap: () => _gotoRefund(it)),
             ],
           ),
           // v1.9.83：删除商品卡「加入购物车/申请售后」按钮下方那条空白虚线分隔线
           // v1.9.85：赠品栏（对齐真实淘宝：赠品 | 1件 + 缩略图 + >；双击编辑件数，0=隐藏）
-          if (_item.giftCount > 0) _giftRow(),
-          ..._priceSectionChildren(),
+          if (it.giftCount > 0) _giftRow(it),
+          if (withPriceSection) ..._priceSectionChildren(),
         ],
       ),
     );
   }
 
-  Future<void> _pickProductImage() async {
+  Future<void> _pickProductImage(OrderItem it) async {
     try {
       final picked =
           await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -869,8 +886,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       await context
           .read<ProductImageProvider>()
-          .setOverride(_item.title, saved.path);
-      context.read<CartProvider>().updateOrderItem(_item, imageUrl: saved.path);
+          .setOverride(it.title, saved.path);
+      context.read<CartProvider>().updateOrderItem(it, imageUrl: saved.path);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
@@ -882,14 +899,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// 把该订单商品重新加回购物车（再次购买）
-  void _reAddToCart() {
+  void _reAddToCart(OrderItem it) {
     context.read<CartProvider>().addToCart(
           shopName: _shop.shopName,
-          title: _item.title,
-          price: _item.price,
-          imageUrl: _item.imageUrl,
-          spec: _item.configuration,
-          quantity: _item.quantity,
+          title: it.title,
+          price: it.price,
+          imageUrl: it.imageUrl,
+          spec: it.configuration,
+          quantity: it.quantity,
         );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -901,29 +918,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// 申请售后：进入退款/售后详情页
-  void _gotoRefund() {
+  void _gotoRefund(OrderItem it) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => RefundDetailScreen(shop: _shop, item: _item),
+        builder: (_) => RefundDetailScreen(shop: _shop, item: it),
       ),
     );
   }
 
   /// 赠品栏（v1.9.85）：对齐真实淘宝——左"赠品"，右"N件 + 缩略图 + >"
   /// 单击=编辑赠品件数（输入 0 隐藏），双击=换赠品图，长按=编辑赠品名
-  Widget _giftRow() {
+  Widget _giftRow(OrderItem it) {
     return GestureDetector(
       onTap: () =>
-          _editNumber('修改赠品件数（0=隐藏赠品栏）', _item.giftCount.toDouble(),
+          _editNumber('修改赠品件数（0=隐藏赠品栏）', it.giftCount.toDouble(),
               (v) {
         context
             .read<CartProvider>()
-            .updateOrderItem(_item, giftCount: v.round());
+            .updateOrderItem(it, giftCount: v.round());
       }),
-      onDoubleTap: _pickGiftImage,
+      onDoubleTap: () => _pickGiftImage(it),
       onLongPress: () =>
-          _editText('修改赠品名称', _item.giftTitle, (v) {
-        context.read<CartProvider>().updateOrderItem(_item, giftTitle: v);
+          _editText('修改赠品名称', it.giftTitle, (v) {
+        context.read<CartProvider>().updateOrderItem(it, giftTitle: v);
       }),
       behavior: HitTestBehavior.opaque,
       child: Padding(
@@ -936,14 +953,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     fontWeight: FontWeight.bold,
                     color: Colors.black87)),
             const Spacer(),
-            Text('${_item.giftCount}件',
+            Text('${it.giftCount}件',
                 style: const TextStyle(
                     fontSize: 13, color: Color(0xFF666666))),
             const SizedBox(width: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: _item.giftImage.isNotEmpty
-                  ? AppImage(url: _item.giftImage, width: 26, height: 26)
+              child: it.giftImage.isNotEmpty
+                  ? AppImage(url: it.giftImage, width: 26, height: 26)
                   : Container(
                       width: 26,
                       height: 26,
@@ -961,7 +978,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// 换赠品缩略图（双击赠品行触发）
-  Future<void> _pickGiftImage() async {
+  Future<void> _pickGiftImage(OrderItem it) async {
     try {
       final picked =
           await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -977,7 +994,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       context
           .read<CartProvider>()
-          .updateOrderItem(_item, giftImage: saved.path);
+          .updateOrderItem(it, giftImage: saved.path);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1001,9 +1018,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ============ 价格明细（与商品卡同一栏目） ============
   List<Widget> _priceSectionChildren() {
-    final productTotal = _item.productTotal > 0
-        ? _item.productTotal
-        : _item.price + _item.shopDiscount + _item.platformCoupon;
+    // v1.9.96：合并订单（多商品同单号）商品总价/件数按全订单聚合
+    final productTotal = _orderItems.fold<double>(0, (s, e) {
+      final pt = e.productTotal > 0
+          ? e.productTotal
+          : e.price + e.shopDiscount + e.platformCoupon;
+      return s + pt;
+    });
+    final totalQty = _orderItems.fold<int>(0, (s, e) => s + e.quantity);
     // 实付款：抓包导入的订单带整单实付总额（单价×数量有分位差），优先用
     final total =
         _shop.actualTotal > 0 ? _shop.actualTotal : _item.price;
@@ -1022,7 +1044,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         : (_item.showShopDiscount ? shopTotal : 0) +
             (_item.showPlatformCoupon ? platformTotal : 0);
     return [
-      _priceRow('商品总价', '共${_item.quantity}件',
+      _priceRow('商品总价', '共$totalQty件',
           '¥${productTotal.toStringAsFixed(2)}'),
       // 运费行：可在编辑菜单开启/修改，默认不显示（金额为 0 也不显示）
       if (_item.showShippingFee)
@@ -1977,7 +1999,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
                 _primaryBtn('再买一单',
-                    color: const Color(0xFFff5000), onTap: _reAddToCart),
+                    color: const Color(0xFFff5000), onTap: () => _reAddToCart(_item)),
               ] else if (isSignedPending) ...[
                 _outlineBtn('延长收货', onTap: () => _demoToast('已延长收货时间')),
                 const SizedBox(width: 8),
@@ -1992,9 +2014,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ));
                 }),
               ] else if (isRefund) ...[
-                _outlineBtn('加入购物车', onTap: _reAddToCart),
+                _outlineBtn('加入购物车', onTap: () => _reAddToCart(_item)),
                 const SizedBox(width: 8),
-                _outlineBtn('钱款去向', onTap: _gotoRefund),
+                _outlineBtn('钱款去向', onTap: () => _gotoRefund(_item)),
                 const SizedBox(width: 8),
                 _primaryBtn('联系商家',
                     color: const Color(0xFFff5000), onTap: _gotoServiceChat),
@@ -2564,10 +2586,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           provider.updateOrderItem(_item, productTotal: v);
                         });
                       }),
-                      _editTile(Icons.price_check, '修改实付款', () {
-                        _editNumber('修改实付款', _item.price, (v) {
+                      // v1.9.96：实付价（商品卡单价行）与实付款（订单总额）分开编辑
+                      _editTile(Icons.price_check, '修改实付价', () {
+                        _editNumber('修改实付价（不含运费）', _item.price, (v) {
                           // 直接写入实付价，provider 不会再用组成项重算覆盖
                           provider.updateOrderItem(_item, price: v);
+                        });
+                      }),
+                      _editTile(Icons.payments, '修改实付款', () {
+                        _editNumber('修改实付款（整单总额，含运费）',
+                            _shop.actualTotal > 0
+                                ? _shop.actualTotal
+                                : _item.price, (v) {
+                          // 实付款是订单级字段，直接写店铺 actualTotal；
+                          // 之后若再改实付价/优惠等组成项，会按组成项重算覆盖
+                          provider.updateShop(_shop, actualTotal: v);
                         });
                       }),
                       _switchTile(Icons.local_shipping_outlined, '显示运费行',
@@ -2640,7 +2673,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Navigator.of(ctx).pop();
                       }),
                       const Divider(height: 1),
-                      _editTile(Icons.edit, '编辑商品', () {
+                      _editTile(Icons.edit, '编辑商品（标题/规格/数量/实付价）', () {
                         _editProductFields(provider);
                       }),
                       ListTile(
@@ -2727,6 +2760,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void _editProductFields(CartProvider provider) {
     final titleCtrl = TextEditingController(text: _item.title);
     final specCtrl = TextEditingController(text: _item.configuration);
+    final qtyCtrl = TextEditingController(text: '${_item.quantity}');
     final priceCtrl =
         TextEditingController(text: _item.price.toStringAsFixed(2));
     showDialog(
@@ -2741,12 +2775,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 decoration: const InputDecoration(labelText: '商品标题')),
             TextField(
                 controller: specCtrl,
-                decoration: const InputDecoration(labelText: '规格')),
+                decoration:
+                    const InputDecoration(labelText: '规格（如：蓝莓味80粒+柠檬味80粒）')),
+            TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '数量')),
             TextField(
                 controller: priceCtrl,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: '实付价')),
+                decoration: const InputDecoration(labelText: '实付价（不含运费）')),
           ],
         ),
         actions: [
@@ -2758,10 +2797,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onPressed: () {
               final price =
                   double.tryParse(priceCtrl.text.trim()) ?? _item.price;
+              final qty =
+                  int.tryParse(qtyCtrl.text.trim()) ?? _item.quantity;
               provider.updateOrderItem(
                 _item,
                 title: titleCtrl.text.trim(),
                 configuration: specCtrl.text.trim(),
+                quantity: qty,
                 price: price,
               );
               Navigator.of(ctx).pop();
