@@ -349,4 +349,9 @@ class PersistenceService {
   /// 公开的店铺 JSON 解析（供预置订单加载器复用）
   static ShoppingCartShop shopFromJson(Map<String, dynamic> j) =>
       _shopFromJson(j);
+
+  /// 公开的店铺序列化（v1.9.96 备份导出用：与 _shopFromJson 对称，
+  /// 导出的 JSON 可直接走同步导入恢复）
+  static Map<String, dynamic> shopToJson(ShoppingCartShop shop) =>
+      _shopToJson(shop);
 }
