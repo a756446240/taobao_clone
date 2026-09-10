@@ -693,7 +693,9 @@ class CartProvider extends ChangeNotifier {
     String? giftImage,
     String? giftTitle,
     String? discountDetails,
+    int? quantity,
   }) {
+    if (quantity != null) item.quantity = quantity.clamp(1, 999);
     if (title != null) item.title = title;
     if (configuration != null) item.configuration = configuration;
     if (price != null) item.price = price;
@@ -812,12 +814,16 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 把 item 所在店铺的 actualTotal 重算为各商品实付价之和
+  /// 把 item 所在店铺的 actualTotal 重算为各商品实付价之和 + 运费
+  /// （v1.9.96：运费只进实付款 actualTotal，不进实付价 price——对齐真实淘宝）
   void _syncShopActualTotal(OrderItem item) {
     for (final shop in _shops) {
       if (shop.items.contains(item)) {
         if (shop.actualTotal > 0) {
-          final sum = shop.items.fold<double>(0, (s, e) => s + e.price);
+          var sum = shop.items.fold<double>(0, (s, e) => s + e.price);
+          for (final e in shop.items) {
+            if (e.showShippingFee) sum += e.shippingFee;
+          }
           shop.actualTotal = double.parse(sum.toStringAsFixed(2));
         }
         return;
@@ -825,11 +831,11 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  /// 实付款 = 商品总价 + 运费（显示中） - 所有（显示中的）优惠
+  /// 实付价 = 商品总价 - 所有（显示中的）优惠
+  /// v1.9.96：运费不再加进 price（实付价），只体现在 actualTotal（实付款）
   void _recalcPaidAmount(OrderItem item) {
     if (item.productTotal <= 0) return;
     var paid = item.productTotal;
-    if (item.showShippingFee) paid += item.shippingFee;
     if (item.showShopDiscount) paid -= item.shopDiscount;
     if (item.showPlatformCoupon) paid -= item.platformCoupon;
     if (paid < 0) paid = 0;
@@ -1078,7 +1084,9 @@ class CartProvider extends ChangeNotifier {
     String? csRate,
     String? fansCount,
     double? shopScore,
+    double? actualTotal,
   }) {
+    if (actualTotal != null) shop.actualTotal = actualTotal;
     if (shopName != null) shop.shopName = shopName;
     if (shopBadge != null) shop.shopBadge = shopBadge;
     if (isInternational != null) shop.isInternational = isInternational;
