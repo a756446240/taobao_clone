@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -406,12 +407,96 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          _buildBackupCard(),
+          const SizedBox(height: 10),
           _buildClearAllCard(),
           const SizedBox(height: 10),
           _buildBlacklistCard(),
         ],
       ),
     );
+  }
+
+  /// 备份卡片（v1.9.96）：导出全部订单（含手动编辑）为 JSON 文件，
+  /// 防证书过期删 App 丢编辑记录；文件在 系统「文件」App 可见，
+  /// 恢复 = 本页「选择 JSON 文件导入」
+  Widget _buildBackupCard() {
+    return Consumer<CartProvider>(
+      builder: (context, provider, _) {
+        final count = provider.shops.length;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_download_outlined,
+                  size: 18, color: Color(0xFF999999)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  '备份全部订单（含你的编辑）防掉签丢数据',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF666666)),
+                ),
+              ),
+              if (count > 0)
+                TextButton(
+                  onPressed: () => _exportBackup(provider),
+                  child: const Text('导出备份',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFFFF5000))),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _exportBackup(CartProvider provider) async {
+    try {
+      final data = {
+        'version': 1,
+        'orders':
+            provider.shops.map(PersistenceService.shopToJson).toList(),
+      };
+      final dir = await getApplicationDocumentsDirectory();
+      final now = DateTime.now();
+      final stamp = '${now.year}'
+          '${now.month.toString().padLeft(2, '0')}'
+          '${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}'
+          '${now.minute.toString().padLeft(2, '0')}';
+      final f = File('${dir.path}/taobao_backup_$stamp.json');
+      await f.writeAsString(
+          const JsonEncoder.withIndent(' ').convert(data));
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('备份已生成', style: TextStyle(fontSize: 16)),
+          content: Text(
+            '文件：taobao_backup_$stamp.json（${provider.shops.length} 家店铺）\n\n'
+            '发送到微信保存：打开系统「文件」App → 我的 iPhone → 淘宝 → '
+            '长按该文件 → 共享 → 微信（文件传输助手）。\n\n'
+            '证书过期换签重装后：回到本页点「选择 JSON 文件导入」，'
+            '选中这个备份文件，全部订单和你的编辑记录原样恢复。',
+            style: const TextStyle(fontSize: 13, height: 1.6),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c),
+                child: const Text('知道了',
+                    style: TextStyle(color: Color(0xFFFF5000)))),
+          ],
+        ),
+      );
+    } catch (e) {
+      _toast('备份失败：$e');
+    }
   }
 
   /// 一键清空全部商品订单（仅淘宝商品订单，不影响闪购/飞猪；
