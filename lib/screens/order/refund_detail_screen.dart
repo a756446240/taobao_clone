@@ -521,11 +521,15 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             ),
           ),
           const SizedBox(height: 4),
+          // 抵扣金额（双击只改 ¥ 数字，文案其余部分不变）
           Padding(
             padding: const EdgeInsets.only(left: 22),
-            child: Text(_pickupInsurance,
-                style: const TextStyle(
-                    fontSize: 11, color: Color(0xFFFF5000))),
+            child: GestureDetector(
+              onDoubleTap: _editPickupInsuranceAmount,
+              child: Text(_pickupInsurance,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFFFF5000))),
+            ),
           ),
           const SizedBox(height: 14),
           // 操作按钮：物流客服 / 取消寄件 / 修改时间地址（对齐真实淘宝）
@@ -548,13 +552,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   Widget _pickupBtn(String text, {bool highlight = false}) {
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$text为演示样式按钮'),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // v1.9.101：去掉演示提示——物流客服进店铺会话，
+        // 修改时间/地址直接弹时间编辑，取消寄件静默
+        if (text == '物流客服') {
+          _gotoServiceChat();
+        } else if (text == '修改时间/地址') {
+          _editPickupTime();
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -673,7 +677,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               value: '${_item.returnedCoins}个',
               iconColor: const Color(0xFFFFB300),
             ),
-          // 运费保障：仅退货退款（发过货）显示，未发货退款无此行
+          // 运费保障：仅退货退款（发过货）显示，未发货退款无此行（双击改金额）
           if (_item.hasFreightInsurance && _item.shipTime.isNotEmpty)
             _buildRefundDetailRow(
               icon: Icons.shield_outlined,
@@ -681,6 +685,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               value: '',
               iconColor: const Color(0xFFFF5000),
               sublabel: '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+              onDoubleTap: _editFreightInsuranceAmount,
             ),
         ],
       ),
@@ -820,7 +825,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(8)),
       padding: const EdgeInsets.all(12),
-      child: Row(
+      // 双击改保障金额（v1.9.101）
+      child: GestureDetector(
+        onDoubleTap: _editFreightInsuranceAmount,
+        behavior: HitTestBehavior.opaque,
+        child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.monetization_on_outlined,
@@ -844,6 +853,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -1901,6 +1911,44 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         setState(() {});
         _toast('退货宝文案已修改');
       }
+    });
+  }
+
+  /// 双击抵扣金额：只改 ¥ 数字（v1.9.101），文案其余部分保持不变
+  void _editPickupInsuranceAmount() {
+    final m = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(_pickupInsurance);
+    final cur = m?.group(1) ?? '6.02';
+    DialogHelpers.showTextInput(context,
+            title: '修改退货宝抵扣金额', initial: cur)
+        .then((v) {
+      final n = double.tryParse(v ?? '');
+      if (n == null || n <= 0) return;
+      final amt = n.toStringAsFixed(2);
+      final old = _pickupInsurance;
+      final next = RegExp(r'\d').hasMatch(old)
+          ? old.replaceFirst(RegExp(r'\d+(?:\.\d+)?'), amt)
+          : '退货宝最高可抵 ¥$amt，88VIP可继续抵';
+      context
+          .read<CartProvider>()
+          .updateOrderItem(_item, pickupInsuranceText: next);
+      setState(() {});
+      _toast('抵扣金额已修改为 ¥$amt');
+    });
+  }
+
+  /// 双击运费保障金额（v1.9.101）
+  void _editFreightInsuranceAmount() {
+    DialogHelpers.showTextInput(context,
+            title: '修改运费保障金额',
+            initial: _item.freightInsuranceAmount.toStringAsFixed(2))
+        .then((v) {
+      final n = double.tryParse(v ?? '');
+      if (n == null || n <= 0) return;
+      setState(() {
+        _item.freightInsuranceAmount = n;
+      });
+      context.read<CartProvider>().updateOrderItem(_item);
+      _toast('运费保障金额已修改为 ¥${n.toStringAsFixed(2)}');
     });
   }
 
