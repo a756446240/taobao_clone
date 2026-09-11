@@ -928,20 +928,11 @@ class _OrderCard extends StatelessWidget {
       _gotoLogistics(context, items.first);
     } else if (name == '加入购物车' || name == '再买一单') {
       _reAddToCart(context);
-    } else if (name == '闲鱼转卖') {
-      _xianyuToast(context);
     } else if (name == '删除订单') {
       _confirmDeleteOrder(context);
-    } else {
-      // 申请开票/延长收货/确认收货/修改地址等平台功能：演示样式仅提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$name为演示样式按钮'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
+    // v1.9.101：申请开票/延长收货/确认收货/修改地址/闲鱼转卖等平台功能
+    // 按钮点击静默，不再弹「演示样式按钮」提示
   }
 
   /// 「删除订单」：确认后移除该店铺卡片（与真实淘宝一致的二次确认）
@@ -982,7 +973,7 @@ class _OrderCard extends StatelessWidget {
     switch (h % 4) {
       case 0:
         btns = [
-          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
+          _outlineBtn('闲鱼转卖', onTap: () {}),
           gap,
           _outlineBtn('再买一单', onTap: () => _reAddToCart(context)),
         ];
@@ -1004,7 +995,7 @@ class _OrderCard extends StatelessWidget {
         break;
       default:
         btns = [
-          _outlineBtn('闲鱼转卖', onTap: () => _xianyuToast(context)),
+          _outlineBtn('闲鱼转卖', onTap: () {}),
           gap,
           _outlineBtn('加入购物车', onTap: () => _reAddToCart(context)),
         ];
@@ -1026,17 +1017,6 @@ class _OrderCard extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => RateOrderScreen(shop: shop, item: items.first),
-      ),
-    );
-  }
-
-  /// 「闲鱼转卖」：外部 App 功能，演示样式仅提示
-  void _xianyuToast(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('闲鱼转卖为演示样式按钮'),
-        duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
