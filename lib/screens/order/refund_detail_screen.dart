@@ -8,6 +8,7 @@ import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/product_image_provider.dart';
+import '../../utils/express_online.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
@@ -103,6 +104,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     if (_item.shipTime.isEmpty && !_isPending) {
       _item.isInstantRefund = true;
     }
+    // 运费保障（v1.9.100）：退货退款单默认带保障，金额按订单号哈希确定性 4.00-8.99
+    if (_item.freightInsuranceAmount <= 0) {
+      _item.hasFreightInsurance = true;
+      final h = _item.orderNo.isNotEmpty
+          ? _item.orderNo.hashCode
+          : _item.title.hashCode;
+      _item.freightInsuranceAmount = 4 + (h.abs() % 500) / 100.0;
+    }
   }
 
   /// 生成 4 开头 17 位退款编号
@@ -119,10 +128,28 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       _item.refundStatus == '待商家退款' || _item.refundStatus == '退款中';
   bool get _isDone => !_isPending;
 
+  // ===== v1.9.100：三种退款情况（对齐真实淘宝截图） =====
+  /// 已填写退货物流 → 退货退款中·已寄回分支
+  bool get _hasReturnLogistics => _item.refundLogistics.isNotEmpty;
+
+  /// 情况A：未发货退款（完成态且无发货时间）→ 2 步状态条，无寄件详情
+  bool get _isNoShipRefund => _isDone && _item.shipTime.isEmpty;
+
+  /// 情况B1：退货退款中·未寄回 → 取件码 + 上门取件卡
+  bool get _isAwaitingPickup => _isPending && !_hasReturnLogistics;
+
+  /// 情况B2：退货退款中·已寄回 → 待商家退款倒计时 + 退货物流卡
+  bool get _isShippedBack => _isPending && _hasReturnLogistics;
+
+  /// 情况C：退货退款完成（完成态且发过货）→ 3 步全完成 + 寄件详情
+  bool get _isReturnDone => _isDone && _item.shipTime.isNotEmpty;
+
   void _startTimerIfPending() {
     _timer?.cancel();
     if (_isPending) {
-      _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      // 已寄回分支倒计时精确到秒（对齐真实淘宝"21时42分12秒后..."）
+      _timer = Timer.periodic(
+          Duration(seconds: _isShippedBack ? 1 : 30), (_) {
         if (mounted) setState(() {});
       });
     }
@@ -140,9 +167,26 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     }
   }
 
+  /// 已寄回分支倒计时文案："21时42分12秒后商家未处理将自动退款给您"（总小时可超24）
+  String get _shippedBackCountdown {
+    try {
+      final t = DateTime.parse(_item.refundApplyTime.replaceFirst(' ', 'T'));
+      final end = t.add(const Duration(days: 3));
+      var diff = end.difference(DateTime.now());
+      if (diff.isNegative) diff = Duration.zero;
+      final h = diff.inHours;
+      final m = diff.inMinutes % 60;
+      final s = diff.inSeconds % 60;
+      return '$h时${m.toString().padLeft(2, '0')}分${s.toString().padLeft(2, '0')}秒后商家未处理将自动退款给您';
+    } catch (_) {
+      return '商家超时未处理将自动退款给您';
+    }
+  }
+
   String get _subtitle {
     if (_item.refundSubtitle.isNotEmpty) return _item.refundSubtitle;
     if (_isPending) {
+      if (_isShippedBack) return _shippedBackCountdown;
       final (d, h, m) = _merchantCountdown();
       return '商家还有${d}天${h}小时${m}分处理，如超时将自动退款';
     }
@@ -175,11 +219,16 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         _item.showInstantRefundBanner &&
                         _isDone)
                       _buildInstantRefundBanner(),
-                    _buildAmountCard(),
-                    if (_isPending && _item.showPickupCard)
+                    // v1.9.100：退款明细卡只在完成态显示（对齐真实淘宝，进行中无金额卡）
+                    if (_isDone) _buildAmountCard(),
+                    // 情况B1 未寄回：取件卡（取件时间/快递员/预估运费）
+                    if (_isAwaitingPickup && _item.showPickupCard)
                       _buildPickupCard(),
-                    if (_isPending && _item.refundLogistics.isNotEmpty)
+                    // 情况B2 已寄回：退货物流卡 + 运费保障卡
+                    if (_isShippedBack) ...[
                       _buildLogisticsCard(),
+                      _buildFreightInsuranceCard(),
+                    ],
                     _buildShopRow(),
                     _buildProductCard(),
                     _buildRefundInfoCard(),
@@ -198,7 +247,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 顶部栏 ============
+  // ============ 顶部栏（v1.9.100：中间放步骤条，对齐真实淘宝退款页） ============
   Widget _buildAppBar() {
     return Container(
       color: Colors.white,
@@ -210,13 +259,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             child: const Icon(Icons.arrow_back_ios,
                 color: Colors.black87, size: 22),
           ),
-          const Expanded(
-            child: Text('退款详情',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87)),
+          Expanded(
+            child: Center(child: _stepBreadcrumb()),
           ),
           GestureDetector(
             onDoubleTap: () => _showEditMenu(),
@@ -228,77 +272,162 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 状态头（大标题 + 副标题/倒计时 + 三步进度） ============
+  /// 顶部步骤条（对齐真实淘宝）：
+  /// - 已完成步骤：灰色「✓步骤名」；当前步骤：加黑「N步骤名」；未到达：浅灰「N步骤名」
+  /// - 未发货退款 2 步：✓商家处理 › 2退款结束
+  /// - 退货退款 3 步：✓商家处理 › 2寄回商品 › 3退款结束（完成态前两个都打勾）
+  /// 双击可自定义步骤文字（refundSteps 逗号分隔）
+  Widget _stepBreadcrumb() {
+    final defaultSteps = _isNoShipRefund
+        ? const ['商家处理', '退款结束']
+        : const ['商家处理', '寄回商品', '退款结束'];
+    final parts = _item.refundSteps.isEmpty
+        ? List<String>.from(defaultSteps)
+        : _item.refundSteps.split(',').map((e) => e.trim()).toList();
+    while (parts.length < defaultSteps.length) {
+      parts.add(defaultSteps[parts.length]);
+    }
+    // 当前步骤下标：进行中=1（寄回商品/退款结束前的中间步）；完成=最后一步
+    final current = _isPending ? 1 : parts.length - 1;
+    final children = <Widget>[];
+    for (var i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        children.add(const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 5),
+          child: Text('›',
+              style: TextStyle(fontSize: 12, color: Color(0xFFCCCCCC))),
+        ));
+      }
+      if (i < current) {
+        // 已完成：灰色 ✓ + 步骤名
+        children.add(Text('✓${parts[i]}',
+            style: const TextStyle(
+                fontSize: 12, color: Color(0xFF999999))));
+      } else if (i == current) {
+        // 当前步骤：加黑
+        children.add(Text('${i + 1}${parts[i]}',
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A))));
+      } else {
+        // 未到达：浅灰
+        children.add(Text('${i + 1}${parts[i]}',
+            style: const TextStyle(
+                fontSize: 12, color: Color(0xFFCCCCCC))));
+      }
+    }
+    return GestureDetector(
+      onDoubleTap: _editSteps,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  // ============ 状态头（大标题 + 副标题/倒计时；步骤条在 AppBar） ============
+  // v1.9.100 三种情况（对齐真实淘宝截图）：
+  // B1 未寄回：大标题=取件码（黑色加粗 + 橙色数字）
+  // B2 已寄回：待商家退款 + 倒计时灰字 + 灰色说明框
+  // 完成态：退款成功 + 主动保障橙色文案
   Widget _buildStatusHeader() {
     return Container(
       width: double.infinity,
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
       child: Column(
         children: [
-          GestureDetector(
-            onDoubleTap: _editTitle,
-            child: Text(
-              _item.refundTitle,
-              style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1A1A)),
+          // ---- 大标题 ----
+          if (_isAwaitingPickup)
+            // B1：取件码（双击改码）
+            GestureDetector(
+              onDoubleTap: _editPickupCode,
+              child: RichText(
+                text: TextSpan(children: [
+                  const TextSpan(
+                      text: '取件码 ',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A1A))),
+                  TextSpan(
+                      text: _pickupCode,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFFF5000))),
+                ]),
+              ),
+            )
+          else
+            GestureDetector(
+              onDoubleTap: _editTitle,
+              child: Text(
+                _item.refundTitle,
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1A1A)),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          GestureDetector(
-            onDoubleTap: _editSubtitle,
-            child: _isPending
-                // v1.9.81：待商家退款倒计时对齐真实淘宝——橙框横幅样式
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7F2),
-                      border: Border.all(
-                          color: const Color(0xFFFF5000), width: 0.8),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(_subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFFFF5000))),
-                  )
-                : _subtitleIsGuarantee
-                // 主动保障：橙色加粗标签 + 橙色正文（照搬真实淘宝退款成功页）
-                ? Text.rich(
-                    const TextSpan(children: [
-                      TextSpan(
-                          text: '主动保障 ',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFFF5000))),
-                      TextSpan(
-                          text: '本单享主动保障服务，平台同意退款',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFFFF5000))),
-                    ]),
-                    textAlign: TextAlign.center,
-                  )
-                : Text(_subtitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF999999))),
-          ),
-          const SizedBox(height: 14),
-          _stepRow(),
-          // v1.9.83：待商家退款页新增说明文字（对齐真实淘宝"如果商家收到货..."）
-          if (_isPending) ...[
-            const SizedBox(height: 14),
-            Text(
-              '如果商家收到货并验货无误，将操作退款给您\n如果商家拒绝退款，需要您修改退货申请\n如果商家超时未处理，将自动退款给您。',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.6,
-                  color: Color(0xFF999999)),
+          const SizedBox(height: 8),
+          // ---- 副标题/倒计时 ----
+          if (_isShippedBack) ...[
+            // B2：倒计时灰字（双击可自定义）
+            GestureDetector(
+              onDoubleTap: _editSubtitle,
+              child: Text(_subtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF999999))),
+            ),
+            const SizedBox(height: 10),
+            // B2：灰色说明框（对齐真实淘宝"如果商家收到货..."）
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F7F7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '如果商家收到货并验货无误，将操作退款给您如果商家拒绝退款，需要您修改退货申请如果商家超时未处理，将自动退款给您。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12,
+                    height: 1.6,
+                    color: Color(0xFF999999)),
+              ),
+            ),
+          ] else if (_isPending) ...[
+            // B1 未寄回：无倒计时/说明（对齐真实淘宝取件页）
+            const SizedBox.shrink(),
+          ] else ...[
+            // 完成态：主动保障橙色加粗标签 + 橙色正文（照搬真实淘宝退款成功页）
+            GestureDetector(
+              onDoubleTap: _editSubtitle,
+              child: _subtitleIsGuarantee
+                  ? Text.rich(
+                      const TextSpan(children: [
+                        TextSpan(
+                            text: '主动保障 ',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFFF5000))),
+                        TextSpan(
+                            text: '本单享主动保障服务，平台同意退款',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFFFF5000))),
+                      ]),
+                      textAlign: TextAlign.center,
+                    )
+                  : Text(_subtitle,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF999999))),
             ),
           ],
         ],
@@ -306,61 +435,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _stepRow() {
-    Widget node(String label, bool done, bool current) {
-      final color = (done || current)
-          ? const Color(0xFFFF5000)
-          : const Color(0xFFCCCCCC);
-      return Column(
-        children: [
-          Icon(done ? Icons.check_circle : Icons.circle_outlined,
-              size: 18, color: color),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 10, color: color)),
-        ],
-      );
-    }
-
-    Widget line(bool done) {
-      return Expanded(
-        child: Container(
-          height: 2,
-          margin: const EdgeInsets.only(bottom: 16),
-          color: done ? const Color(0xFFFF5000) : const Color(0xFFE5E5E5),
-        ),
-      );
-    }
-
-    // 步骤文字可编辑（refundSteps 逗号分隔 3 段，空=默认）
-    final parts = _item.refundSteps.isEmpty
-        ? const ['申请退款', '商家处理', '退款结束']
-        : _item.refundSteps.split(',').map((e) => e.trim()).toList();
-    while (parts.length < 3) {
-      parts.add(['申请退款', '商家处理', '退款结束'][parts.length]);
-    }
-    final done = _isDone;
-    return GestureDetector(
-      onDoubleTap: _editSteps,
-      behavior: HitTestBehavior.opaque,
-      child: Row(
-        children: [
-          node(parts[0], true, false),
-          line(true),
-          node(parts[1], done, _isPending),
-          line(done),
-          node(parts[2], done, false),
-        ],
-      ),
-    );
-  }
-
-  // ============ 寄回商品卡（退款进行中；取件码/保障/时间/退货宝均可双击编辑） ============
-  String get _pickupCode => _item.pickupCode.isEmpty ? '6033' : _item.pickupCode;
-  String get _pickupGuarantee => _item.pickupGuarantee.isEmpty
-      ? '主动保障 本单享主动保障服务，平台同意退货'
-      : _item.pickupGuarantee;
+  // ============ 寄回商品卡（退款进行中·未寄回；取件码/时间/退货宝均可双击编辑） ============
+  String get _pickupCode => _item.pickupCode.isEmpty ? '0180' : _item.pickupCode;
   String get _pickupTime => _item.pickupTimeText.isEmpty
-      ? '今天 17:00-19:00 上门取件'
+      ? '明天 17:00-19:00 上门取件'
       : _item.pickupTimeText;
   String get _pickupInsurance => _item.pickupInsuranceText.isEmpty
       ? '退货宝最高可抵 ¥6.02，88VIP可继续抵'
@@ -375,55 +453,20 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 取件码（双击编辑）
-          GestureDetector(
-            onDoubleTap: _editPickupCode,
-            child: Center(
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1A1A)),
-                  children: [
-                    const TextSpan(
-                        text: '取件码 ',
-                        style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
-                    TextSpan(text: _pickupCode),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          // 主动保障（双击编辑）
-          GestureDetector(
-            onDoubleTap: _editPickupGuarantee,
-            child: Center(
-              child: Text(_pickupGuarantee,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFFFF5000))),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF0F0F0)),
-          const SizedBox(height: 10),
           // 等待快递员上门时间 + 取件地址（双击编辑时间；对齐真实淘宝带地址行）
           GestureDetector(
             onDoubleTap: _editPickupTime,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.schedule,
-                    size: 15, color: Color(0xFFFF5000)),
+                const Icon(Icons.watch_later_outlined,
+                    size: 16, color: Color(0xFFFF5000)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('等待快递员 $_pickupTime',
+                      Text('等待快递员$_pickupTime',
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -441,31 +484,30 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          // 承运快递员（对齐真实淘宝：[申通承运]李毅）
+          const SizedBox(height: 12),
+          // 快递员已接单（对齐真实淘宝 v1.9.100）
           const Row(
             children: [
-              Icon(Icons.person_pin_circle_outlined,
-                  size: 15, color: Color(0xFFFF5000)),
+              Icon(Icons.person_outline,
+                  size: 16, color: Color(0xFFFF5000)),
               SizedBox(width: 6),
-              Text('[申通承运]李毅',
+              Text('快递员已接单',
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF1A1A1A))),
               SizedBox(width: 6),
-              Icon(Icons.phone_in_talk_outlined,
-                  size: 14, color: Color(0xFFFFB300)),
+              Icon(Icons.refresh, size: 14, color: Color(0xFFCCCCCC)),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           // 预估运费 + 退货宝（对齐真实淘宝）
           GestureDetector(
             onDoubleTap: _editPickupInsurance,
             child: Row(
               children: [
                 const Icon(Icons.local_shipping_outlined,
-                    size: 15, color: Color(0xFFFF5000)),
+                    size: 16, color: Color(0xFFFF5000)),
                 const SizedBox(width: 6),
                 const Text('预估运费',
                     style: TextStyle(
@@ -473,37 +515,19 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1A1A1A))),
                 const Spacer(),
-                const Text('退货宝 1kg内包运费',
+                const Text('退货宝  1kg内包运费',
                     style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32))),
               ],
             ),
           ),
           const SizedBox(height: 4),
           Padding(
-            padding: const EdgeInsets.only(left: 21),
+            padding: const EdgeInsets.only(left: 22),
             child: Text(_pickupInsurance,
                 style: const TextStyle(
                     fontSize: 11, color: Color(0xFFFF5000))),
           ),
-          const SizedBox(height: 10),
-          // 可上传商品及取件图片（对齐真实淘宝）
-          const Row(
-            children: [
-              Icon(Icons.assignment_outlined,
-                  size: 15, color: Color(0xFFFF5000)),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text('可上传商品及取件图片，避免后续纠纷',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1A1A1A))),
-              ),
-              Icon(Icons.chevron_right,
-                  size: 16, color: Color(0xFFCCCCCC)),
-            ],
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           // 操作按钮：物流客服 / 取消寄件 / 修改时间地址（对齐真实淘宝）
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -597,8 +621,16 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 退款金额卡（含运费保障） ============
+  // ============ 退款明细卡（仅完成态；对齐真实淘宝：退回渠道/返还优惠/淘金币/运费保障） ============
   Widget _buildAmountCard() {
+    // 支付宝渠道的优惠零头（对齐真实淘宝"退回支付宝"下的 优惠/银行卡 子行）
+    final seed = _item.orderNo.isNotEmpty
+        ? _item.orderNo.hashCode
+        : _item.title.hashCode;
+    final discountPart = (seed.abs() % 20 + 1) / 100.0; // 0.01-0.20
+    final bankPart = (_item.refundAmount - discountPart)
+        .clamp(0, double.infinity)
+        .toDouble();
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       decoration: BoxDecoration(
@@ -606,62 +638,74 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          GestureDetector(
-            onDoubleTap: _editRefundAmount,
-            child: Row(
-              children: [
-                const Icon(Icons.account_balance_wallet_outlined,
-                    color: Color(0xFFFF5000), size: 20),
-                const SizedBox(width: 8),
-                Text(_isPending ? '预计退款金额' : '退款金额',
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF333333))),
-                const Spacer(),
-                Text('¥${_item.refundAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        color: Color(0xFFFF5000),
-                        fontWeight: FontWeight.w700)),
-              ],
-            ),
+          // 退回渠道主行（双击=改退款方式，长按=改退款金额）
+          _buildRefundDetailRow(
+            icon: _item.refundMethod.contains('微信')
+                ? Icons.chat_bubble_outline
+                : Icons.account_balance_wallet,
+            label: _item.refundMethod.contains('银行卡')
+                ? '退回${_item.refundMethod} 平安银行8738'
+                : '退回${_item.refundMethod}',
+            value: '¥${_item.refundAmount.toStringAsFixed(2)}',
+            iconColor: const Color(0xFF1890FF),
+            bold: true,
+            onDoubleTap: _editRefundMethod,
+            onLongPress: _editRefundAmount,
           ),
-          if (_isDone) ...[
-            const SizedBox(height: 10),
-            // 退款明细列表（参考图 6：退回花呗/返还优惠/退回淘金币/运费保障）
-            // v1.9.78：银行卡渠道带真实尾号（对齐真实淘宝"退回银行卡 平安银行8738"）
-            _buildRefundDetailRow(
-              icon: Icons.account_balance,
-              label: _item.refundMethod.contains('银行卡')
-                  ? '退回${_item.refundMethod} 平安银行8738'
-                  : '退回${_item.refundMethod}',
-              value: '¥${_item.refundAmount.toStringAsFixed(2)}',
-              iconColor: const Color(0xFF1890FF),
-              onDoubleTap: _editRefundMethod,
-            ),
-            if (_item.refundDiscount > 0 && _item.showRefundDiscount)
-              _buildRefundDetailRow(
-                icon: Icons.card_giftcard,
-                label: '返还优惠',
-                value: '¥${_item.refundDiscount.toStringAsFixed(2)}',
-                iconColor: const Color(0xFFFF8C00),
-              ),
-            if (_item.returnedCoins > 0)
-              _buildRefundDetailRow(
-                icon: Icons.monetization_on,
-                label: '退回淘金币',
-                value: '${_item.returnedCoins}个',
-                iconColor: const Color(0xFFFFB300),
-              ),
-            // 运费保障（参考图 6 红框）
-            if (_item.hasFreightInsurance)
-              _buildRefundDetailRow(
-                icon: Icons.shield_outlined,
-                label: '运费保障',
-                value: '',
-                iconColor: const Color(0xFFFF5000),
-                sublabel: '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
-              ),
+          // 支付宝渠道：优惠/银行卡 子行（对齐真实淘宝 v1.9.100）
+          if (_item.refundMethod.contains('支付宝')) ...[
+            _buildRefundSubRow('优惠',
+                '¥${discountPart.toStringAsFixed(2)}'),
+            _buildRefundSubRow('银行卡（平安银行4853）',
+                '¥${bankPart.toStringAsFixed(2)}'),
           ],
+          if (_item.refundDiscount > 0 && _item.showRefundDiscount)
+            _buildRefundDetailRow(
+              icon: Icons.card_giftcard,
+              label: '返还优惠',
+              value: '¥${_item.refundDiscount.toStringAsFixed(2)}',
+              iconColor: const Color(0xFFFF8C00),
+            ),
+          if (_item.returnedCoins > 0)
+            _buildRefundDetailRow(
+              icon: Icons.monetization_on,
+              label: '退回淘金币',
+              value: '${_item.returnedCoins}个',
+              iconColor: const Color(0xFFFFB300),
+            ),
+          // 运费保障：仅退货退款（发过货）显示，未发货退款无此行
+          if (_item.hasFreightInsurance && _item.shipTime.isNotEmpty)
+            _buildRefundDetailRow(
+              icon: Icons.shield_outlined,
+              label: '运费保障',
+              value: '',
+              iconColor: const Color(0xFFFF5000),
+              sublabel: '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 退款明细子行（缩进灰字，对齐真实淘宝"退回支付宝"下的 优惠/银行卡 行）
+  Widget _buildRefundSubRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 26, top: 2, bottom: 6),
+      child: Row(
+        children: [
+          Text('L',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade400)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF999999))),
+          ),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF999999))),
         ],
       ),
     );
@@ -673,10 +717,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     required String value,
     required Color iconColor,
     String? sublabel,
+    bool bold = false,
     VoidCallback? onDoubleTap,
+    VoidCallback? onLongPress,
   }) {
     return GestureDetector(
       onDoubleTap: onDoubleTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
@@ -689,8 +736,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF333333))),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              bold ? FontWeight.w600 : FontWeight.w400,
+                          color: const Color(0xFF333333))),
                   if (sublabel != null) ...[
                     const SizedBox(height: 2),
                     Text(sublabel,
@@ -712,7 +762,15 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 退款物流 ============
+  // ============ 退货物流卡（情况B2 已寄回，对齐真实淘宝 v1.9.100） ============
+  // refundLogistics 编码：第一行=主文案（退货物流：已签收 申通快递 运单号:xxx），
+  // 第二行（\n 分隔，可空）=最新轨迹摘要（包裹已从代收点取出）
+  String get _refundLogisticsMain => _item.refundLogistics.split('\n').first;
+  String get _refundLogisticsSub {
+    final parts = _item.refundLogistics.split('\n');
+    return parts.length > 1 ? parts.sublist(1).join('\n') : '';
+  }
+
   Widget _buildLogisticsCard() {
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
@@ -720,28 +778,161 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           color: Colors.white, borderRadius: BorderRadius.circular(8)),
       padding: const EdgeInsets.all(12),
       child: GestureDetector(
-        onDoubleTap: _editRefundLogistics,
+        // 双击：更换/输入快递单号并联网实时更新（v1.9.100）
+        onDoubleTap: _editRefundLogisticsOnline,
+        behavior: HitTestBehavior.opaque,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.local_shipping_outlined,
-                color: Color(0xFFFF5000), size: 20),
+            const Icon(Icons.local_shipping,
+                color: Color(0xFFFF5000), size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('退款物流',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 2),
-                  Text(_item.refundLogistics,
+                  Text(_refundLogisticsMain,
                       style: const TextStyle(
                           fontSize: 13,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500)),
+                          color: Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w600)),
+                  if (_refundLogisticsSub.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(_refundLogisticsSub,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF999999))),
+                  ],
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+            const Icon(Icons.chevron_right,
+                size: 16, color: Color(0xFFCCCCCC)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 运费保障卡（情况B2 已寄回，对齐真实淘宝 v1.9.100） ============
+  Widget _buildFreightInsuranceCard() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.monetization_on_outlined,
+              color: Color(0xFFFF5000), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('运费保障',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 3),
+                Text(
+                    '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF999999))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 双击退货物流卡：更换快递单号并联网实时更新轨迹（v1.9.100）
+  /// - 输入单号 → 快递100 识别公司 → apizero 拉实时轨迹 → 主文案+摘要一并更新
+  /// - 「手动改文案」走旧的纯文本编辑（留空=隐藏物流卡，回到未寄回分支）
+  void _editRefundLogisticsOnline() {
+    final oldMain = _refundLogisticsMain;
+    // 从旧文案里尽力提取已有单号作为默认值
+    final m = RegExp(r'[A-Za-z0-9]{8,}').firstMatch(oldMain);
+    final ctrl = TextEditingController(text: m?.group(0) ?? '');
+    var busy = false;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('更换退货快递单号', style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                decoration: const InputDecoration(
+                  labelText: '退货快递单号',
+                  hintText: '输入单号，自动识别公司并联网更新轨迹',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                busy ? '正在联网识别并拉取轨迹…' : '保存时自动识别公司并联网拉取实时轨迹',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF999999)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.of(ctx).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () {
+                      Navigator.of(ctx).pop();
+                      _editRefundLogistics();
+                    },
+              child: const Text('手动改文案',
+                  style: TextStyle(color: Color(0xFF999999))),
+            ),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final no = ctrl.text.trim();
+                      if (no.isEmpty) return;
+                      setDlg(() => busy = true);
+                      final detected =
+                          await ExpressOnline.detectCompany(no);
+                      final traces = await ExpressOnline.fetchTraces(
+                          detected.$1, no);
+                      if (!mounted) return;
+                      final company = detected.$2.isNotEmpty
+                          ? detected.$2
+                          : '快递';
+                      String main;
+                      String sub = '';
+                      var gotReal = false;
+                      if (traces != null && traces.isNotEmpty) {
+                        gotReal = true;
+                        var tag = (traces.first['tag'] ?? '').toString();
+                        if (tag.isEmpty) tag = '运输中';
+                        main = '退货物流：$tag $company 运单号:$no';
+                        sub = (traces.first['text'] ?? '').toString();
+                      } else {
+                        main = '退货物流：运输中 $company 运单号:$no';
+                      }
+                      context.read<CartProvider>().updateOrderItem(
+                          _item,
+                          refundLogistics:
+                              sub.isEmpty ? main : '$main\n$sub');
+                      Navigator.of(ctx).pop();
+                      setState(() {});
+                      _toast(gotReal
+                          ? '单号已更新，已联网拉取最新退货轨迹'
+                          : '已识别「$company」，实时轨迹拉取失败（接口限流），已保留单号');
+                    },
+              child: const Text('联网更新'),
+            ),
           ],
         ),
       ),
@@ -1300,9 +1491,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  // ============ 底部栏（v1.9.80 照搬真实淘宝） ============
-  // 退款成功/结束：卖家 + 钱款去向（橙色实心）
-  // 退款进行中：卖家 + 平台介入 + 关闭退货（白底描边）
+  // ============ 底部栏（v1.9.100 三种情况，照搬真实淘宝） ============
+  // B1 未寄回：卖家 + 平台介入 + 关闭退货（白框黑字，无寄件详情）
+  // B2 已寄回：卖家 + 寄件详情 + 平台介入 + 催处理（白框黑字）
+  // 完成·未发货退款：卖家 + 钱款去向（橙底白字，无寄件详情）
+  // 完成·退货退款：卖家 + 寄件详情（白框黑字）+ 钱款去向（橙底白字）
   Widget _buildBottomBar() {
     return Container(
       decoration: BoxDecoration(
@@ -1318,10 +1511,21 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               _bottomIcon(Icons.tag_faces, '卖家',
                   onTap: _gotoServiceChat),
               const Spacer(),
-              if (_isPending) ...[
+              if (_isAwaitingPickup) ...[
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
                 const SizedBox(width: 8),
                 _smallBtn('关闭退货', onTap: _confirmCloseReturn),
+              ] else if (_isShippedBack) ...[
+                _smallBtn('寄件详情', onTap: _showShipDetailSheet),
+                const SizedBox(width: 8),
+                _smallBtn('平台介入', onTap: _showInterveneSheet),
+                const SizedBox(width: 8),
+                _smallBtn('催处理',
+                    onTap: () => _toast('已提醒商家尽快处理退款')),
+              ] else if (_isReturnDone) ...[
+                _smallBtn('寄件详情', onTap: _showShipDetailSheet),
+                const SizedBox(width: 8),
+                _bigBtn('钱款去向', onTap: _showMoneyFlowSheet),
               ] else ...[
                 _bigBtn('钱款去向', onTap: _showMoneyFlowSheet),
               ],
@@ -1359,10 +1563,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5E5E5)),
+          border: Border.all(color: const Color(0xFFDDDDDD)),
         ),
+        // v1.9.100：白框黑字（对齐真实淘宝退款页按钮）
         child: Text(label,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF666666))),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF1A1A1A))),
       ),
     );
   }
@@ -1643,13 +1848,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  /// 编辑步骤条文字（逗号分隔 3 段）
+  /// 编辑步骤条文字（逗号分隔；未发货退款 2 段，退货退款 3 段）
   void _editSteps() {
+    final def =
+        _isNoShipRefund ? '商家处理,退款结束' : '商家处理,寄回商品,退款结束';
     DialogHelpers.showTextInput(context,
-            title: '修改步骤条（逗号分隔 3 段）',
-            initial: _item.refundSteps.isEmpty
-                ? '申请退款,商家处理,退款结束'
-                : _item.refundSteps)
+            title: '修改步骤条（逗号分隔）',
+            initial: _item.refundSteps.isEmpty ? def : _item.refundSteps)
         .then((v) {
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, refundSteps: v);
@@ -1667,20 +1872,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         context.read<CartProvider>().updateOrderItem(_item, pickupCode: v);
         setState(() {});
         _toast('取件码已修改：$v');
-      }
-    });
-  }
-
-  void _editPickupGuarantee() {
-    DialogHelpers.showTextInput(context,
-            title: '修改主动保障文案', initial: _pickupGuarantee)
-        .then((v) {
-      if (v != null) {
-        context
-            .read<CartProvider>()
-            .updateOrderItem(_item, pickupGuarantee: v);
-        setState(() {});
-        _toast('主动保障文案已修改');
       }
     });
   }
@@ -1900,8 +2091,6 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                     }),
                     _menuTile(ctx, Icons.linear_scale, '修改步骤条文字', _editSteps),
                     _menuTile(ctx, Icons.pin_outlined, '修改取件码', _editPickupCode),
-                    _menuTile(ctx, Icons.verified_user_outlined, '修改主动保障文案',
-                        _editPickupGuarantee),
                     _menuTile(ctx, Icons.schedule, '修改上门取件时间', _editPickupTime),
                     _menuTile(ctx, Icons.savings_outlined, '修改退货宝抵扣文案',
                         _editPickupInsurance),
