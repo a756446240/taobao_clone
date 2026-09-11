@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
+import '../../providers/cart_provider.dart';
 import '../../providers/material_pool_provider.dart';
 import '../../providers/product_image_provider.dart';
 import '../../providers/profile_provider.dart';
@@ -548,6 +549,9 @@ class _MineScreenState extends State<MineScreen> {
 
   // ============ 我的订单 ============
   Widget _buildOrderSection() {
+    // v1.9.100：五个入口图标右上角橙色角标，数量按 IPA 内订单实际状态统计
+    final counts =
+        CartProvider.statusCounts(context.watch<CartProvider>().shops);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
@@ -570,11 +574,11 @@ class _MineScreenState extends State<MineScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              _orderItem('待付款'),
-              _orderItem('待发货'),
-              _orderItem('待收货'),
-              _orderItem('待评价'),
-              _orderItem('退款/售后'),
+              _orderItem('待付款', counts['待付款'] ?? 0),
+              _orderItem('待发货', counts['待发货'] ?? 0),
+              _orderItem('待收货', counts['待收货'] ?? 0),
+              _orderItem('待评价', counts['待评价'] ?? 0),
+              _orderItem('退款/售后', counts['退款/售后'] ?? 0),
             ],
           ),
         ],
@@ -582,13 +586,13 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _orderItem(String label) {
+  Widget _orderItem(String label, [int badge = 0]) {
     return Expanded(
       child: GestureDetector(
         onTap: () => _gotoOrder(label),
         child: Column(
           children: [
-            _orderIcon(label),
+            _orderIcon(label, badge),
             const SizedBox(height: 6),
             Text(label, style: AppTextStyles.small),
           ],
@@ -597,7 +601,7 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _orderIcon(String label) {
+  Widget _orderIcon(String label, [int badge = 0]) {
     IconData icon;
     switch (label) {
       case '待付款':
@@ -615,7 +619,37 @@ class _MineScreenState extends State<MineScreen> {
       default:
         icon = Icons.assignment_return_outlined;
     }
-    return Icon(icon, color: AppColors.primary, size: 28);
+    final ic = Icon(icon, color: AppColors.primary, size: 28);
+    if (badge <= 0) return ic;
+    // 橙色数字角标（对齐真实淘宝：图标右上角橙色圆底白字，>99 显示 99+）
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ic,
+        Positioned(
+          right: -8,
+          top: -5,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 16),
+            height: 16,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF5000),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              badge > 99 ? '99+' : '$badge',
+              style: const TextStyle(
+                  fontSize: 10,
+                  height: 1,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   // ============ 工具卡片 ============
