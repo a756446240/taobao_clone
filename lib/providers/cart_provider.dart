@@ -48,6 +48,44 @@ class CartProvider extends ChangeNotifier {
     return '已完成';
   }
 
+  /// 我的淘宝「我的订单」五个入口的角标数量（v1.9.100）
+  /// 统计口径与订单列表各 Tab 过滤逻辑保持一致
+  static Map<String, int> statusCounts(List<ShoppingCartShop> shops) {
+    final counts = <String, int>{
+      '待付款': 0,
+      '待发货': 0,
+      '待收货': 0,
+      '待评价': 0,
+      '退款/售后': 0,
+    };
+    for (final shop in shops) {
+      final s = shop.orderSubStatus;
+      if (s.contains('购物车')) continue; // 购物车条目不算订单
+      final category = statusCategory(s);
+      if (s.contains('待付款') || s.contains('等待付款')) {
+        counts['待付款'] = counts['待付款']! + 1;
+      } else if (category == '退款/售后' ||
+          s.contains('退款') ||
+          s.contains('售后')) {
+        counts['退款/售后'] = counts['退款/售后']! + 1;
+      } else if (s.contains('评价')) {
+        counts['待评价'] = counts['待评价']! + 1;
+      } else if (category == '待发货' ||
+          s.contains('待发货') ||
+          s.contains('等待发货')) {
+        counts['待发货'] = counts['待发货']! + 1;
+      } else if (category == '待收货' ||
+          s.contains('已发货') ||
+          s.contains('运输中') ||
+          s.contains('派送中') ||
+          s.contains('签收') ||
+          s.contains('收货')) {
+        counts['待收货'] = counts['待收货']! + 1;
+      }
+    }
+    return counts;
+  }
+
   List<ShoppingCartShop> _shops = [];
   bool _loading = true;
 
