@@ -76,6 +76,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     if (pool.isEmpty) return;
     final seed = it.orderNo.isEmpty ? it.title.hashCode : it.orderNo.hashCode;
     final donor = pool[seed.abs() % pool.length];
+    // v1.9.101：标记为借用单号——联网刷新跳过借用单号，避免串入别的订单物流
+    it.waybillBorrowed = true;
     provider.updateOrderItem(
       it,
       waybillNo: donor.waybillNo,
@@ -96,7 +98,29 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     if (it == null || _refreshingOnline) return;
     // 只跟踪真实/手动覆盖的单号；空单号（派生假号）不联网
     final waybill = it.waybillNo.trim();
-    if (waybill.isEmpty) return;
+    if (waybill.isEmpty) {
+      // v1.9.101：手动刷新给明确反馈，不再静默无反应
+      if (force && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('该订单暂无快递单号，双击公司行填写单号后可联网刷新'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+    // v1.9.101：借用单号（运单池分配）不联网拉轨迹——
+    // 拉回来的必是别的订单的物流信息（用户反馈"串单"根因）
+    if (it.waybillBorrowed) {
+      if (force && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('该订单未关联真实快递单号，双击公司行填写真实单号后可联网刷新'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
     if (!force) {
       final real = _realTraces;
       if (real != null) {
@@ -108,7 +132,18 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     try {
       final detected = await _detectCompany(waybill);
       final list = await _fetchTracesOnline(detected.$1, waybill);
-      if (!mounted || list == null || list.isEmpty) return;
+      if (!mounted) return;
+      if (list == null || list.isEmpty) {
+        // v1.9.101：拉取失败给明确反馈，不再静默无反应
+        if (force) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('联网刷新失败：免费接口限流或网络异常，请稍后再试'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+        return;
+      }
       final provider = context.read<CartProvider>();
       provider.updateOrderItem(
         it,
@@ -458,6 +493,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                         gotReal = true;
                       }
                       if (!mounted) return;
+                      // 手动填写的单号视为真实单号，清掉借用标记（v1.9.101）
+                      it.waybillBorrowed = false;
                       provider.updateOrderItem(
                         it,
                         waybillNo: no,
