@@ -44,6 +44,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _addressExpanded = false; // 地址区单击展开查看完整信息
   bool _orderInfoExpanded = false; // 订单信息折叠（v1.9.85 恢复：默认折叠，点标题展开）
   bool _shopDiscountExpanded = false; // 店铺优惠明细展开（v1.9.93）
+  // 商品标题展开状态（v1.9.99：>16字默认折叠1行，点∨展开；key=商品标题）
+  final Set<String> _expandedTitles = {};
   bool _platformCouponExpanded = false; // 平台优惠明细展开（v1.9.93）
 
   @override
@@ -148,9 +150,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Expanded(
             child: Text(title,
                 textAlign: TextAlign.center,
+                // v1.9.99：标题加大加粗（对齐真实淘宝状态页标题）
                 style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
                     color: Colors.black87)),
           ),
           // 编辑入口：双击打开编辑菜单
@@ -400,9 +403,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _buildOnTimeCard() {
     final provider = context.read<CartProvider>();
-    const iconColor = Color(0xFF2A9655);
+    // v1.9.99：图标换用户提供的 UI 贴图，字体加大（对齐真实淘宝准时达卡）
     const textStyle = TextStyle(
-        fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF333333));
+        fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A));
+    const clockIcon = Image(
+        image: AssetImage('assets/images/icons/ontime_clock.png'),
+        width: 18,
+        height: 18);
+    const boxIcon = Image(
+        image: AssetImage('assets/images/icons/ontime_box.png'),
+        width: 18,
+        height: 18);
     if (_onTimeStyle == 0) {
       // 样式0：单排「预计XX送达」+ 箭头
       return Container(
@@ -415,8 +426,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           }),
           child: Row(
             children: [
-              const Icon(Icons.bolt, color: iconColor, size: 16),
-              const SizedBox(width: 6),
+              clockIcon,
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(_onTimeMainText, style: textStyle),
               ),
@@ -443,8 +454,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
-                  const Icon(Icons.bolt, color: iconColor, size: 16),
-                  const SizedBox(width: 6),
+                  clockIcon,
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(_onTimeMainText, style: textStyle),
                   ),
@@ -462,9 +473,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
-                  const Icon(Icons.local_shipping_outlined,
-                      color: iconColor, size: 16),
-                  const SizedBox(width: 6),
+                  boxIcon,
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _item.onTimeText2.isEmpty
@@ -578,8 +588,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold)),
                           ),
-                          const Icon(Icons.chevron_right,
-                              color: Color(0xFF999999), size: 18),
+                          // v1.9.99：店名右侧 > 箭头已删（用户要求）
                         ],
                       ),
                     ),
@@ -802,15 +811,89 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      onDoubleTap: () => _editText('修改商品标题', it.title, (v) {
-                        context.read<CartProvider>().updateOrderItem(it, title: v);
-                      }),
-                      child: Text(it.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.small),
-                    ),
+                    // v1.9.99：标题>16字默认折叠1行（∨按钮展开），右侧灰色
+                    // 单价（优惠前单价=商品总价÷数量，样式同商品总价）+ xN
+                    Builder(builder: (context) {
+                      final collapsible = it.title.length > 16;
+                      final expanded =
+                          _expandedTitles.contains(it.title);
+                      final unitOriginal = it.productTotal > 0
+                          ? it.productTotal /
+                              (it.quantity > 0 ? it.quantity : 1)
+                          : _unitPriceOf(it);
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onDoubleTap: () =>
+                                  _editText('修改商品标题', it.title, (v) {
+                                context
+                                    .read<CartProvider>()
+                                    .updateOrderItem(it, title: v);
+                              }),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(it.title,
+                                        maxLines: collapsible && !expanded
+                                            ? 1
+                                            : 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppTextStyles.small),
+                                  ),
+                                  if (collapsible)
+                                    GestureDetector(
+                                      onTap: () => setState(() {
+                                        expanded
+                                            ? _expandedTitles
+                                                .remove(it.title)
+                                            : _expandedTitles
+                                                .add(it.title);
+                                      }),
+                                      child: Icon(
+                                        expanded
+                                            ? Icons.keyboard_arrow_up
+                                            : Icons.keyboard_arrow_down,
+                                        size: 16,
+                                        color: const Color(0xFF999999),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                  '¥${unitOriginal.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF666666))),
+                              const SizedBox(height: 10),
+                              // 数量双击可改（x1、x2…）
+                              GestureDetector(
+                                onDoubleTap: () => _editNumber(
+                                    '修改数量', it.quantity.toDouble(), (v) {
+                                  context
+                                      .read<CartProvider>()
+                                      .updateOrderItem(it,
+                                          quantity: v.round() < 1
+                                              ? 1
+                                              : v.round());
+                                }),
+                                child: Text('x${it.quantity}',
+                                    style: AppTextStyles.minSub),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 6),
                     GestureDetector(
                       onDoubleTap: () => _editText('修改规格', it.configuration, (v) {
@@ -863,18 +946,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const Icon(Icons.chevron_right,
                             size: 12, color: Color(0xFF00A870)),
                         const Spacer(),
-                        // v1.9.98：数量双击可改（x1、x2…）
-                        GestureDetector(
-                          onDoubleTap: () => _editNumber(
-                              '修改数量', it.quantity.toDouble(), (v) {
-                            context.read<CartProvider>().updateOrderItem(
-                                it,
-                                quantity:
-                                    v.round() < 1 ? 1 : v.round());
-                          }),
-                          child: Text('x${it.quantity}',
-                              style: AppTextStyles.minSub),
-                        ),
+                        // v1.9.99：xN 已移至标题右侧灰色单价下方
                       ],
                     ),
                   ],
