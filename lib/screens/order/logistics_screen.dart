@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -13,6 +12,7 @@ import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/material_pool_provider.dart';
+import '../../utils/express_online.dart';
 import '../../widgets/app_image.dart';
 import '../../widgets/product_card.dart';
 
@@ -88,17 +88,21 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
 
   /// 打开物流页自动联网更新：
   /// - 最新轨迹 6 小时内不重复拉（apizero 匿名额度 30 次/天）
+  /// - force=true 时跳过 6h 限频（手动改单号/抓包覆盖后必须立即联网刷新，
+  ///   v1.9.100 修复：此前覆盖单号后被 6h 限频挡住，用户感知"不能实时更新"）
   /// - 拉到已签收 → 订单自动跳「待确认收货」
-  Future<void> _autoRefreshOnline() async {
+  Future<void> _autoRefreshOnline({bool force = false}) async {
     final it = item;
     if (it == null || _refreshingOnline) return;
     // 只跟踪真实/手动覆盖的单号；空单号（派生假号）不联网
     final waybill = it.waybillNo.trim();
     if (waybill.isEmpty) return;
-    final real = _realTraces;
-    if (real != null) {
-      final t = _parseT(real.first.time);
-      if (t != null && DateTime.now().difference(t).inHours < 6) return;
+    if (!force) {
+      final real = _realTraces;
+      if (real != null) {
+        final t = _parseT(real.first.time);
+        if (t != null && DateTime.now().difference(t).inHours < 6) return;
+      }
     }
     _refreshingOnline = true;
     try {
@@ -379,150 +383,19 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
   // ============ v1.9.80：双击公司行改单号（可联网识别公司+实时物流） ============
 
   /// 快递100 comCode → 中文公司名
-  static const _comCodeNames = {
-    'shunfeng': '顺丰速运',
-    'yuantong': '圆通速递',
-    'zhongtong': '中通快递',
-    'shentong': '申通快递',
-    'yunda': '韵达快递',
-    'jd': '京东物流',
-    'youzhengguonei': '邮政快递包裹',
-    'ems': 'EMS',
-    'jtexpress': '极兔速递',
-    'huitongkuaidi': '百世快递',
-    'debangwuliu': '德邦快递',
-    'danniao': '丹鸟',
-    'cainiao': '菜鸟速递',
-  };
-
-  /// 模拟手机浏览器请求头（快递100 对无 UA/Referer 的请求会拦截返回非 JSON）
-  static void _applyBrowserHeaders(HttpClientRequest req, String referer) {
-    req.headers.set(HttpHeaders.userAgentHeader,
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1');
-    req.headers.set(HttpHeaders.refererHeader, referer);
-    req.headers.set(HttpHeaders.acceptHeader,
-        'application/json, text/javascript, */*; q=0.01');
-  }
-
-  /// 快递公司官方 logo（快递100 图床，实测长期有效）
+  /// 快递公司官方 logo（v1.9.100 起走共享工具 ExpressOnline）
   static String _logoForComCode(String comCode) =>
-      'https://cdn.kuaidi100.com/images/all/56/$comCode.png';
+      ExpressOnline.logoForComCode(comCode);
 
-  /// 联网识别快递公司（快递100 autonumber，全公司覆盖，实测可用）
+  /// 联网识别快递公司（v1.9.100 起走共享工具 ExpressOnline）
   /// 返回 (comCode, 中文公司名)，失败返回 ('','')
-  static Future<(String, String)> _detectCompany(String waybill) async {
-    try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 8);
-      final req = await client.getUrl(Uri.parse(
-          'https://www.kuaidi100.com/autonumber/autoComNum?text=$waybill'));
-      _applyBrowserHeaders(req, 'https://www.kuaidi100.com/');
-      final resp = await req.close().timeout(const Duration(seconds: 8));
-      final body = await resp.transform(utf8.decoder).join();
-      client.close();
-      final auto = jsonDecode(body)['auto'];
-      if (auto is List && auto.isNotEmpty) {
-        final code = (auto.first['comCode'] ?? '').toString();
-        final named = _comCodeNames[code] ??
-            (auto.first['name'] ?? '').toString();
-        return (code, named);
-      }
-    } catch (_) {}
-    return ('', '');
-  }
-
-  /// apizero 免费物流接口（2026 实测匿名可用，30 次/天）：
-  /// /api/express 覆盖 申通/圆通/顺丰/中通/百世/极兔；
-  /// /api/express-pro 覆盖 京东/韵达/EMS 及其余公司
-  Future<Map<String, dynamic>?> _fetchApizero(String waybill,
-      {bool pro = false}) async {
-    final path = pro ? '/api/express-pro' : '/api/express';
-    try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 8);
-      final req = await client.getUrl(
-          Uri.parse('https://v1.apizero.cn$path?number=$waybill'));
-      _applyBrowserHeaders(req, 'https://apizero.cn/');
-      final resp = await req.close().timeout(const Duration(seconds: 8));
-      final body = await resp.transform(utf8.decoder).join();
-      client.close();
-      final j = jsonDecode(body);
-      if (j is! Map) return null;
-      if (j['code'] == 4000) return {'upgrade': true}; // 免费版不支持→换 pro
-      if (j['code'] != 0) return null;
-      final data = j['data'];
-      if (data is! Map) return null;
-      final traces = data['traces'];
-      if (traces is! List || traces.isEmpty) return null;
-      final statusDesc = (data['status_desc'] ?? '').toString();
-      return {
-        'com': (data['com'] ?? '').toString(),
-        'comName': (data['com_name'] ?? '').toString(),
-        'traces': [
-          for (var i = 0; i < traces.length; i++)
-            {
-              'time': (traces[i]['time'] ?? '').toString(),
-              // 首条挂状态标签（已签收/派送中/运输中），驱动页面阶段展示
-              'tag': i == 0 ? statusDesc : '',
-              'text': (traces[i]['content'] ?? '').toString(),
-            }
-        ],
-      };
-    } catch (_) {
-      return null;
-    }
-  }
+  static Future<(String, String)> _detectCompany(String waybill) =>
+      ExpressOnline.detectCompany(waybill);
 
   /// 联网查询实时物流轨迹：apizero 双通道优先，快递100 严格判失败兜底
   Future<List<Map<String, String>>?> _fetchTracesOnline(
-      String comCode, String waybill) async {
-    // 1) apizero（匿名免费，自动识别公司）
-    var r = await _fetchApizero(waybill);
-    if (r != null && r['upgrade'] == true) {
-      r = await _fetchApizero(waybill, pro: true);
-    }
-    if (r != null && r['traces'] is List) {
-      return [
-        for (final e in (r['traces'] as List))
-          Map<String, String>.from((e as Map)
-              .map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
-      ];
-    }
-    // 2) 快递100 兜底（免费通道常返「查无结果」，必须严格判失败）
-    if (comCode.isEmpty) return null;
-    final urls = [
-      'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill',
-      'https://www.kuaidi100.com/query?type=$comCode&postid=$waybill&temp=${DateTime.now().millisecondsSinceEpoch / 1000}',
-    ];
-    for (final url in urls) {
-      try {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 8);
-        final req = await client.getUrl(Uri.parse(url));
-        _applyBrowserHeaders(req, 'https://m.kuaidi100.com/');
-        final resp = await req.close().timeout(const Duration(seconds: 8));
-        final body = await resp.transform(utf8.decoder).join();
-        client.close();
-        final j = jsonDecode(body);
-        if (j is! Map || j['status']?.toString() != '200') continue;
-        final data = j['data'];
-        if (data is! List || data.isEmpty) continue;
-        // 「查无结果」是假轨迹，判失败（v1.9.88 修复：此前会被当成成功）
-        if ((data.first['context'] ?? '').toString().contains('查无结果')) {
-          continue;
-        }
-        return [
-          for (final e in data)
-            {
-              'time': (e['time'] ?? '').toString(),
-              'tag': '',
-              'text': (e['context'] ?? '').toString(),
-            }
-        ];
-      } catch (_) {}
-    }
-    return null;
-  }
+          String comCode, String waybill) =>
+      ExpressOnline.fetchTraces(comCode, waybill);
 
   /// 双击公司/单号行：修改快递单号（可选联网识别公司并拉取实时物流）
   void _editWaybill() {
@@ -728,9 +601,11 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                       Navigator.of(sheetCtx).pop();
                       setState(() {});
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('已用抓包真实物流覆盖当前订单'),
-                        duration: Duration(seconds: 1),
+                        content: Text('已用抓包真实物流覆盖当前订单，正在联网刷新最新轨迹…'),
+                        duration: Duration(seconds: 2),
                       ));
+                      // v1.9.100：覆盖单号后强制联网刷新（跳过 6h 限频）
+                      _autoRefreshOnline(force: true);
                     },
                   );
                 },
@@ -939,12 +814,20 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
       child: Column(
         children: [
-          // 公司行（双击公司/单号区域：修改单号，联网识别公司/拉取实时物流）
+          // 公司行（双击公司/单号区域：修改单号，联网识别公司/拉取实时物流；
+          // 长按：跳过 6h 限频强制联网刷新最新轨迹，v1.9.100）
           Row(
             children: [
               Expanded(
                 child: GestureDetector(
                   onDoubleTap: _editWaybill,
+                  onLongPress: () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('正在联网刷新最新物流…'),
+                      duration: Duration(seconds: 1),
+                    ));
+                    _autoRefreshOnline(force: true);
+                  },
                   behavior: HitTestBehavior.opaque,
                   child: Row(
                     children: [
