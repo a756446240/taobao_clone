@@ -25,12 +25,15 @@ class CartProvider extends ChangeNotifier {
     '交易成功',
     '交易关闭',
     '待商家退款',
+    '已寄出',
     '退款成功',
     '退款结束',
   ];
 
   /// 状态 → 栏目归类（待发货 / 待收货 / 退款/售后 / 已完成）
   static String statusCategory(String status) {
+    // 退货退款的「已寄出/已寄回」是退款流程分支，归入退款/售后（v1.9.101）
+    if (status.contains('寄出') || status.contains('寄回')) return '退款/售后';
     if (status.contains('待发货') ||
         status.contains('等待发货') ||
         status.contains('商家处理')) {
@@ -67,7 +70,14 @@ class CartProvider extends ChangeNotifier {
       } else if (category == '退款/售后' ||
           s.contains('退款') ||
           s.contains('售后')) {
-        counts['退款/售后'] = counts['退款/售后']! + 1;
+        // v1.9.101：角标只统计「进行中」的退款/售后（对齐真实淘宝），已完结不计数
+        final refundDone = s.contains('成功') ||
+            s.contains('结束') ||
+            s.contains('关闭') ||
+            s.contains('完成');
+        if (!refundDone) {
+          counts['退款/售后'] = counts['退款/售后']! + 1;
+        }
       } else if (s.contains('评价')) {
         counts['待评价'] = counts['待评价']! + 1;
       } else if (category == '待发货' ||
@@ -398,6 +408,7 @@ class CartProvider extends ChangeNotifier {
         _shops = saved;
         _migrateTradeNos();
         _migrateRefundBar();
+        _migrateBorrowedWaybills();
       } else {
         // 本地无数据时，优先加载打包内置的预置订单
         final preset = await PresetOrders.loadWithVersion();
@@ -405,6 +416,7 @@ class CartProvider extends ChangeNotifier {
           _shops = preset.shops;
           _migrateTradeNos();
           _migrateRefundBar();
+          _migrateBorrowedWaybills();
           await PersistenceService.saveShops(_shops);
           await PersistenceService.saveImportedPresetVersion(preset.version);
         }
@@ -918,6 +930,15 @@ class CartProvider extends ChangeNotifier {
         item.refundStatus = '退款结束';
       } else {
         item.refundStatus = '待商家退款';
+        // v1.9.101：「已寄出」=退货已寄回（退款详情走退货物流卡+运费保障卡分支），
+        // 无退货物流文案时自动生成；「待商家退款」=未寄回（走取件码/上门取件卡分支）
+        if (status.contains('寄出')) {
+          if (item.refundLogistics.trim().isEmpty) {
+            item.refundLogistics = _autoReturnLogistics(item);
+          }
+        } else {
+          item.refundLogistics = '';
+        }
       }
       item.refundTitle = item.refundStatus;
     } else {
@@ -962,9 +983,19 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
+  /// 生成退货物流文案（v1.9.101，按订单号哈希确定性）：
+  /// 「已寄出」状态下退款详情页退货物流卡的主文案
+  String _autoReturnLogistics(OrderItem item) {
+    const companies = ['圆通速递', '中通快递', '申通快递', '韵达速递', '顺丰速运'];
+    final seed =
+        (item.orderNo.isEmpty ? item.title : item.orderNo).hashCode.abs();
+    final c = companies[seed % companies.length];
+    final no = '77${(seed % 10000000000000).toString().padLeft(13, '0')}';
+    return '退货物流：运输中 $c 运单号:$no';
+  }
+
   /// 生成在途物流文案（按订单号哈希确定性，对齐真实淘宝列表物流条格式）
-  String _autoTransitText(OrderItem item) {
-    const origins = ['长沙', '杭州', '广州', '金华', '武汉', '上海', '郑州', '义乌'];
+  String _autoTransitText(OrderItem item) {    const origins = ['长沙', '杭州', '广州', '金华', '武汉', '上海', '郑州', '义乌'];
     const dests = ['济南', '淄博', '青岛', '潍坊', '烟台', '临沂'];
     final seed = (item.orderNo.isEmpty ? item.title : item.orderNo)
         .hashCode
@@ -988,6 +1019,9 @@ class CartProvider extends ChangeNotifier {
         .abs();
     final donor = pool[seed % pool.length];
     item.waybillNo = donor.waybillNo;
+    // v1.9.101：标记为借用单号——联网刷新跳过借用单号，
+    // 避免把别的订单的物流轨迹写进本订单（用户反馈"串单"根因）
+    item.waybillBorrowed = true;
     if (item.shipCompany.isEmpty) item.shipCompany = donor.shipCompany;
     if (item.shipLogo.isEmpty) item.shipLogo = donor.shipLogo;
     if (item.shipPhone.isEmpty) item.shipPhone = donor.shipPhone;
@@ -1085,6 +1119,36 @@ class CartProvider extends ChangeNotifier {
         }
         if (needTradeNo(item.wechatTradeNo)) {
           item.wechatTradeNo = _composeWechatTradeNo();
+          changed = true;
+        }
+      }
+    }
+    if (changed) _persist();
+  }
+
+  /// v1.9.101 数据迁移：老版本从运单池借用的单号没有标记。
+  /// 多个订单共用同一运单号时，保留有抓包真实轨迹（logisticsTraces 非空）
+  /// 的那一单为真实单号，其余全部补标为借用——联网刷新跳过借用单号，
+  /// 不再把别的订单的物流写进本订单。
+  void _migrateBorrowedWaybills() {
+    final byNo = <String, List<OrderItem>>{};
+    for (final s in _shops) {
+      for (final it in s.items) {
+        final no = it.waybillNo.trim();
+        if (no.isEmpty) continue;
+        byNo.putIfAbsent(no, () => []).add(it);
+      }
+    }
+    var changed = false;
+    for (final group in byNo.values) {
+      if (group.length < 2) continue;
+      final genuine = group.firstWhere(
+          (e) => e.logisticsTraces.trim().isNotEmpty,
+          orElse: () => group.first);
+      for (final e in group) {
+        final borrowed = !identical(e, genuine);
+        if (e.waybillBorrowed != borrowed) {
+          e.waybillBorrowed = borrowed;
           changed = true;
         }
       }
