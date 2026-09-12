@@ -958,21 +958,15 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          // 店铺头像：优先抓包真实头像（shopAvatar），空则默认红圆"淘"图标
+          // 店铺头像：优先抓包真实头像（shopAvatar），空则淘宝通用默认店标
+          // （v1.9.109：橙色小店图标，与订单详情页一致，不再用红圆"淘"）
           ClipRRect(
             borderRadius: BorderRadius.circular(11),
             child: _shop.shopAvatar.isNotEmpty
                 ? AppImage(url: _shop.shopAvatar, width: 22, height: 22,
                     fit: BoxFit.cover)
-                : Container(
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                        color: Color(0xFFFF5000), shape: BoxShape.circle),
-                    alignment: Alignment.center,
-                    child: const Text('淘',
-                        style: TextStyle(fontSize: 10, color: Colors.white)),
-                  ),
+                : Image.asset('assets/images/shop_default.png',
+                    width: 22, height: 22, fit: BoxFit.cover),
           ),
           const SizedBox(width: 6),
           Expanded(
