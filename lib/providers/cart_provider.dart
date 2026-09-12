@@ -141,7 +141,12 @@ class CartProvider extends ChangeNotifier {
   /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数)。
   ({int added, int skipped, int blocked}) importSyncedShops(
       List<ShoppingCartShop> incoming,
-      {bool forceRefresh = false, Set<String>? forceOrderNos}) {
+      {bool forceRefresh = false,
+      Set<String>? forceOrderNos,
+      // v1.9.103：强制覆盖绿色标签——导入页开关打开时，所有匹配订单的
+      // detailTags 无条件以抓包为准（含手动改过的；抓包为空=该商品无标签，
+      // 置 tagsForced 防 displayTags 自动补默认标签）
+      bool forceTags = false}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -251,7 +256,18 @@ class CartProvider extends ChangeNotifier {
             // 抓包有真实标签时替换；用户手动改过的（非默认值）绝不覆盖
             // v1.9.102：抓包标签与旧标签不一致时也以抓包为准（用户要求
             // 标签跟真实订单一模一样，生成器随机多出的标签必须纠正）
-            if (it.detailTags.isNotEmpty) {
+            // v1.9.103 强制覆盖模式：抓包标签无条件照搬（空也照抄，
+            // 置 tagsForced 告诉 displayTags 别再补默认标签）
+            if (forceTags) {
+              final same = oldItem.detailTags.length == it.detailTags.length &&
+                  oldItem.detailTags.every(it.detailTags.contains);
+              if (!same || !oldItem.tagsForced) {
+                oldItem.detailTags = it.detailTags;
+                oldItem.tagsForced = true;
+                oldItem.returnText = '';
+                opsBackfilled = true;
+              }
+            } else if (it.detailTags.isNotEmpty) {
               final same = oldItem.detailTags.length == it.detailTags.length &&
                   oldItem.detailTags.every(it.detailTags.contains);
               if (!same) {
@@ -295,6 +311,12 @@ class CartProvider extends ChangeNotifier {
           it.wechatTradeNo = _composeWechatTradeNo();
         }
         it.alipayTradeNo = '';
+        // v1.9.103：强制覆盖标签模式下，新增/整单替换的商品也按抓包为准——
+        // 抓包没有标签就是真没有，不允许 displayTags 自动补默认标签
+        if (forceTags) {
+          it.tagsForced = true;
+          it.returnText = '';
+        }
         // v1.9.85：非待发货/待付款订单缺发货时间时，按创建时间当天随机补齐
         final cat = statusCategory(
             it.statusTitle.isEmpty ? shop.orderSubStatus : it.statusTitle);
