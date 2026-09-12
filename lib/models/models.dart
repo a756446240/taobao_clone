@@ -176,7 +176,10 @@ class OrderItem {
       final covered = raw.any((o) => o.trim() != tag && o.trim().contains(tag));
       if (!covered && !result.contains(tag)) result.add(tag);
     }
-    if (result.isEmpty) return const ['极速退款', '7天无理由退货'];
+    if (result.isEmpty) {
+      // v1.9.103：强制对齐过抓包的订单不补默认标签（抓包=没有标签就是没有）
+      return tagsForced ? const [] : const ['极速退款', '7天无理由退货'];
+    }
     return result;
   }
 
@@ -207,6 +210,10 @@ class OrderItem {
   String taxContent; // 进口税内容
   bool showTax; // 是否显示进口税
   List<String> detailTags; // 详情页红色标签（极速退款/7天无理由等）
+  /// v1.9.103：导入页「强制覆盖绿色标签」写入的标记——true 表示标签已以
+  /// 抓包为准强制对齐过；此时即使 detailTags 为空也不补默认标签
+  /// （真实订单该商品就是没有服务标签，默认标签反而对不上）
+  bool tagsForced;
 
   // ===== 赠品栏（v1.9.85 起，抓包/手动编辑；0=不显示赠品行） =====
   int giftCount; // 赠品件数
@@ -318,6 +325,7 @@ class OrderItem {
     this.taxContent = '价格已含税',
     this.showTax = true,
     this.detailTags = const ['极速退款', '7天无理由'],
+    this.tagsForced = false,
     this.giftCount = 0,
     this.giftImage = '',
     this.giftTitle = '',
