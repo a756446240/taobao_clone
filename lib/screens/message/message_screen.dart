@@ -111,6 +111,12 @@ class _MessageScreenState extends State<MessageScreen> {
         final resolved = '${saveDir.path}/$name';
         if (File(resolved).existsSync()) _customAvatars[k] = resolved;
       });
+      // v1.9.102：加载完成后回填已生成会话的头像——_history 在 initState
+      // 同步生成时自定义头像尚未读完，不回填的话重启后手动换的头像"消失"
+      for (final m in _history) {
+        final custom = _customAvatars[m.shopName];
+        if (custom != null) m.avatarUrl = custom;
+      }
       if (mounted) setState(() {});
     } catch (_) {}
   }
