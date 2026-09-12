@@ -717,11 +717,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? picked.path.substring(picked.path.lastIndexOf('.'))
           : '.jpg';
       final fileName = 'shop_${DateTime.now().millisecondsSinceEpoch}$ext';
-      final saved = await File(picked.path).copy('${saveDir.path}/$fileName');
+      await File(picked.path).copy('${saveDir.path}/$fileName');
       if (!mounted) return;
+      // v1.9.102：存相对 Documents 路径——自签重装容器变化后头像不丢
       await context
           .read<ProductImageProvider>()
-          .setOverride('shop_avatar:${_shop.shopName}', saved.path);
+          .setOverride('shop_avatar:${_shop.shopName}',
+              'shop_avatars/$fileName');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
       );
@@ -997,12 +999,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? picked.path.substring(picked.path.lastIndexOf('.'))
           : '.jpg';
       final fileName = 'product_${DateTime.now().millisecondsSinceEpoch}$ext';
-      final saved = await File(picked.path).copy('${saveDir.path}/$fileName');
+      await File(picked.path).copy('${saveDir.path}/$fileName');
       if (!mounted) return;
+      // v1.9.102：存相对 Documents 路径——自签重装容器变化后图片不丢
+      final rel = 'product_images/$fileName';
       await context
           .read<ProductImageProvider>()
-          .setOverride(it.title, saved.path);
-      context.read<CartProvider>().updateOrderItem(it, imageUrl: saved.path);
+          .setOverride(it.title, rel);
+      context.read<CartProvider>().updateOrderItem(it, imageUrl: rel);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
@@ -1072,24 +1076,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 style: const TextStyle(
                     fontSize: 13, color: Color(0xFF666666))),
             const SizedBox(width: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: it.giftImage.isNotEmpty
-                  ? AppImage(url: it.giftImage, width: 26, height: 26)
-                  : Container(
-                      width: 26,
-                      height: 26,
-                      color: const Color(0xFFF2F2F4),
-                      child: const Icon(Icons.card_giftcard,
-                          size: 16, color: Color(0xFFbbbbbb)),
-                    ),
-            ),
+            // v1.9.102：多张赠品缩略图（抓包 gifts 数组全量），
+            // 最多展示 3 张；无图时灰色占位——之前只显示 1 张导致"赠品显示不全"
+            for (final g in _giftThumbs(it).take(3))
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: AppImage(url: g, width: 26, height: 26),
+                ),
+              ),
+            if (_giftThumbs(it).isEmpty)
+              Container(
+                width: 26,
+                height: 26,
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F2F4),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(Icons.card_giftcard,
+                    size: 16, color: Color(0xFFbbbbbb)),
+              ),
             const Icon(Icons.chevron_right,
                 color: Color(0xFFcccccc), size: 18),
           ],
         ),
       ),
     );
+  }
+
+  /// 赠品缩略图列表：giftImages（抓包多图）优先，空时回退 giftImage 单图
+  List<String> _giftThumbs(OrderItem it) {
+    if (it.giftImages.isNotEmpty) return it.giftImages;
+    if (it.giftImage.isNotEmpty) return [it.giftImage];
+    return const [];
   }
 
   /// 换赠品缩略图（双击赠品行触发）
@@ -1105,11 +1126,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ? picked.path.substring(picked.path.lastIndexOf('.'))
           : '.jpg';
       final fileName = 'gift_${DateTime.now().millisecondsSinceEpoch}$ext';
-      final saved = await File(picked.path).copy('${saveDir.path}/$fileName');
+      await File(picked.path).copy('${saveDir.path}/$fileName');
       if (!mounted) return;
+      // v1.9.102：存相对 Documents 路径——自签重装容器变化后图片不丢
+      final rel = 'gift_images/$fileName';
       context
           .read<CartProvider>()
-          .updateOrderItem(it, giftImage: saved.path);
+          .updateOrderItem(it, giftImage: rel, giftImages: [rel]);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
