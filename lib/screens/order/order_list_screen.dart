@@ -1115,16 +1115,16 @@ class _OrderCard extends StatelessWidget {
           if (!isRefund && items.any((e) => e.giftCount > 0))
             _listGiftRow(
                 context, items.firstWhere((e) => e.giftCount > 0)),
-          // 状态框架（物流/待发货承诺/评价引导）从商品区下移到卡片底部，
-          // 贴近按钮区（v1.9.102，对齐真实淘宝列表卡层级）
+          // 日期+实付款行（v1.9.103：上移到商品区正下方，与商品图底部边缘对齐；
+          // 运费计入实付款；标题右侧单价只算货品价值）
+          if (!isRefund) _paidDateLine(total),
+          // 状态框架（物流/待发货承诺/评价引导）在实付款行下方，
+          // 贴近按钮区（v1.9.103 与实付款行互换位置，对齐真实淘宝列表卡层级）
           _OrderStatusFrame(
             item: items.first,
             orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
             ratePrompt: rateTab,
           ),
-          // 日期+实付款行（v1.9.102：09.11 | 含运费¥x 实付款 ¥Y）——
-          // 运费计入下方实付款；标题右侧单价只算货品价值
-          if (!isRefund) _paidDateLine(total),
           // 底部操作栏（售后卡片无合计行，对齐真实淘宝退款单）
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -1682,19 +1682,20 @@ class _OrderItemTile extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
+              // 规格（v1.9.103：字号调小 11，紧贴标题）
               Text(
                 item.configuration,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.min
-                    .copyWith(color: AppColors.subText),
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.subText),
               ),
-              const SizedBox(height: 6),
-              // 服务标签（v1.9.102）：与抓包数据一一对应（displayTags），
-              // 纯绿色字体不带框（对齐真实淘宝）
+              const SizedBox(height: 2),
+              // 服务标签（v1.9.103：字号调大 12 贴合真实淘宝，纯绿色字体不带框；
+              // 与抓包数据一一对应 displayTags）
               Wrap(
-                spacing: 6,
+                spacing: 8,
                 runSpacing: 4,
                 children: item.displayTags.map(_greenTag).toList(),
               ),
@@ -1734,10 +1735,10 @@ class _OrderItemTile extends StatelessWidget {
     return item.price;
   }
 
-  /// 服务标签：纯绿色字体不带框（v1.9.102，对齐真实淘宝）
+  /// 服务标签：纯绿色字体不带框，字号 12（v1.9.103 调大，对齐真实淘宝）
   Widget _greenTag(String text) {
     return Text(text,
-        style: const TextStyle(color: Color(0xFF00A870), fontSize: 10));
+        style: const TextStyle(color: Color(0xFF00A870), fontSize: 12));
   }
 }
 
