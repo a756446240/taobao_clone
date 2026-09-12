@@ -18,14 +18,18 @@ import 'providers/product_image_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/reviews_provider.dart';
 import 'providers/search_provider.dart';
+import 'utils/doc_paths.dart';
 
 void main() {
   // 关键：让 widget build 阶段抛错时显示错误页而不是纯白屏（便于 HarmonyOS 等真机排错）
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return _FatalErrorScreen(error: details.exceptionAsString());
   };
-  runZonedGuarded(() {
+  runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    // v1.9.102：初始化文档目录根路径（图片相对路径持久化的解析基础），
+    // 必须在任何 AppImage build 之前完成
+    await DocPaths.init();
     // Android 状态栏透明沉浸
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
