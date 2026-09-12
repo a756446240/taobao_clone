@@ -28,6 +28,9 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
   // v1.9.103：强制覆盖绿色标签——导入时所有匹配订单的服务标签
   // 无条件以抓包为准（含手动改过的；抓包无标签=该商品真没有标签）
   bool _forceTags = false;
+  // v1.9.107：强制覆盖店铺头像——修正旧抓包/兜底链抓到的错版头像
+  // （红底 logo 等），以本次抓包 newShopImg 为准
+  bool _forceAvatar = false;
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -206,6 +209,40 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                     style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
                   ),
                 ),
+              // v1.9.107：强制覆盖店铺头像——旧抓包/兜底链抓到的错版头像
+              // （如红底 logo）会被本次抓包的 newShopImg 白底正版覆盖
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: () => setState2(() => _forceAvatar = !_forceAvatar),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: _forceAvatar,
+                        onChanged: (v) =>
+                            setState2(() => _forceAvatar = v ?? false),
+                        activeColor: const Color(0xFFFF5000),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text('强制覆盖店铺头像（以本次抓包为准）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+              if (_forceAvatar)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '⚠️ 同名店铺所有订单的头像都会被本次抓包头像覆盖，'
+                    '用于修正以前抓错的头像（红底/错版）。',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
+                  ),
+                ),
               if (dup > 0) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -280,7 +317,9 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     }
 
     final result = provider.importSyncedShops(shops,
-        forceOrderNos: selected, forceTags: _forceTags);
+        forceOrderNos: selected,
+        forceTags: _forceTags,
+        forceAvatar: _forceAvatar);
     // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
     // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
     // 覆盖层清除后详情页/退款页立即显示抓包头像
