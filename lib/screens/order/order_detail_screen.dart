@@ -1106,11 +1106,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 赠品缩略图列表：giftImages（抓包多图）优先，空时回退 giftImage 单图
+  /// 赠品缩略图列表：giftImages（抓包多图）优先，空时回退 giftImage 单图。
+  /// v1.9.104：图片数量少于赠品件数时循环重复填充（旧抓包数据 gifts 数组
+  /// 只存了 1 张图，导致"2件赠品只显示 1 张"）；上限 3 张
   List<String> _giftThumbs(OrderItem it) {
-    if (it.giftImages.isNotEmpty) return it.giftImages;
-    if (it.giftImage.isNotEmpty) return [it.giftImage];
-    return const [];
+    final base = it.giftImages.isNotEmpty
+        ? it.giftImages
+        : (it.giftImage.isNotEmpty ? [it.giftImage] : const <String>[]);
+    if (base.isEmpty) return const [];
+    final target = it.giftCount.clamp(1, 3);
+    if (base.length >= target) return base;
+    return [for (var i = 0; i < target; i++) base[i % base.length]];
   }
 
   /// 换赠品缩略图（双击赠品行触发）
