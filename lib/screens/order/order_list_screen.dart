@@ -1036,13 +1036,11 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 合计：抓包导入的订单带 actualTotal（接口实付总额，单价×数量有分位差）优先用；
+    // 实付款：抓包导入的订单带 actualTotal（接口实付总额，单价×数量有分位差）优先用；
     // 否则沿用旧逻辑 = 各商品实付价直接相加（实付录入多少就是多少，不再乘规格数量）
     final total = shop.actualTotal > 0
         ? shop.actualTotal
         : items.fold<double>(0, (sum, item) => sum + item.price);
-    // 件数 = 各商品数量求和（对齐真实淘宝的"共N件"）
-    final pieceCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
     final isRefund = isRefundStatus(shop.orderSubStatus);
 
     return Container(
@@ -1107,30 +1105,27 @@ class _OrderCard extends StatelessWidget {
           // 商品列表：点击进入详情，双击弹出编辑菜单
           ...items.map((item) => _OrderItemTile(
                 item: item,
+                shop: shop,
                 orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
-                ratePrompt: rateTab,
                 onTap: () => onDetail(item),
                 onDoubleTap: () => onEditItem(item),
               )),
-          const Divider(height: 1, color: Color(0xFFf5f5f5)),
+          // 赠品行（v1.9.102：对齐真实淘宝列表卡——左"N件赠品"，
+          // 右赠品缩略图+箭头，位于物流信息上方）
+          if (!isRefund && items.any((e) => e.giftCount > 0))
+            _listGiftRow(
+                context, items.firstWhere((e) => e.giftCount > 0)),
+          // 状态框架（物流/待发货承诺/评价引导）从商品区下移到卡片底部，
+          // 贴近按钮区（v1.9.102，对齐真实淘宝列表卡层级）
+          _OrderStatusFrame(
+            item: items.first,
+            orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
+            ratePrompt: rateTab,
+          ),
+          // 日期+实付款行（v1.9.102：09.11 | 含运费¥x 实付款 ¥Y）——
+          // 运费计入下方实付款；标题右侧单价只算货品价值
+          if (!isRefund) _paidDateLine(total),
           // 底部操作栏（售后卡片无合计行，对齐真实淘宝退款单）
-          if (!isRefund)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text('共${pieceCount}件商品 合计：',
-                      style: AppTextStyles.min),
-                  Text('¥',
-                      style: AppTextStyles.price.copyWith(fontSize: 13)),
-                  Text(
-                    total.toStringAsFixed(2),
-                    style: AppTextStyles.price.copyWith(fontSize: 18),
-                  ),
-                ],
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: isRefund
@@ -1183,6 +1178,111 @@ class _OrderCard extends StatelessWidget {
                               onTap: () => _onPrimaryTap(context)),
                     ],
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 金额格式化：去掉末尾的 .00/.0（对齐真实淘宝 ¥265.5 / ¥32 / ¥3.4 的写法）
+  static String fmtPrice(double v) {
+    var s = v.toStringAsFixed(2);
+    if (s.endsWith('00')) {
+      s = s.substring(0, s.length - 3);
+    } else if (s.endsWith('0')) {
+      s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
+
+  /// 列表卡赠品行（v1.9.102）：左"N件赠品"，右赠品缩略图（最多2张）+箭头。
+  /// 对齐真实淘宝待收货卡片；单击进订单详情（赠品的编辑在详情页）
+  Widget _listGiftRow(BuildContext context, OrderItem it) {
+    final thumbs = it.giftImages.isNotEmpty
+        ? it.giftImages
+        : (it.giftImage.isNotEmpty ? [it.giftImage] : <String>[]);
+    return GestureDetector(
+      onTap: () => onDetail(it),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Row(
+          children: [
+            Text('${it.giftCount}件赠品',
+                style: const TextStyle(
+                    fontSize: 13, color: Color(0xFF333333))),
+            const Spacer(),
+            for (final t in thumbs.take(2))
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: AppImage(url: t, width: 20, height: 20),
+                ),
+              ),
+            if (thumbs.isEmpty)
+              Container(
+                width: 20,
+                height: 20,
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F2F4),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(Icons.card_giftcard,
+                    size: 12, color: Color(0xFFbbbbbb)),
+              ),
+            const Icon(Icons.chevron_right,
+                color: Color(0xFFcccccc), size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 日期+实付款行（v1.9.102，对齐真实淘宝列表卡右下角）：
+  /// "09.11  |  含运费¥35 实付款 ¥99"
+  /// - 日期取订单创建时间的月日（MM.DD）
+  /// - 运费计入实付款；有运费时显示"含运费¥x"
+  /// - "实付款"较细黑体，右侧价格相对较粗——两个价格都与订单实付款一致
+  Widget _paidDateLine(double total) {
+    const grey = TextStyle(fontSize: 11, color: Color(0xFF999999));
+    // 日期：解析创建时间里的月日（兼容 2026-09-11 / 2026/09/11 / 2026年9月1日）
+    String date = '';
+    final ct = items.first.createTime;
+    final m = RegExp(r'\d{2,4}[-/年](\d{1,2})[-/月](\d{1,2})').firstMatch(ct);
+    if (m != null) {
+      date = '${m.group(1)!.padLeft(2, '0')}.${m.group(2)!.padLeft(2, '0')}';
+    }
+    // 运费：订单级运费挂在首个商品上（抓包）；生成订单按各商品求和
+    final freight = items.fold<double>(
+        0, (s, e) => s + (e.showShippingFee ? e.shippingFee : 0));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text.rich(
+            TextSpan(
+              children: [
+                if (date.isNotEmpty) ...[
+                  TextSpan(text: date, style: grey),
+                  const TextSpan(text: '  |  ', style: grey),
+                ],
+                if (freight > 0)
+                  TextSpan(text: '含运费¥${fmtPrice(freight)}  ', style: grey),
+                const TextSpan(
+                    text: '实付款 ',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF333333))),
+                TextSpan(
+                  text: '¥${fmtPrice(total)}',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1319,17 +1419,17 @@ class _OrderCard extends StatelessWidget {
 // ============ 订单商品项（可点击编辑） ============
 class _OrderItemTile extends StatelessWidget {
   final OrderItem item;
+  final ShoppingCartShop shop; // 计算标题右侧实付单价需要整单实付/运费（v1.9.102）
   final String orderStatus; // 店铺级订单状态，决定下方状态行的文案与图标
-  final bool ratePrompt; // 待评价 Tab：商品下方显示评价引导灰框（随机文案+灰星）
   final VoidCallback onTap;
   final VoidCallback? onDoubleTap;
 
   const _OrderItemTile({
     required this.item,
+    required this.shop,
     required this.orderStatus,
     required this.onTap,
     this.onDoubleTap,
-    this.ratePrompt = false,
   });
 
   Future<void> _pickImage(BuildContext context) async {
@@ -1344,14 +1444,16 @@ class _OrderItemTile extends StatelessWidget {
           ? picked.path.substring(picked.path.lastIndexOf('.'))
           : '.jpg';
       final fileName = 'order_${DateTime.now().millisecondsSinceEpoch}$ext';
-      final saved = await File(picked.path).copy('${saveDir.path}/$fileName');
+      await File(picked.path).copy('${saveDir.path}/$fileName');
       if (!context.mounted) return;
+      // v1.9.102：存相对 Documents 路径——自签重装容器变化后图片不丢
+      final rel = 'order_images/$fileName';
       // 用商品标题作为 key，详情页也会读取同一张图
       await context
           .read<ProductImageProvider>()
-          .setOverride(item.title, saved.path);
+          .setOverride(item.title, rel);
       if (!context.mounted) return;
-      context.read<CartProvider>().updateOrderItem(item, imageUrl: saved.path);
+      context.read<CartProvider>().updateOrderItem(item, imageUrl: rel);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
       );
@@ -1437,7 +1539,7 @@ class _OrderItemTile extends StatelessWidget {
                   // 随机商品对应规格（前缀按商品稳定选取）
                   Text(
                     '$_specPrefix:${item.configuration}',
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTextStyles.min
                         .copyWith(color: AppColors.subText),
@@ -1524,171 +1626,242 @@ class _OrderItemTile extends StatelessWidget {
   }
 
   // ============ 普通订单布局 ============
+  // v1.9.102 对齐真实淘宝列表卡：
+  // - 标题只一行（约 17-18 字符后省略号截断），右侧实付单价（较粗黑体）+ ×N
+  // - 规格在标题下方，服务标签再下方（纯绿色字、不带框）
+  // - 状态框架（物流/待发货/评价引导）下移到卡片底部（_OrderStatusFrame）
   Widget _buildNormalLayout(BuildContext context, String imageUrl) {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onDoubleTap: () => _pickImage(context), // 双击换商品图
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: AppImage(
-                  url: imageUrl,
-                  width: 80,
-                  height: 80,
-                ),
-              ),
+        GestureDetector(
+          onDoubleTap: () => _pickImage(context), // 双击换商品图
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AppImage(
+              url: imageUrl,
+              width: 80,
+              height: 80,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.small,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.configuration,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.min
-                        .copyWith(color: AppColors.subText),
-                  ),
-                  const SizedBox(height: 6),
-                  // 保障标签（v1.9.81）：displayTags 合并去重——
-                  // 「7天无理由」与「7天无理由退货」只保留后者；抓包无标签自动补默认
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: item.displayTags.map(_greenTag).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  // "平台加补后 / 领消费券后约" 价格行已按需求删除
-                  if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
-                    Text(item.taxInfo,
-                        style: const TextStyle(
-                            color: Color(0xFF999999), fontSize: 11)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        // 待评价 Tab：评价引导灰框（随机文案 + 灰色星标行，对齐真实淘宝评价列表）
-        if (ratePrompt)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
                   Expanded(
-                    child: Text.rich(
-                      TextSpan(children: _ratePromptSpans),
+                    child: Text(
+                      item.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.small,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // 灰色星标行（未评价，对齐真实淘宝）
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  // 标题右侧：实付单价 + ×N——只算货品价值（不含运费），
+                  // 数量>1 自动 ÷数量（与详情页 _unitPriceOf 同逻辑）
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      for (var i = 0; i < 5; i++)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 2),
-                          child: Icon(Icons.star_rounded,
-                              color: Color(0xFFDDDDDD), size: 15),
-                        ),
+                      Text(
+                        '¥${_OrderCard.fmtPrice(_unitPrice)}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A1A1A)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('×${item.quantity}',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF999999))),
                     ],
                   ),
                 ],
               ),
-            ),
-          )
-        // 待发货：灰底圆角框架（图标 + "待发货"粗体 + 时间文案），双击编辑具体时间
-        else if (_isPendingShip)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: GestureDetector(
-              onDoubleTap: () => _editShipPromise(context),
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F8FA),
-                  borderRadius: BorderRadius.circular(6),
+              const SizedBox(height: 4),
+              Text(
+                item.configuration,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.min
+                    .copyWith(color: AppColors.subText),
+              ),
+              const SizedBox(height: 6),
+              // 服务标签（v1.9.102）：与抓包数据一一对应（displayTags），
+              // 纯绿色字体不带框（对齐真实淘宝）
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: item.displayTags.map(_greenTag).toList(),
+              ),
+              // "平台加补后 / 领消费券后约" 价格行已按需求删除
+              if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(item.taxInfo,
+                      style: const TextStyle(
+                          color: Color(0xFF999999), fontSize: 11)),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.schedule,
-                        color: Color(0xFF999999), size: 14),
-                    const SizedBox(width: 4),
-                    const Text('待发货',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A))),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(_shipPromiseText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF999999))),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )
-        // 交易成功：下方不再显示任何框架（对齐真实淘宝）
-        // 其余状态行全部统一灰色圆角框架（图标 + 粗体状态词 + 灰色描述 + 箭头）
-        else if (_statusLine != null && !_isTradeSuccess)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  Icon(_statusIcon,
-                      color: const Color(0xFF999999), size: 14),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(children: _statusLineSpans),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right,
-                      color: Color(0xFF999999), size: 16),
-                ],
-              ),
-            ),
+            ],
           ),
+        ),
       ],
     );
+  }
+
+  /// 标题右侧实付单价（v1.9.102）：与详情页 _unitPriceOf 同逻辑——
+  /// price≈整单实付时先剥运费再 ÷数量；抓包新数据 price 本就是单价直接用
+  double get _unitPrice {
+    if (shop.actualTotal > 0 &&
+        (item.price - shop.actualTotal).abs() < 1.0) {
+      final shipFee = item.showShippingFee ? item.shippingFee : 0.0;
+      return (item.price - shipFee) / item.quantity;
+    }
+    if (item.quantity > 1) {
+      if (shop.actualTotal > 0 &&
+          (item.price * item.quantity - shop.actualTotal).abs() < 1.0) {
+        return item.price;
+      }
+      if (item.productTotal > 0 &&
+          (item.price - item.productTotal).abs() < 1.0) {
+        return item.price / item.quantity;
+      }
+    }
+    return item.price;
+  }
+
+  /// 服务标签：纯绿色字体不带框（v1.9.102，对齐真实淘宝）
+  Widget _greenTag(String text) {
+    return Text(text,
+        style: const TextStyle(color: Color(0xFF00A870), fontSize: 10));
+  }
+}
+
+// ============ 卡片底部状态框架（v1.9.102：从商品区下移，贴近按钮区） ============
+class _OrderStatusFrame extends StatelessWidget {
+  final OrderItem item;
+  final String orderStatus; // 店铺级订单状态，决定状态行的文案与图标
+  final bool ratePrompt; // 待评价 Tab：显示评价引导灰框（随机文案+灰星）
+
+  const _OrderStatusFrame({
+    required this.item,
+    required this.orderStatus,
+    this.ratePrompt = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 待评价 Tab：评价引导灰框（随机文案 + 灰色星标行，对齐真实淘宝评价列表）
+    if (ratePrompt) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: _ratePromptSpans),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 灰色星标行（未评价，对齐真实淘宝）
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 5; i++)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 2),
+                      child: Icon(Icons.star_rounded,
+                          color: Color(0xFFDDDDDD), size: 15),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // 待发货：灰底圆角框架（图标 + "待发货"粗体 + 时间文案），双击编辑具体时间
+    if (_isPendingShip) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: GestureDetector(
+          onDoubleTap: () => _editShipPromise(context),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule,
+                    color: Color(0xFF999999), size: 14),
+                const SizedBox(width: 4),
+                const Text('待发货',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A))),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(_shipPromiseText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF999999))),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    // 交易成功：下方不再显示任何框架（对齐真实淘宝）
+    // 其余状态行全部统一灰色圆角框架（图标 + 粗体状态词 + 灰色描述 + 箭头）
+    if (_statusLine != null && !_isTradeSuccess) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
+              Icon(_statusIcon, color: const Color(0xFF999999), size: 14),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: _statusLineSpans),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: Color(0xFF999999), size: 16),
+            ],
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   /// 待评价 Tab 评价引导文案池（对齐真实淘宝评价列表的随机引导语，
@@ -1857,18 +2030,6 @@ class _OrderItemTile extends StatelessWidget {
     return Icons.local_shipping;
   }
 
-  Widget _greenTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(text,
-          style: const TextStyle(
-              color: Color(0xFF2E7D32), fontSize: 10)),
-    );
-  }
 }
 
 // ============ 编辑菜单 BottomSheet ============
