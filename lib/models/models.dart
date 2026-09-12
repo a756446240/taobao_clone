@@ -160,13 +160,14 @@ class OrderItem {
   String deliveryText; // 签收/派送文字
 
   /// 展示用服务标签（v1.9.81：列表绿标签/详情红标签同源）
-  /// detailTags + returnText 合并后按"包含关系"去重——
-  /// 如「7天无理由」被「7天无理由退货」覆盖时只保留更具体的后者；
-  /// 全部为空时自动补默认标签（抓包订单无标签信息也能对齐真实淘宝）
+  /// v1.9.102：detailTags 非空（抓包真实标签）时原样照搬，不再混入
+  /// returnText——真实淘宝订单标签与抓包一一对应，混入会多出标签；
+  /// detailTags 为空时才回退 returnText，全部为空补默认标签
   List<String> get displayTags {
     final raw = <String>[
       ...detailTags,
-      if (returnText.trim().isNotEmpty) returnText.trim(),
+      if (detailTags.isEmpty && returnText.trim().isNotEmpty)
+        returnText.trim(),
     ];
     final result = <String>[];
     for (final t in raw) {
@@ -211,6 +212,7 @@ class OrderItem {
   int giftCount; // 赠品件数
   String giftImage; // 赠品缩略图（URL 或本地路径，空=灰色占位）
   String giftTitle; // 赠品名称（展开/提示用）
+  List<String> giftImages; // 赠品缩略图列表（v1.9.102：抓包 gifts 数组全部图片，展示多张缩略图；空时回退 giftImage 单图）
 
   // ===== 优惠明细（v1.9.93 起，抓包 detailv2/手动编辑） =====
   // JSON 数组：[{"group":"shop|platform","name":"官方立减","sub":"立减优惠","amount":57.0}]
@@ -319,6 +321,7 @@ class OrderItem {
     this.giftCount = 0,
     this.giftImage = '',
     this.giftTitle = '',
+    this.giftImages = const [],
     this.discountDetails = '',
     this.tmallPoints = 35,
     this.showTmallPoints = false,
