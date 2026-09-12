@@ -787,6 +787,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildProductCard(OrderItem it, {bool withPriceSection = true}) {
     final override = context.watch<ProductImageProvider>().imageFor(it.title);
     final imageUrl = override ?? it.imageUrl;
+    // v1.9.108：灰色单价（优惠前单价=商品总价÷数量）提到外层，
+    // 右侧价格/数量列移出标题行（规格/标签才能紧贴标题）
+    final unitOriginal = it.productTotal > 0
+        ? it.productTotal / (it.quantity > 0 ? it.quantity : 1)
+        : _unitPriceOf(it);
 
     return Container(
       width: double.infinity,
@@ -817,20 +822,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                // 规格/标签行紧跟标题（间距 6→2），"默认规格"不显示
-                child: Column(
+                // v1.9.108：右侧拆「内容列 + 价格/数量列」——灰色单价/xN
+                // 移出标题行，规格/标签行紧贴标题（间距 2），Spacer 把
+                // "实付价"行压到与商品图底边对齐（对齐真实淘宝）
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                  Expanded(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // v1.9.99：标题>16字默认折叠1行（∨按钮展开），右侧灰色
-                    // 单价（优惠前单价=商品总价÷数量，样式同商品总价）+ xN
+                    // v1.9.99：标题>16字默认折叠1行（∨按钮展开）
                     Builder(builder: (context) {
                       final collapsible = it.title.length > 16;
                       final expanded =
                           _expandedTitles.contains(it.title);
-                      final unitOriginal = it.productTotal > 0
-                          ? it.productTotal /
-                              (it.quantity > 0 ? it.quantity : 1)
-                          : _unitPriceOf(it);
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -874,32 +880,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 ],
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                  '¥${unitOriginal.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF666666))),
-                              const SizedBox(height: 10),
-                              // 数量双击可改（x1、x2…）
-                              GestureDetector(
-                                onDoubleTap: () => _editNumber(
-                                    '修改数量', it.quantity.toDouble(), (v) {
-                                  context
-                                      .read<CartProvider>()
-                                      .updateOrderItem(it,
-                                          quantity: v.round() < 1
-                                              ? 1
-                                              : v.round());
-                                }),
-                                child: Text('x${it.quantity}',
-                                    style: AppTextStyles.minSub),
-                              ),
-                            ],
                           ),
                         ],
                       );
@@ -965,10 +945,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const Icon(Icons.chevron_right,
                             size: 12, color: Color(0xFF999999)),
                         const Spacer(),
-                        // v1.9.99：xN 已移至标题右侧灰色单价下方
                       ],
                     ),
                   ],
+                ),
+                ),
+                const SizedBox(width: 8),
+                // v1.9.108：右侧灰色单价（优惠前）+ 数量 xN 独立列，
+                // 顶部对齐、不参与内容流，规格/标签才能紧贴标题
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                          '¥${unitOriginal.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF666666))),
+                      const SizedBox(height: 10),
+                      // 数量双击可改（x1、x2…）
+                      GestureDetector(
+                        onDoubleTap: () => _editNumber(
+                            '修改数量', it.quantity.toDouble(), (v) {
+                          context
+                              .read<CartProvider>()
+                              .updateOrderItem(it,
+                                  quantity: v.round() < 1 ? 1 : v.round());
+                        }),
+                        child: Text('x${it.quantity}',
+                            style: AppTextStyles.minSub),
+                      ),
+                    ],
+                  ),
+                ),
+                ],
                 ),
               ),
             ],
