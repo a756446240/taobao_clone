@@ -1120,11 +1120,14 @@ class _OrderCard extends StatelessWidget {
           if (!isRefund) _paidDateLine(total),
           // 状态框架（物流/待发货承诺/评价引导）在实付款行下方，
           // 贴近按钮区（v1.9.103 与实付款行互换位置，对齐真实淘宝列表卡层级）
-          _OrderStatusFrame(
-            item: items.first,
-            orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
-            ratePrompt: rateTab,
-          ),
+          // v1.9.104：退款售后卡不再渲染底部状态框架——商品区已有一条退款条，
+          // 底部再来一条就是用户截图里"多余的第二个退款框"（真实淘宝退款卡只有一条）
+          if (!isRefund)
+            _OrderStatusFrame(
+              item: items.first,
+              orderStatus: rateTab ? '交易成功' : shop.orderSubStatus,
+              ratePrompt: rateTab,
+            ),
           // 底部操作栏（售后卡片无合计行，对齐真实淘宝退款单）
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -1198,9 +1201,16 @@ class _OrderCard extends StatelessWidget {
   /// 列表卡赠品行（v1.9.102）：左"N件赠品"，右赠品缩略图（最多2张）+箭头。
   /// 对齐真实淘宝待收货卡片；单击进订单详情（赠品的编辑在详情页）
   Widget _listGiftRow(BuildContext context, OrderItem it) {
-    final thumbs = it.giftImages.isNotEmpty
+    // v1.9.104：图片少于件数时循环重复填充（与详情页 _giftThumbs 同逻辑）
+    final base = it.giftImages.isNotEmpty
         ? it.giftImages
         : (it.giftImage.isNotEmpty ? [it.giftImage] : <String>[]);
+    final target = it.giftCount.clamp(1, 2);
+    final thumbs = base.isEmpty
+        ? <String>[]
+        : (base.length >= target
+            ? base
+            : [for (var i = 0; i < target; i++) base[i % base.length]]);
     return GestureDetector(
       onTap: () => onDetail(it),
       behavior: HitTestBehavior.opaque,
@@ -1593,14 +1603,14 @@ class _OrderItemTile extends StatelessWidget {
 
   /// 退款条变体文案：0极速退款成功/1退款金额/2支付渠道/3平台支持退款
   /// 支付渠道跟订单内选择的支付方式一致；优惠随机生成、可在编辑菜单隐藏
+  /// v1.9.104：style 3（平台支持退款）并入 style 1（退款金额）——真实淘宝
+  /// 退款卡只有一条退款框，"平台支持退款"条是多余的（用户截图确认）
   List<TextSpan> _refundBarSpans(double amount) {
     const grey = TextStyle(fontSize: 12, color: Color(0xFF999999));
     const orange = TextStyle(fontSize: 12, color: Color(0xFFFF5000));
     final pending = _refundBarStatus == '待商家退款';
-    final style = item.refundBarStyle < 0 ? 1 : item.refundBarStyle;
-    if (style == 3) {
-      return [const TextSpan(text: '平台支持退款', style: grey)];
-    }
+    var style = item.refundBarStyle < 0 ? 1 : item.refundBarStyle;
+    if (style == 3) style = 1; // 平台支持退款 → 退款金额样式
     final label = switch (style) {
       0 => pending ? '极速退款中 ' : '极速退款成功 ',
       2 => item.paymentMethod.contains('微信') ? '微信 ' : '支付宝 ',
@@ -1658,7 +1668,7 @@ class _OrderItemTile extends StatelessWidget {
                       item.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.small,
+                      style: AppTextStyles.small.copyWith(height: 1.15),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1682,22 +1692,32 @@ class _OrderItemTile extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
-              // 规格（v1.9.103：字号调小 11，紧贴标题）
+              // 规格（v1.9.104：与标题零间距相贴，行高压 1.15 消除视觉空隙）
               Text(
                 item.configuration,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 11, color: AppColors.subText),
+                    fontSize: 11, color: AppColors.subText, height: 1.15),
               ),
-              const SizedBox(height: 2),
-              // 服务标签（v1.9.103：字号调大 12 贴合真实淘宝，纯绿色字体不带框；
-              // 与抓包数据一一对应 displayTags）
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: item.displayTags.map(_greenTag).toList(),
+              // 服务标签（v1.9.104：强制单行，放不下的直接裁掉不显示，
+              // 对齐真实淘宝列表卡只显示一行标签的样式）
+              ClipRect(
+                child: SizedBox(
+                  height: 16,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: Row(
+                      children: [
+                        for (final t in item.displayTags) ...[
+                          _greenTag(t),
+                          const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
               // "平台加补后 / 领消费券后约" 价格行已按需求删除
               if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
