@@ -146,7 +146,10 @@ class CartProvider extends ChangeNotifier {
       // v1.9.103：强制覆盖绿色标签——导入页开关打开时，所有匹配订单的
       // detailTags 无条件以抓包为准（含手动改过的；抓包为空=该商品无标签，
       // 置 tagsForced 防 displayTags 自动补默认标签）
-      bool forceTags = false}) {
+      bool forceTags = false,
+      // v1.9.107：强制覆盖店铺头像——导入页开关打开时，同名店铺所有订单的
+      // shopAvatar 无条件以本次抓包为准（修正旧抓包错版头像，如红底 logo）
+      bool forceAvatar = false}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -175,8 +178,10 @@ class CartProvider extends ChangeNotifier {
       if (shop.shopAvatar.isNotEmpty) {
         final incomingNos = shop.items.map((e) => e.orderNo).toSet();
         for (final old in _shops) {
-          // 旧的淘宝通用默认头像视为"没有头像"，允许抓包真实头像覆盖
-          if (old.shopAvatar.isNotEmpty &&
+          // 旧的淘宝通用默认头像视为"没有头像"，允许抓包真实头像覆盖；
+          // v1.9.107：forceAvatar 打开时跳过此保护，错版头像也强制覆盖
+          if (!forceAvatar &&
+              old.shopAvatar.isNotEmpty &&
               !_isGenericAvatar(old.shopAvatar)) {
             continue;
           }
