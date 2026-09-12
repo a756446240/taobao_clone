@@ -25,6 +25,9 @@ class TaobaoSyncImportScreen extends StatefulWidget {
 
 class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
   bool _busy = false;
+  // v1.9.103：强制覆盖绿色标签——导入时所有匹配订单的服务标签
+  // 无条件以抓包为准（含手动改过的；抓包无标签=该商品真没有标签）
+  bool _forceTags = false;
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -170,6 +173,39 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                 '⏭ 已存在：$dup 条（默认跳过，只补空字段）',
                 style: const TextStyle(fontSize: 13, height: 1.6),
               ),
+              // v1.9.103：强制覆盖绿色标签开关（配合 taobao_tags_*.json 使用）
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: () => setState2(() => _forceTags = !_forceTags),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: _forceTags,
+                        onChanged: (v) =>
+                            setState2(() => _forceTags = v ?? false),
+                        activeColor: const Color(0xFFFF5000),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text('强制覆盖绿色标签（以抓包为准）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+              if (_forceTags)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '⚠️ 所有匹配订单的服务标签将被抓包数据覆盖，'
+                    '手动改过的标签也会冲掉；抓包没有标签的商品将不显示标签。',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
+                  ),
+                ),
               if (dup > 0) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -243,8 +279,8 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
       if (ok2 != true) return;
     }
 
-    final result =
-        provider.importSyncedShops(shops, forceOrderNos: selected);
+    final result = provider.importSyncedShops(shops,
+        forceOrderNos: selected, forceTags: _forceTags);
     // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
     // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
     // 覆盖层清除后详情页/退款页立即显示抓包头像
@@ -259,6 +295,8 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     if (result.added > 0) {
       _toast('已导入 ${result.added} 条$cover（跳过 ${result.skipped} 条$tail）');
       if (mounted) Navigator.of(context).pop();
+    } else if (_forceTags) {
+      _toast('绿色标签已按抓包强制覆盖（无新订单，${result.skipped} 条已存在）');
     } else {
       _toast('没有新订单，${result.skipped} 条已存在$tail');
     }
