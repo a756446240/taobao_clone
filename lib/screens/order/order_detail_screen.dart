@@ -702,7 +702,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (_shop.shopAvatar.isNotEmpty) {
       return AppImage(url: _shop.shopAvatar, width: 30, height: 30);
     }
-    return const Icon(Icons.favorite, color: Colors.white, size: 16);
+    // v1.9.109：无头像店铺显示淘宝通用默认店标（橙色小店图标，对齐
+    // 真实淘宝搜索结果/订单页的默认头像），不再用红圆白心
+    return Image.asset('assets/images/shop_default.png',
+        width: 30, height: 30, fit: BoxFit.cover);
   }
 
   Future<void> _pickShopAvatar() async {
@@ -897,30 +900,55 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                     ],
                     const SizedBox(height: 2),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      // v1.9.81：displayTags 合并去重——「7天无理由」与
-                      // 「7天无理由退货」只保留后者；抓包无标签自动补默认
-                      // v1.9.97：对齐真实淘宝——绿色字体不带框
-                      children: [
-                        ...it.displayTags.map(_greenTag),
-                        // v1.9.107：无标签时不显示孤零零的箭头
-                        if (it.displayTags.isNotEmpty)
-                          const Icon(Icons.chevron_right,
-                              size: 13, color: Color(0xFF00A870)),
-                      ],
-                    ),
+                    // v1.9.109：绿标只显示一行（对齐真实淘宝）——按宽度容纳
+                    // 尽可能多的完整标签，放不下的截断，› 固定在行尾跟行
+                    if (it.displayTags.isNotEmpty)
+                      LayoutBuilder(builder: (context, cons) {
+                        const tagStyle = TextStyle(
+                            color: Color(0xFF00A870), fontSize: 10);
+                        const spacing = 6.0;
+                        const chevW = 13.0;
+                        final shown = <String>[];
+                        var used = 0.0;
+                        for (final t in it.displayTags) {
+                          final tp = TextPainter(
+                              text: TextSpan(text: t, style: tagStyle),
+                              textDirection: TextDirection.ltr,
+                              maxLines: 1)
+                            ..layout();
+                          final w =
+                              tp.width + (shown.isEmpty ? 0 : spacing);
+                          // 至少保留一个标签；其余放不下就截断
+                          if (shown.isNotEmpty &&
+                              used + w + chevW > cons.maxWidth) {
+                            break;
+                          }
+                          shown.add(t);
+                          used += w;
+                        }
+                        return Row(
+                          children: [
+                            for (var i = 0; i < shown.length; i++) ...[
+                              if (i > 0) const SizedBox(width: spacing),
+                              Text(shown[i], style: tagStyle),
+                            ],
+                            const Icon(Icons.chevron_right,
+                                size: 13, color: Color(0xFF00A870)),
+                          ],
+                        );
+                      }),
                     // v1.9.107：Spacer 把实付价行压到商品图底边
                     const Spacer(),
                     Row(
                       children: [
                         Text('实付价 ',
                             style: AppTextStyles.minSub),
-                        Text('¥',
-                            style: AppTextStyles.price
-                                .copyWith(fontSize: 12)),
+                        // v1.9.109：实付价金额改黑色粗体（对齐真实淘宝）
+                        const Text('¥',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black)),
                         // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
                         // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
                         // v1.9.97：双击金额=直接改该商品实付价（多商品订单各改各的）
@@ -932,8 +960,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 .updateOrderItem(it, price: v);
                           }),
                           child: Text(_unitPriceOf(it).toStringAsFixed(2),
-                              style: AppTextStyles.price
-                                  .copyWith(fontSize: 18)),
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black)),
                         ),
                         const SizedBox(width: 6),
                         // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
@@ -1256,7 +1286,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87)),
+                  color: Colors.black)),
           if (co > 0) ...[
             const SizedBox(width: 6),
             Text('共减¥${co.toStringAsFixed(2)}',
@@ -1285,11 +1315,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ],
           const Spacer(),
-          Text('¥',
-              style: AppTextStyles.price.copyWith(fontSize: 12)),
+          // v1.9.109：实付款金额改黑色粗体（对齐真实淘宝）
+          const Text('¥',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black)),
           // 实付款：录入多少显示多少（不乘规格数量）
           Text(total.toStringAsFixed(2),
-              style: AppTextStyles.price.copyWith(fontSize: 20)),
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black)),
         ],
       ),
     ];
@@ -1304,11 +1341,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }),
         child: Row(
           children: [
-            Text('进口税', style: AppTextStyles.small),
+            Text('进口税',
+                style: AppTextStyles.small
+                    .copyWith(fontWeight: FontWeight.bold)),
             const Spacer(),
             Text(_item.taxContent,
                 style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF666666))),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black)),
           ],
         ),
       ),
@@ -1337,14 +1378,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Row(
         children: [
           if (icon != null) _discountIcon(icon),
-          Text(label, style: AppTextStyles.small),
+          // v1.9.109：价格区标签/数值改黑色粗体（对齐真实淘宝）
+          Text(label,
+              style: AppTextStyles.small
+                  .copyWith(fontWeight: FontWeight.bold)),
           if (sub.isNotEmpty)
             Text('  $sub', style: AppTextStyles.minSub),
           const Spacer(),
           Text(value,
               style: TextStyle(
                   fontSize: 13,
-                  color: valueColor ?? const Color(0xFF666666))),
+                  fontWeight: FontWeight.bold,
+                  color: valueColor ?? Colors.black)),
         ],
       ),
     );
