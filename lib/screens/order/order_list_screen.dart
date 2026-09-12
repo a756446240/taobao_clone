@@ -1215,7 +1215,8 @@ class _OrderCard extends StatelessWidget {
       onTap: () => onDetail(it),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        // v1.9.106：底距 10→4，实付款行紧贴赠品行下方
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
         child: Row(
           children: [
             Text('${it.giftCount}件赠品',
@@ -1268,7 +1269,8 @@ class _OrderCard extends StatelessWidget {
     final freight = items.fold<double>(
         0, (s, e) => s + (e.showShippingFee ? e.shippingFee : 0));
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+      // v1.9.106：顶距 2→0——无赠品时与商品图底边对齐，有赠品时紧贴赠品行
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -1486,7 +1488,9 @@ class _OrderItemTile extends StatelessWidget {
       onDoubleTap: onDoubleTap ?? onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        // v1.9.106：底距 10→4——无赠品时实付款行紧贴商品图底边（对齐），
+        // 有赠品时赠品行紧贴图片下方、实付款再贴赠品行
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
         child: isRefund
             ? _buildRefundLayout(context, imageUrl)
             : _buildNormalLayout(context, imageUrl),
@@ -1659,10 +1663,11 @@ class _OrderItemTile extends StatelessWidget {
           onDoubleTap: () => _pickImage(context), // 双击换商品图
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
+            // v1.9.106：80→76，缩小与文字区的高度差
             child: AppImage(
               url: imageUrl,
-              width: 80,
-              height: 80,
+              width: 76,
+              height: 76,
             ),
           ),
         ),
@@ -1697,20 +1702,12 @@ class _OrderItemTile extends StatelessWidget {
                               height: 1.2),
                         ),
                       ),
-                    // 服务标签：单行，超出直接裁掉（对齐真实淘宝只显示一行）
+                    // 服务标签：单行，只显示能完整放下的标签——
+                    // 放不下的整个不显示，绝不切半个字（v1.9.106，对齐真实淘宝）
                     if (tagsText.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          tagsText,
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.clip,
-                          style: const TextStyle(
-                              color: Color(0xFF00A870),
-                              fontSize: 12,
-                              height: 1.2),
-                        ),
+                        child: _fitTagsRow(item.displayTags),
                       ),
                     // "平台加补后 / 领消费券后约" 价格行已按需求删除
                     if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
@@ -1746,6 +1743,40 @@ class _OrderItemTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// 服务标签单行整词显示（v1.9.106）：逐个测量标签宽度，
+  /// 只保留能在可用宽度内完整放下的标签，放不下的整个丢弃——
+  /// 绝不出现"7天无理由"被切成"7天无理"这种半个字的情况（对齐真实淘宝）
+  Widget _fitTagsRow(List<String> tags) {
+    const style =
+        TextStyle(color: Color(0xFF00A870), fontSize: 12, height: 1.2);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final kept = <String>[];
+        var used = 0.0;
+        for (final t in tags) {
+          final tp = TextPainter(
+            text: TextSpan(text: t, style: style),
+            textDirection: TextDirection.ltr,
+            textScaler: scaler,
+          )..layout();
+          // 间距按 8 计（渲染用两个空格≈7px，往保守算）
+          final w = tp.width + (kept.isEmpty ? 0 : 8);
+          if (kept.isNotEmpty && used + w > constraints.maxWidth) break;
+          used += w;
+          kept.add(t);
+        }
+        return Text(
+          kept.join('  '),
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.clip,
+          style: style,
+        );
+      },
     );
   }
 
