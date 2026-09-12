@@ -169,6 +169,7 @@ class PersistenceService {
       'giftImages': item.giftImages,
       'discountDetails': item.discountDetails,
       'detailTags': item.detailTags,
+      'tagsForced': item.tagsForced,
       'tmallPoints': item.tmallPoints,
       'showTmallPoints': item.showTmallPoints,
       'showPlatformPriceRow': item.showPlatformPriceRow,
@@ -263,6 +264,7 @@ class PersistenceService {
       discountDetails: j['discountDetails'] ?? '',
       detailTags: (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
           const ['极速退款', '7天无理由'],
+      tagsForced: j['tagsForced'] ?? false,
       tmallPoints: j['tmallPoints'] ?? 0,
       showTmallPoints: j['showTmallPoints'] ?? false,
       showPlatformPriceRow: j['showPlatformPriceRow'] ?? true,
