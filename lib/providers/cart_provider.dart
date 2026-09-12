@@ -127,6 +127,14 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 淘宝通用默认头像特征（抓包脚本 is_real_avatar 同款过滤）：
+  /// 旧数据里可能存着这种默认图，视为"没有头像"允许后续抓包覆盖
+  static bool _isGenericAvatar(String url) =>
+      url.contains('-tps-') ||
+      url.contains('gtd.alicdn.com/tps') ||
+      url.contains('tps/i') ||
+      url.contains('TB1f.8ZFV');
+
   /// 淘宝同步导入：按订单号去重，只追加本地不存在的新订单。
   /// 已在本地的订单（含用户编辑过的内容）绝不覆盖；
   /// 用户删除过的订单（黑名单）永久跳过、不会复活。
@@ -156,11 +164,19 @@ class CartProvider extends ChangeNotifier {
         }
       }
       // v1.9.78：抓包真实店铺头像，按订单号匹配回填（只补空值）
+      // v1.9.102：同时按店名匹配——同一家店的所有历史订单（含之前抓不到
+      // 头像的旧订单）在后续抓包拿到头像后自动补上；手动换过的头像存在
+      // ProductImageProvider 覆盖层（优先级更高），此处回填碰不到它
       if (shop.shopAvatar.isNotEmpty) {
         final incomingNos = shop.items.map((e) => e.orderNo).toSet();
         for (final old in _shops) {
-          if (old.shopAvatar.isNotEmpty) continue;
-          if (old.items.any((e) => incomingNos.contains(e.orderNo))) {
+          // 旧的淘宝通用默认头像视为"没有头像"，允许抓包真实头像覆盖
+          if (old.shopAvatar.isNotEmpty &&
+              !_isGenericAvatar(old.shopAvatar)) {
+            continue;
+          }
+          if (old.shopName == shop.shopName ||
+              old.items.any((e) => incomingNos.contains(e.orderNo))) {
             old.shopAvatar = shop.shopAvatar;
             opsBackfilled = true;
           }
@@ -210,6 +226,12 @@ class CartProvider extends ChangeNotifier {
               oldItem.giftCount = it.giftCount;
               oldItem.giftImage = it.giftImage;
               oldItem.giftTitle = it.giftTitle;
+              oldItem.giftImages = it.giftImages;
+              opsBackfilled = true;
+            }
+            // 赠品多图（v1.9.102）：只补空值
+            if (oldItem.giftImages.isEmpty && it.giftImages.isNotEmpty) {
+              oldItem.giftImages = it.giftImages;
               opsBackfilled = true;
             }
             // 优惠明细（v1.9.93）：抓包优惠子项只补空值，手动改过的绝不覆盖
@@ -218,15 +240,21 @@ class CartProvider extends ChangeNotifier {
               oldItem.discountDetails = it.discountDetails;
               opsBackfilled = true;
             }
+            // 商品图（v1.9.102）：抓包图只补空值——之前没抓下来的商品
+            // 后续抓包拿到图后自动补上；手动换过的图非空不会被覆盖
+            if (oldItem.imageUrl.isEmpty && it.imageUrl.isNotEmpty) {
+              oldItem.imageUrl = it.imageUrl;
+              opsBackfilled = true;
+            }
             // 服务标签（v1.9.91）：抓包 detailTags 只补空值——
             // 旧数据默认是 ['极速退款','7天无理由']（模型默认值），
             // 抓包有真实标签时替换；用户手动改过的（非默认值）绝不覆盖
+            // v1.9.102：抓包标签与旧标签不一致时也以抓包为准（用户要求
+            // 标签跟真实订单一模一样，生成器随机多出的标签必须纠正）
             if (it.detailTags.isNotEmpty) {
-              final isDefault = oldItem.detailTags.length == 2 &&
-                  oldItem.detailTags.contains('极速退款') &&
-                  (oldItem.detailTags.contains('7天无理由') ||
-                      oldItem.detailTags.contains('7天无理由退货'));
-              if (oldItem.detailTags.isEmpty || isDefault) {
+              final same = oldItem.detailTags.length == it.detailTags.length &&
+                  oldItem.detailTags.every(it.detailTags.contains);
+              if (!same) {
                 oldItem.detailTags = it.detailTags;
                 // 抓包有真实标签时清空 returnText，避免 displayTags 合并重复
                 oldItem.returnText = '';
@@ -744,6 +772,7 @@ class CartProvider extends ChangeNotifier {
     int? giftCount,
     String? giftImage,
     String? giftTitle,
+    List<String>? giftImages,
     String? discountDetails,
     int? quantity,
   }) {
