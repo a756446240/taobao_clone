@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/persistence_service.dart';
+import '../../providers/product_image_provider.dart';
+import '../../utils/simple_zip.dart';
 
 /// 淘宝订单同步导入页（我的 → 工具卡片「同步订单」进入）
 /// 电脑端脚本抓取真实淘宝订单生成 JSON → 微信传到手机 → 这里导入。
@@ -243,6 +245,15 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
 
     final result =
         provider.importSyncedShops(shops, forceOrderNos: selected);
+    // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
+    // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
+    // 覆盖层清除后详情页/退款页立即显示抓包头像
+    final imgProvider = context.read<ProductImageProvider>();
+    for (final s in shops) {
+      if (s.shopAvatar.isNotEmpty) {
+        imgProvider.removeOverride('shop_avatar:${s.shopName}');
+      }
+    }
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
     final cover = selected.isNotEmpty ? '，其中覆盖 ${selected.length} 条' : '';
     if (result.added > 0) {
@@ -253,18 +264,23 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     }
   }
 
-  /// 选择 JSON 文件导入
+  /// 选择文件导入（支持抓包 JSON / 备份 ZIP）
   Future<void> _pickFile() async {
     setState(() => _busy = true);
     try {
       final res = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['json', 'txt'],
+        allowedExtensions: ['json', 'txt', 'zip'],
       );
       if (res == null || res.files.isEmpty) return;
       final path = res.files.single.path;
       if (path == null) {
         _toast('读不到文件路径');
+        return;
+      }
+      // v1.9.102：备份 ZIP（订单 JSON + 本地图片）先还原图片再导订单
+      if (path.toLowerCase().endsWith('.zip')) {
+        await _restoreFromZip(path);
         return;
       }
       final raw = await File(path).readAsString();
@@ -273,6 +289,45 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
       _toast('读取文件失败：$e');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 从备份 ZIP 恢复（v1.9.102）：先把图片写回 Documents 各目录
+  /// （手动换的商品图/店铺头像/赠品图/消息头像/首页banner），
+  /// 再走 JSON 订单导入流程；图片覆盖层重新加载让恢复的头像立即生效
+  Future<void> _restoreFromZip(String path) async {
+    try {
+      final entries = await SimpleZip.extract(path);
+      if (entries.isEmpty) {
+        _toast('ZIP 里没有可恢复的内容');
+        return;
+      }
+      final dir = await getApplicationDocumentsDirectory();
+      String? jsonStr;
+      var imgCount = 0;
+      for (final e in entries.entries) {
+        if (e.key.endsWith('.json')) {
+          jsonStr = utf8.decode(e.value);
+          continue;
+        }
+        final safe = e.key.replaceAll('..', ''); // 防路径穿越
+        final f = File('${dir.path}/$safe');
+        f.parent.createSync(recursive: true);
+        await f.writeAsBytes(e.value, flush: true);
+        imgCount++;
+      }
+      if (imgCount > 0) {
+        _toast('已恢复 $imgCount 张本地图片');
+        // 重新扫描图片覆盖层（启动时文件缺失被丢弃的映射现在能命中了）
+        await context.read<ProductImageProvider>().load();
+      }
+      if (jsonStr == null) {
+        _toast('ZIP 里没有订单数据');
+        return;
+      }
+      await _previewAndImport(jsonStr, '备份ZIP');
+    } catch (e) {
+      _toast('恢复失败：$e');
     }
   }
 
@@ -419,7 +474,7 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
 
   /// 备份卡片（v1.9.96）：导出全部订单（含手动编辑）为 JSON 文件，
   /// 防证书过期删 App 丢编辑记录；文件在 系统「文件」App 可见，
-  /// 恢复 = 本页「选择 JSON 文件导入」
+  /// 恢复 = 本页「选择文件导入」（v1.9.102 起 ZIP 含全部本地图片）
   Widget _buildBackupCard() {
     return Consumer<CartProvider>(
       builder: (context, provider, _) {
@@ -470,20 +525,54 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
           '${now.day.toString().padLeft(2, '0')}_'
           '${now.hour.toString().padLeft(2, '0')}'
           '${now.minute.toString().padLeft(2, '0')}';
-      final f = File('${dir.path}/taobao_backup_$stamp.json');
-      await f.writeAsString(
-          const JsonEncoder.withIndent(' ').convert(data));
+      final jsonStr = const JsonEncoder.withIndent(' ').convert(data);
+
+      // v1.9.102：备份升级为 ZIP——JSON + 全部本地图片一起打包。
+      // 手动换的商品图/店铺头像/赠品图/消息头像/首页banner/个人头像都存
+      // 在这些目录里，证书过期删 App 重装后导入 ZIP 可原样恢复（含图片）
+      final entries = <String, List<int>>{
+        'taobao_backup.json': utf8.encode(jsonStr),
+      };
+      var imgCount = 0;
+      for (final sub in const [
+        'order_images',
+        'product_images',
+        'shop_avatars',
+        'gift_images',
+        'message_avatars',
+        'banner_materials',
+        'profile_avatars',
+        'profile_backgrounds',
+        'materials',
+      ]) {
+        final d = Directory('${dir.path}/$sub');
+        if (!d.existsSync()) continue;
+        for (final f in d.listSync(recursive: true).whereType<File>()) {
+          final rel =
+              f.path.replaceAll('\\', '/').split('${dir.path}/').last;
+          try {
+            entries[rel] = await f.readAsBytes();
+            imgCount++;
+          } catch (_) {}
+        }
+      }
+      final zipName = 'taobao_backup_$stamp.zip';
+      await SimpleZip.create('${dir.path}/$zipName', entries);
+      // 同步保留一份纯 JSON（老习惯/跨版本兼容）
+      await File('${dir.path}/taobao_backup_$stamp.json')
+          .writeAsString(jsonStr);
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('备份已生成', style: TextStyle(fontSize: 16)),
           content: Text(
-            '文件：taobao_backup_$stamp.json（${provider.shops.length} 家店铺）\n\n'
+            '文件：$zipName\n'
+            '（${provider.shops.length} 家店铺 + $imgCount 张本地图片）\n\n'
             '发送到微信保存：打开系统「文件」App → 我的 iPhone → 淘宝 → '
             '长按该文件 → 共享 → 微信（文件传输助手）。\n\n'
-            '证书过期换签重装后：回到本页点「选择 JSON 文件导入」，'
-            '选中这个备份文件，全部订单和你的编辑记录原样恢复。',
+            '证书过期换签重装后：回到本页点「选择文件导入」，选中这个 ZIP，'
+            '全部订单、你的编辑记录和换过的图片一起恢复。',
             style: const TextStyle(fontSize: 13, height: 1.6),
           ),
           actions: [
