@@ -794,22 +794,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onDoubleTap: () => _pickProductImage(it),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: AppImage(
-                    url: imageUrl,
-                    width: 90,
-                    height: 90,
+          // v1.9.107：IntrinsicHeight+stretch 让右侧内容列至少撑到
+          // 图高（90），Spacer 把"实付价"行压到与商品图底边对齐
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              // v1.9.107：Align 给图片松约束，防止 stretch 把 90x90 拉高
+              Align(
+                alignment: Alignment.topCenter,
+                child: GestureDetector(
+                  onDoubleTap: () => _pickProductImage(it),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AppImage(
+                      url: imageUrl,
+                      width: 90,
+                      height: 90,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
+                // 规格/标签行紧跟标题（间距 6→2），"默认规格"不显示
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -896,15 +904,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ],
                       );
                     }),
-                    const SizedBox(height: 6),
-                    GestureDetector(
-                      onDoubleTap: () => _editText('修改规格', it.configuration, (v) {
-                        context.read<CartProvider>().updateOrderItem(it, configuration: v);
-                      }),
-                      child: Text(it.configuration,
-                          style: AppTextStyles.minSub),
-                    ),
-                    const SizedBox(height: 6),
+                    // v1.9.107："默认规格"不显示（与列表页一致）
+                    if (it.configuration.isNotEmpty &&
+                        it.configuration != '默认规格') ...[
+                      const SizedBox(height: 2),
+                      GestureDetector(
+                        onDoubleTap: () => _editText('修改规格', it.configuration, (v) {
+                          context.read<CartProvider>().updateOrderItem(it, configuration: v);
+                        }),
+                        child: Text(it.configuration,
+                            style: AppTextStyles.minSub),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
@@ -914,11 +926,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       // v1.9.97：对齐真实淘宝——绿色字体不带框
                       children: [
                         ...it.displayTags.map(_greenTag),
-                        const Icon(Icons.chevron_right,
-                            size: 13, color: Color(0xFF00A870)),
+                        // v1.9.107：无标签时不显示孤零零的箭头
+                        if (it.displayTags.isNotEmpty)
+                          const Icon(Icons.chevron_right,
+                              size: 13, color: Color(0xFF00A870)),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    // v1.9.107：Spacer 把实付价行压到商品图底边
+                    const Spacer(),
                     Row(
                       children: [
                         Text('实付价 ',
@@ -941,12 +956,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   .copyWith(fontSize: 18)),
                         ),
                         const SizedBox(width: 6),
-                        // v1.9.97：价格明细入口（对齐真实淘宝，绿色文字+箭头）
+                        // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
                         const Text('价格明细',
                             style: TextStyle(
-                                fontSize: 11, color: Color(0xFF00A870))),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                                color: Color(0xFF999999))),
                         const Icon(Icons.chevron_right,
-                            size: 12, color: Color(0xFF00A870)),
+                            size: 12, color: Color(0xFF999999)),
                         const Spacer(),
                         // v1.9.99：xN 已移至标题右侧灰色单价下方
                       ],
@@ -955,6 +972,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
             ],
+            ),
           ),
           const SizedBox(height: 14),
           Row(
