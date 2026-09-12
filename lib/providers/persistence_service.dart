@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/cart_generator.dart';
 import '../models/models.dart';
+import '../utils/doc_paths.dart';
 
 /// 本地持久化：保存订单/资料到 SharedPreferences
 /// 退出 App 后再次进入依然保留用户之前的修改
@@ -165,6 +166,7 @@ class PersistenceService {
       'giftCount': item.giftCount,
       'giftImage': item.giftImage,
       'giftTitle': item.giftTitle,
+      'giftImages': item.giftImages,
       'discountDetails': item.discountDetails,
       'detailTags': item.detailTags,
       'tmallPoints': item.tmallPoints,
@@ -200,7 +202,8 @@ class PersistenceService {
 
   static OrderItem _itemFromJson(Map<String, dynamic> j) {
     return OrderItem(
-      imageUrl: j['imageUrl'] ?? '',
+      // v1.9.102：本地图片路径统一转相对 Documents 存储（自签重装不丢图）
+      imageUrl: DocPaths.relativize(j['imageUrl'] ?? ''),
       title: j['title'] ?? '',
       configuration: j['configuration'] ?? '',
       stock: j['stock'] ?? 0,
@@ -252,8 +255,11 @@ class PersistenceService {
       taxContent: j['taxContent'] ?? '价格已含税',
       showTax: j['showTax'] ?? true,
       giftCount: j['giftCount'] ?? 0,
-      giftImage: j['giftImage'] ?? '',
+      giftImage: DocPaths.relativize(j['giftImage'] ?? ''),
       giftTitle: j['giftTitle'] ?? '',
+      giftImages:
+          (j['giftImages'] as List?)?.map((e) => DocPaths.relativize(e.toString())).toList() ??
+              const [],
       discountDetails: j['discountDetails'] ?? '',
       detailTags: (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
           const ['极速退款', '7天无理由'],
