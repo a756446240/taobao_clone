@@ -1545,15 +1545,19 @@ class _OrderItemTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  // 随机商品对应规格（前缀按商品稳定选取）
-                  Text(
-                    '$_specPrefix:${item.configuration}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.min
-                        .copyWith(color: AppColors.subText),
-                  ),
+                  // 随机商品对应规格（前缀按商品稳定选取）；
+                  // v1.9.105：「默认规格」/空规格不显示（对齐真实淘宝）
+                  if (item.configuration.trim().isNotEmpty &&
+                      item.configuration.trim() != '默认规格') ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '$_specPrefix:${item.configuration}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.min
+                          .copyWith(color: AppColors.subText),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1641,6 +1645,13 @@ class _OrderItemTile extends StatelessWidget {
   // - 规格在标题下方，服务标签再下方（纯绿色字、不带框）
   // - 状态框架（物流/待发货/评价引导）下移到卡片底部（_OrderStatusFrame）
   Widget _buildNormalLayout(BuildContext context, String imageUrl) {
+    // v1.9.105：规格为「默认规格」或空时不渲染规格行
+    // （对齐真实淘宝——天猫超市等无规格商品不显示规格）
+    final spec = item.configuration.trim();
+    final showSpec = spec.isNotEmpty && spec != '默认规格';
+    // 标签拼成一条 Text（空格分隔）：单行裁切由 Text 自身保证，
+    // 绝不会溢出卡片（v1.9.105 弃用 SingleChildScrollView 方案）
+    final tagsText = item.displayTags.join('  ');
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1656,77 +1667,81 @@ class _OrderItemTile extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
+        // v1.9.105 结构修复：标题/规格/标签放左列，价格放右列——
+        // 旧结构把标题和价格放同一 Row，价格列（¥+×N 约33px高）撑高了
+        // 整行，规格只能从价格列底部开始排，视觉上永远"贴不上标题"
         Expanded(
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       item.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.small.copyWith(height: 1.15),
+                      style: AppTextStyles.small.copyWith(height: 1.2),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 标题右侧：实付单价 + ×N——只算货品价值（不含运费），
-                  // 数量>1 自动 ÷数量（与详情页 _unitPriceOf 同逻辑）
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '¥${_OrderCard.fmtPrice(_unitPrice)}',
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A)),
-                      ),
-                      const SizedBox(height: 2),
-                      Text('×${item.quantity}',
+                    if (showSpec)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          spec,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF999999))),
-                    ],
+                              fontSize: 11,
+                              color: AppColors.subText,
+                              height: 1.2),
+                        ),
+                      ),
+                    // 服务标签：单行，超出直接裁掉（对齐真实淘宝只显示一行）
+                    if (tagsText.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          tagsText,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.clip,
+                          style: const TextStyle(
+                              color: Color(0xFF00A870),
+                              fontSize: 12,
+                              height: 1.2),
+                        ),
+                      ),
+                    // "平台加补后 / 领消费券后约" 价格行已按需求删除
+                    if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(item.taxInfo,
+                            style: const TextStyle(
+                                color: Color(0xFF999999), fontSize: 11)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 标题右侧：实付单价 + ×N——只算货品价值（不含运费），
+              // 数量>1 自动 ÷数量（与详情页 _unitPriceOf 同逻辑）
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '¥${_OrderCard.fmtPrice(_unitPrice)}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A)),
                   ),
+                  const SizedBox(height: 2),
+                  Text('×${item.quantity}',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF999999))),
                 ],
               ),
-              // 规格（v1.9.104：与标题零间距相贴，行高压 1.15 消除视觉空隙）
-              Text(
-                item.configuration,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.subText, height: 1.15),
-              ),
-              // 服务标签（v1.9.104：强制单行，放不下的直接裁掉不显示，
-              // 对齐真实淘宝列表卡只显示一行标签的样式）
-              ClipRect(
-                child: SizedBox(
-                  height: 16,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: Row(
-                      children: [
-                        for (final t in item.displayTags) ...[
-                          _greenTag(t),
-                          const SizedBox(width: 8),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // "平台加补后 / 领消费券后约" 价格行已按需求删除
-              if (item.showTaxInfoLine && item.taxInfo.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(item.taxInfo,
-                      style: const TextStyle(
-                          color: Color(0xFF999999), fontSize: 11)),
-                ),
             ],
           ),
         ),
@@ -1755,11 +1770,6 @@ class _OrderItemTile extends StatelessWidget {
     return item.price;
   }
 
-  /// 服务标签：纯绿色字体不带框，字号 12（v1.9.103 调大，对齐真实淘宝）
-  Widget _greenTag(String text) {
-    return Text(text,
-        style: const TextStyle(color: Color(0xFF00A870), fontSize: 12));
-  }
 }
 
 // ============ 卡片底部状态框架（v1.9.102：从商品区下移，贴近按钮区） ============
