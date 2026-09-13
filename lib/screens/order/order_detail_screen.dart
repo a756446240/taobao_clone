@@ -128,9 +128,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ..._buildProductCards(),
                     _greyBar(),
                     _buildOrderInfoCard(),
-                    // v1.9.111：订单信息与订单保障之间不用灰色间隔，
-                    // 改一条黑色细线衔接（对齐真实淘宝，折叠/展开一致）
-                    _darkLineDivider(),
+                    // v1.9.112：订单信息与订单保障之间用细分隔线衔接，
+                    // 与上方商品总价下方的线同款（对齐真实淘宝）
+                    _lineDivider(),
                     _buildGuaranteeCard(),
                     _greyBar(),
                     _buildRecommendCard(),
@@ -157,16 +157,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: const Divider(height: 1, thickness: 1, color: Color(0xFFf0f0f0)),
-    );
-  }
-
-  /// v1.9.111：订单信息/订单保障之间的黑色细线（比灰线更深更细）
-  Widget _darkLineDivider() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child:
-          const Divider(height: 1, thickness: 0.6, color: Color(0xFF666666)),
     );
   }
 
@@ -289,27 +279,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _item.address.isEmpty
-                      ? '中房大厦C座1001'
-                      : _item.address.replaceAll('\n', ' '),
-                  style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF1A1A1A)),
+                // v1.9.112：地址行前加定位图标（贴图，对齐真实淘宝）
+                Row(
+                  children: [
+                    Image.asset('assets/images/icon_location.png',
+                        width: 16, height: 18),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        _item.address.isEmpty
+                            ? '中房大厦C座1001'
+                            : _item.address.replaceAll('\n', ' '),
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1A1A1A)),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    // v1.9.111：手机号显示全（中间****掩码），只让收件人名可截断
-                    Flexible(
-                      child: Text(
-                        _item.receiver.isEmpty ? '黑山灰' : _item.receiver,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF666666)),
-                      ),
+                    // v1.9.112：收件人名字全部显示（不截断），手机号完整掩码显示
+                    Text(
+                      _item.receiver.isEmpty ? '黑山灰' : _item.receiver,
+                      maxLines: 1,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF666666)),
                     ),
                     const Text(' 86-186****5652',
                         style: TextStyle(
@@ -977,11 +974,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         Text('实付价 ',
                             style: AppTextStyles.minSub),
-                        // v1.9.109：实付价金额改黑色粗体（对齐真实淘宝）
+                        // v1.9.112：实付价金额调小调细（对齐真实淘宝 ¥85 样式，
+                        // 与下方实付款大小区分开）
                         const Text('¥',
                             style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.black)),
                         // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
                         // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
@@ -995,8 +993,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           }),
                           child: Text(_unitPriceOf(it).toStringAsFixed(2),
                               style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                   color: Colors.black)),
                         ),
                         const SizedBox(width: 6),
@@ -1322,9 +1320,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: Colors.black)),
           if (co > 0)
-            // v1.9.111：共减稍粗稍大、与右侧¥金额框同高（上下边缘对齐）
+            // v1.9.112：共减组与右侧¥金额框同高（上下边缘对齐），高度随金额调整
             Container(
-              height: 30,
+              height: 24,
               margin: const EdgeInsets.only(left: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1373,17 +1371,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           const Spacer(),
-          // v1.9.111：实付款金额拉大加粗（对齐真实淘宝）
+          // v1.9.112：实付款金额调回真实淘宝大小粗细（比商品卡实付价略大）
           const Text('¥',
               style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: Colors.black)),
           // 实付款：录入多少显示多少（不乘规格数量）
           Text(total.toStringAsFixed(2),
               style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                   color: Colors.black)),
         ],
       ),
@@ -3245,12 +3243,13 @@ class _DashedBorderPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
+      ..strokeWidth = 1.0;
     final rrect = RRect.fromRectAndRadius(
         Offset.zero & size, Radius.circular(borderRadius));
     final path = Path()..addRRect(rrect);
-    const dashWidth = 3.0;
-    const dashGap = 2.0;
+    // v1.9.112：加大间隙让虚线肉眼可辨（0.8 宽 3/2 在小框上看着实线）
+    const dashWidth = 2.5;
+    const dashGap = 2.2;
     for (final metric in path.computeMetrics()) {
       double distance = 0;
       while (distance < metric.length) {
