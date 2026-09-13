@@ -86,6 +86,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           children: [
             _buildAppBar(title),
+            // v1.9.111：倒计时从状态头移出，固定在 AppBar 下方——
+            // 黑色细体（对齐真实淘宝），向下滚动时保持置顶
+            if (CartProvider.statusCategory(_item.statusTitle.isEmpty
+                    ? _shop.orderSubStatus
+                    : _item.statusTitle) ==
+                '待收货')
+              GestureDetector(
+                onDoubleTap: _editCountdown,
+                child: Container(
+                  width: double.infinity,
+                  color: Colors.white,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Center(
+                    child: Text(
+                      _item.countDown.isEmpty
+                          ? '还剩3天21小时自动确认'
+                          : _item.countDown,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF333333)),
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 24),
@@ -105,7 +128,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ..._buildProductCards(),
                     _greyBar(),
                     _buildOrderInfoCard(),
-                    _greyBar(),
+                    // v1.9.111：订单信息与订单保障之间不用灰色间隔，
+                    // 改一条黑色细线衔接（对齐真实淘宝，折叠/展开一致）
+                    _darkLineDivider(),
                     _buildGuaranteeCard(),
                     _greyBar(),
                     _buildRecommendCard(),
@@ -132,6 +157,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: const Divider(height: 1, thickness: 1, color: Color(0xFFf0f0f0)),
+    );
+  }
+
+  /// v1.9.111：订单信息/订单保障之间的黑色细线（比灰线更深更细）
+  Widget _darkLineDivider() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child:
+          const Divider(height: 1, thickness: 0.6, color: Color(0xFF666666)),
     );
   }
 
@@ -167,12 +202,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 状态头（3.4 样式：大标题居中 + 倒计时 + 物流行 + 地址 + 承诺发货 + 准时送达） ============
+  // ============ 状态头（物流行 + 地址 + 承诺发货 + 准时送达；倒计时 v1.9.111 起置顶 AppBar 下方） ============
   Widget _buildStatusHeader() {
     final provider = context.read<CartProvider>();
-    final category = CartProvider.statusCategory(
-        _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
-    final showCountdown = category == '待收货';
     final logisticsOptions = [
       '已揽件 · 预计后天送达',
       '运输中 · 预计明天送达',
@@ -190,22 +222,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 倒计时（居中橙色，双击滚动选择器编辑）
-          if (showCountdown) ...[
-            GestureDetector(
-              onDoubleTap: _editCountdown,
-              child: Center(
-                child: Text(
-                  _item.countDown.isEmpty
-                      ? '还剩3天21小时自动确认'
-                      : _item.countDown,
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFFFF5000)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
+          // v1.9.111：倒计时已移至 AppBar 下方置顶（黑色细体），此处不再显示
           // 物流状态行（单击 → 物流详情页，对齐真实淘宝；双击换选项）
           GestureDetector(
             onTap: () => Navigator.of(context).push(
@@ -239,7 +256,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             fontSize: 14, color: Color(0xFF333333)),
                       ),
                     ]),
-                    maxLines: 3,
+                    // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -283,15 +301,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
+                    // v1.9.111：手机号显示全（中间****掩码），只让收件人名可截断
                     Flexible(
                       child: Text(
-                        '${_item.receiver.isEmpty ? '黑山灰' : _item.receiver} 86-186****5652',
+                        _item.receiver.isEmpty ? '黑山灰' : _item.receiver,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF666666)),
                       ),
                     ),
+                    const Text(' 86-186****5652',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF666666))),
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -305,9 +327,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               fontSize: 10, color: Color(0xFF999999))),
                     ),
                     const SizedBox(width: 6),
-                    const Text('取件出示虚拟号 ›',
-                        style: TextStyle(
-                            fontSize: 11, color: Color(0xFFFF5000))),
+                    // v1.9.111：取件出示虚拟号加橘色虚线框（对齐真实淘宝）
+                    CustomPaint(
+                      painter: _DashedBorderPainter(
+                        color: const Color(0xFFFF5000),
+                        borderRadius: 3,
+                      ),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        child: Text('取件出示虚拟号 ›',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFFF5000))),
+                      ),
+                    ),
                     const Spacer(),
                     Icon(
                       _addressExpanded
@@ -1287,59 +1321,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.black)),
-          if (co > 0) ...[
-            const SizedBox(width: 6),
-            // v1.9.110：对齐真实淘宝——「共减」浅橘色细体，¥+金额深橘色；
-            // 金额去尾零（¥3 / ¥8.95 / ¥109.8）
-            const Text('共减',
-                style: TextStyle(fontSize: 12, color: Color(0xFFF48B54))),
-            Text('¥${_trimZero(co)}',
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFff5000))),
-            const SizedBox(width: 4),
-            // v1.9.110：优惠解析改淡粉色内嵌框（#FEEFEB 无描边）+
-            // 橘→粉渐变文字（ShaderMask），对齐真实淘宝
+          if (co > 0)
+            // v1.9.111：共减稍粗稍大、与右侧¥金额框同高（上下边缘对齐）
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEEFEB),
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFFF07848), Color(0xFFE83870)],
-                ).createShader(bounds),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('优惠解析',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white)),
-                    Icon(Icons.chevron_right,
-                        size: 12, color: Colors.white),
-                  ],
-                ),
+              height: 30,
+              margin: const EdgeInsets.only(left: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text('共减',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFF48B54))),
+                  Text('¥${_trimZero(co)}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFff5000))),
+                  const SizedBox(width: 4),
+                  // v1.9.110：优惠解析改淡粉色内嵌框（#FEEFEB 无描边）+
+                  // 橘→粉渐变文字（ShaderMask），对齐真实淘宝
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEEFEB),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [Color(0xFFF07848), Color(0xFFE83870)],
+                      ).createShader(bounds),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('优惠解析',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white)),
+                          Icon(Icons.chevron_right,
+                              size: 13, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
           const Spacer(),
-          // v1.9.109：实付款金额改黑色粗体（对齐真实淘宝）
+          // v1.9.111：实付款金额拉大加粗（对齐真实淘宝）
           const Text('¥',
               style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                   color: Colors.black)),
           // 实付款：录入多少显示多少（不乘规格数量）
           Text(total.toStringAsFixed(2),
               style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
                   color: Colors.black)),
         ],
       ),
@@ -3187,4 +3231,37 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
   }
+}
+
+/// v1.9.111：虚线圆角边框（取件出示虚拟号橘色虚线框）
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.color, this.borderRadius = 3});
+
+  final Color color;
+  final double borderRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    final rrect = RRect.fromRectAndRadius(
+        Offset.zero & size, Radius.circular(borderRadius));
+    final path = Path()..addRRect(rrect);
+    const dashWidth = 3.0;
+    const dashGap = 2.0;
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final end = (distance + dashWidth).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance = end + dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
 }
