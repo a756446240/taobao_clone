@@ -1186,6 +1186,8 @@ class CartProvider extends ChangeNotifier {
   /// 多个订单共用同一运单号时，保留有抓包真实轨迹（logisticsTraces 非空）
   /// 的那一单为真实单号，其余全部补标为借用——联网刷新跳过借用单号，
   /// 不再把别的订单的物流写进本订单。
+  /// v1.9.113：选"真单"时优先尊重已有标记（未被标借用的优先），
+  /// 避免覆盖流程刚标好的借用在重启后被迁移洗回去。
   void _migrateBorrowedWaybills() {
     final byNo = <String, List<OrderItem>>{};
     for (final s in _shops) {
@@ -1199,8 +1201,10 @@ class CartProvider extends ChangeNotifier {
     for (final group in byNo.values) {
       if (group.length < 2) continue;
       final genuine = group.firstWhere(
-          (e) => e.logisticsTraces.trim().isNotEmpty,
-          orElse: () => group.first);
+          (e) => !e.waybillBorrowed && e.logisticsTraces.trim().isNotEmpty,
+          orElse: () => group.firstWhere(
+              (e) => e.logisticsTraces.trim().isNotEmpty,
+              orElse: () => group.first));
       for (final e in group) {
         final borrowed = !identical(e, genuine);
         if (e.waybillBorrowed != borrowed) {
