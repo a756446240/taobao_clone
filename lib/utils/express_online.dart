@@ -102,6 +102,29 @@ class ExpressOnline {
     }
   }
 
+  /// 联网轨迹 → 订单列表/详情摘要文案（v1.9.110，对齐真实淘宝物流条）：
+  /// 派送→「派送中 预计今天送达」；签收→「已签收 您的包裹已送达」；
+  /// 其余→「运输中 预计明天送达」。空轨迹返回 ''。
+  /// （此前直接拿首条原始轨迹文案当摘要，订单列表显示一大段地址派件员文字，
+  ///  用户反馈"联网更新不好用"的根因）
+  static String summarize(List<Map<String, String>> traces) {
+    if (traces.isEmpty) return '';
+    final first = traces.first;
+    var tag = (first['tag'] ?? '').toString();
+    final text = (first['text'] ?? '').toString();
+    if (tag.isEmpty) {
+      // 兜底通道无 tag：从文案推断阶段
+      if (text.contains('签收') || text.contains('已送达')) {
+        tag = '已签收';
+      } else if (text.contains('派件') || text.contains('派送')) {
+        tag = '派送中';
+      }
+    }
+    if (tag.contains('签收')) return '已签收 您的包裹已送达';
+    if (tag.contains('派')) return '派送中 预计今天送达';
+    return '运输中 预计明天送达';
+  }
+
   /// 联网查询实时物流轨迹：apizero 双通道优先，快递100 严格判失败兜底
   /// 返回 [{time, tag, text}] 最新在前；失败返回 null
   static Future<List<Map<String, String>>?> fetchTraces(
