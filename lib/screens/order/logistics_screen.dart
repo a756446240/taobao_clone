@@ -121,6 +121,29 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       }
       return;
     }
+    // v1.9.113：运行时共享单号守卫——同一运单号被多个订单使用且归属
+    // 未标记清楚时（老数据/覆盖流程残留），一律不联网拉轨迹，
+    // 否则拉回来的必是另一个订单的物流（用户反馈"刷新串单"）
+    {
+      final provider = context.read<CartProvider>();
+      final sharers = <OrderItem>[
+        for (final s in provider.shops)
+          for (final e in s.items)
+            if (!identical(e, it) && e.waybillNo.trim() == waybill) e,
+      ];
+      final ambiguous =
+          sharers.any((e) => !e.waybillBorrowed);
+      if (ambiguous) {
+        if (force && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('该单号同时关联多个订单，已跳过联网刷新避免串单'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
+        return;
+      }
+    }
     if (!force) {
       final real = _realTraces;
       if (real != null) {
@@ -628,6 +651,12 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                         style: const TextStyle(
                             fontSize: 11, color: Color(0xFF999999))),
                     onTap: () {
+                      // v1.9.113：覆盖来的单号属于其他订单，先标记为借用
+                      // （须在 updateOrderItem 之前置位，其内部会持久化）——
+                      // 不再强制联网刷新（v1.9.100 的强制刷新会把该单号原订单的
+                      // 最新物流拉进来，用户反馈"刷新串单"）；抓包时间线本身
+                      // 就是真实完整轨迹，直接展示即可
+                      it.waybillBorrowed = true;
                       // 覆盖：公司/单号/logo/电话/全量时间线/横幅最新一条
                       provider.updateOrderItem(
                         it,
@@ -641,11 +670,9 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                       Navigator.of(sheetCtx).pop();
                       setState(() {});
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('已用抓包真实物流覆盖当前订单，正在联网刷新最新轨迹…'),
+                        content: Text('已用抓包真实物流覆盖当前订单（该单号属其他订单，不联网刷新）'),
                         duration: Duration(seconds: 2),
                       ));
-                      // v1.9.100：覆盖单号后强制联网刷新（跳过 6h 限频）
-                      _autoRefreshOnline(force: true);
                     },
                   );
                 },
