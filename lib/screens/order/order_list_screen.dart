@@ -664,17 +664,20 @@ class _OrderListScreenState extends State<OrderListScreen>
             child: _topAction(AppIcons.filter, '筛选'),
           ),
           const SizedBox(width: 12),
-          // 管理 → 订单管理页（编辑入口，双击进入）
+          // 管理 → v1.9.115：单击开面板（批量操作/回收站等，对齐真实淘宝）；
+          // 双击仍是订单管理页（编辑入口）
           GestureDetector(
+            onTap: _openMorePanel,
             onDoubleTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const OrderManagerScreen()),
             ),
             child: _topAction(AppIcons.list, '管理'),
           ),
           const SizedBox(width: 10),
-          // v1.9.114：右上角三个点（带 67 角标，对齐真实淘宝）→ 下拉面板
+          // v1.9.115：右上角三个点（带 67 角标）→ 快捷入口底部弹层
+          // （消息/回到首页/我的淘宝/购物车/我的订单/足迹/收藏/客服/反馈/举报）
           GestureDetector(
-            onTap: _openMorePanel,
+            onTap: _openShortcutsSheet,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -776,6 +779,16 @@ class _OrderListScreenState extends State<OrderListScreen>
           ),
         );
       },
+    );
+  }
+
+  // ============ v1.9.115：三个点 → 快捷入口底部弹层（对齐真实淘宝） ============
+  // ============ 消息/回到首页/我的淘宝/购物车/我的订单/足迹/收藏/客服/反馈/举报 ============
+  void _openShortcutsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ShortcutsSheet(),
     );
   }
 
@@ -3163,6 +3176,128 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                   fontSize: 13, color: Colors.black87)),
         ],
       ),
+    );
+  }
+}
+
+/// v1.9.115：三个点 → 快捷入口底部弹层（对齐真实淘宝，纯视觉可关闭）
+/// 第一行：消息(带67角标)/回到首页/我的淘宝/购物车/我的订单
+/// 第二行：我的足迹/我的收藏/专属客服/意见反馈/举报；底部取消按钮
+class _ShortcutsSheet extends StatelessWidget {
+  const _ShortcutsSheet();
+
+  static const _row1 = <(IconData, String)>[
+    (Icons.chat_bubble_outline, '消息'),
+    (Icons.home_outlined, '回到首页'),
+    (Icons.sentiment_satisfied_alt, '我的淘宝'),
+    (Icons.shopping_cart_outlined, '购物车'),
+    (Icons.receipt_long, '我的订单'),
+  ];
+  static const _row2 = <(IconData, String)>[
+    (Icons.travel_explore, '我的足迹'),
+    (Icons.star_border, '我的收藏'),
+    (Icons.headset_mic_outlined, '专属客服'),
+    (Icons.edit_outlined, '意见反馈'),
+    (Icons.report_gmailerrorred_outlined, '举报'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 上半部分白底图标区
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              padding: const EdgeInsets.fromLTRB(8, 22, 8, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildRow(context, _row1, badgeOnFirst: true),
+                  const SizedBox(height: 22),
+                  _buildRow(context, _row2),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 取消按钮
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.center,
+                child: const Text('取消',
+                    style: TextStyle(
+                        fontSize: 16, color: Colors.black87)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRow(BuildContext context, List<(IconData, String)> items,
+      {bool badgeOnFirst = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        for (var i = 0; i < items.length; i++)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).pop(),
+            child: SizedBox(
+              width: 62,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(items[i].$1,
+                          color: Colors.black87, size: 28),
+                      if (badgeOnFirst && i == 0)
+                        Positioned(
+                          right: -12,
+                          top: -6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF5000),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('67',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 9)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(items[i].$2,
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.black87)),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
