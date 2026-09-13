@@ -658,16 +658,9 @@ class _OrderListScreenState extends State<OrderListScreen>
             ),
           ),
           const SizedBox(width: 10),
-          // 筛选 → 订单始终按创建时间自动排序（新订单在最上方），点击仅提示
+          // 筛选 → v1.9.114：订单筛选底部弹层（对齐真实淘宝，纯视觉）
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('订单已按创建时间自动排序，新订单在最上方'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            },
+            onTap: _openFilterSheet,
             child: _topAction(AppIcons.filter, '筛选'),
           ),
           const SizedBox(width: 12),
@@ -678,8 +671,124 @@ class _OrderListScreenState extends State<OrderListScreen>
             ),
             child: _topAction(AppIcons.list, '管理'),
           ),
+          const SizedBox(width: 10),
+          // v1.9.114：右上角三个点（带 67 角标，对齐真实淘宝）→ 下拉面板
+          GestureDetector(
+            onTap: _openMorePanel,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.more_horiz,
+                        color: Colors.black87, size: 22),
+                    Positioned(
+                      right: -10,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 3, vertical: 0.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5000),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: const Text('67',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 8)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text('',
+                    style:
+                        TextStyle(color: Colors.black87, fontSize: 10)),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  // ============ v1.9.114：三个点下拉面板（批量操作/回收站/调研反馈/ ============
+  // ============ 我的快递/发票中心/价保中心，纯视觉无实际功能） ============
+  void _openMorePanel() {
+    const items = <(IconData, String)>[
+      (Icons.how_to_reg_outlined, '批量操作'),
+      (Icons.delete_outline, '回收站'),
+      (Icons.edit_note, '调研反馈'),
+      (Icons.local_shipping_outlined, '我的快递'),
+      (Icons.receipt_long, '发票中心'),
+      (Icons.verified_user_outlined, '价保中心'),
+    ];
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'more',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (dlgCtx, _, __) {
+        final top = MediaQuery.of(dlgCtx).padding.top;
+        return Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: EdgeInsets.only(top: top + 52),
+            child: Material(
+              color: Colors.white,
+              elevation: 6,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 14),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final e in items)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.of(dlgCtx).pop(),
+                          child: SizedBox(
+                            width: 68,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(e.$1,
+                                    color: Colors.black87, size: 26),
+                                const SizedBox(height: 6),
+                                Text(e.$2,
+                                    style: const TextStyle(
+                                        color: Colors.black87,
+                                        fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ============ v1.9.114：订单筛选底部弹层（纯视觉，对齐真实淘宝） ============
+  void _openFilterSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (_) => const _OrderFilterSheet(),
     );
   }
 
@@ -697,7 +806,8 @@ class _OrderListScreenState extends State<OrderListScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: AppColors.primary, size: 22),
+        // v1.9.114：除 AI助手外顶部图标改黑色（对齐真实淘宝，此前橙色被驳回）
+        Icon(icon, color: Colors.black87, size: 22),
         const SizedBox(height: 2),
         Text(label,
             style: const TextStyle(color: Colors.black87, fontSize: 10)),
@@ -2704,6 +2814,353 @@ class _AiAssistantSheetState extends State<_AiAssistantSheet> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// v1.9.114：订单筛选底部弹层（对齐真实淘宝，纯视觉——选中态可切换，
+/// 重置清空、确认关闭，不做真实过滤）
+class _OrderFilterSheet extends StatefulWidget {
+  const _OrderFilterSheet();
+
+  @override
+  State<_OrderFilterSheet> createState() => _OrderFilterSheetState();
+}
+
+class _OrderFilterSheetState extends State<_OrderFilterSheet> {
+  final Set<String> _sel = {};
+
+  static const _timeChips = [
+    '1个月前', '3个月前', '6个月前',
+    '2026年', '2025年', '2024年',
+    '2023年', '2022年', '展开 ∨',
+  ];
+
+  static const _categories = <(IconData, String)>[
+    (Icons.checkroom, '女装'),
+    (Icons.person_outline, '男装'),
+    (Icons.child_care, '母婴'),
+    (Icons.pets, '宠物'),
+    (Icons.weekend_outlined, '家装家居'),
+    (Icons.local_laundry_service_outlined, '家电数码'),
+    (Icons.favorite_border, '个护健康'),
+    (Icons.place_outlined, '其他'),
+    (Icons.menu_book_outlined, '报刊文教'),
+    (Icons.shopping_bag_outlined, '鞋包配饰'),
+    (Icons.sanitizer_outlined, '洗护用品'),
+    (Icons.cleaning_services_outlined, '清洁'),
+  ];
+
+  static const _statusChips = ['交易成功', '交易关闭'];
+  static const _invoiceChips = ['已开票', '申请中', '未开票'];
+  static const _sourceChips = ['天猫超市', '天猫国际'];
+  static const _giftChips = ['我收到的', '我送出的'];
+
+  void _toggle(String key) {
+    setState(() {
+      if (_sel.contains(key)) {
+        _sel.remove(key);
+      } else {
+        _sel.add(key);
+      }
+    });
+  }
+
+  Widget _sectionTitle(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+        child: Text(t,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87)),
+      );
+
+  Widget _chip(String label, {IconData? icon}) {
+    final sel = _sel.contains(label);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _toggle(label),
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: sel ? const Color(0xFFFFF1E8) : const Color(0xFFF5F6F8),
+          borderRadius: BorderRadius.circular(6),
+          border: sel
+              ? Border.all(color: const Color(0xFFFF5000), width: 0.8)
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 20,
+                  color: sel
+                      ? const Color(0xFFFF5000)
+                      : Colors.black87),
+              const SizedBox(width: 4),
+            ],
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: sel
+                        ? const Color(0xFFFF5000)
+                        : Colors.black87)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chipGrid(List<String> labels) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.6,
+          children: [for (final l in labels) _chip(l)],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.86,
+      child: Column(
+        children: [
+          // 标题栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 4, 6),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Center(
+                    child: Text('订单筛选',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87)),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 22, color: Colors.black87),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _sectionTitle('下单时间'),
+                _chipGrid(_timeChips),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F6F8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('起始时间',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF999999))),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('-',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF999999))),
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F6F8),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('终止时间',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF999999))),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _sectionTitle('常买的类目'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 2.6,
+                    children: [
+                      for (final c in _categories)
+                        _chip(c.$2, icon: c.$1),
+                    ],
+                  ),
+                ),
+                // 收货地址
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                  child: Row(
+                    children: const [
+                      Text('收货地址',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87)),
+                      Spacer(),
+                      Text('试试按地址关键字搜索订单 ›',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF999999))),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      _addrBox('山东省 淄博市 张店区',
+                          '中央公园(人民西路) 华润中央公园9号楼803'),
+                      const SizedBox(height: 8),
+                      _addrBox(
+                          '山东省 淄博市 张店区', '中房大厦C座1001'),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F6F8),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('展开更多地址 ∨',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF999999))),
+                      ),
+                    ],
+                  ),
+                ),
+                _sectionTitle('订单状态'),
+                _chipGrid(_statusChips),
+                _sectionTitle('发票'),
+                _chipGrid(_invoiceChips),
+                _sectionTitle('来源'),
+                _chipGrid(_sourceChips),
+                _sectionTitle('礼物'),
+                _chipGrid(_giftChips),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Center(
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(
+                          text: '没有找到适合的筛选条件？',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF999999))),
+                      TextSpan(
+                          text: '试试订单搜索',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFFF5000))),
+                    ])),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 底部按钮：重置（黄）/ 确认（橘）
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, 6, 12, 10 + bottom),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(_sel.clear),
+                    child: Container(
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFB400),
+                        borderRadius: BorderRadius.horizontal(
+                            left: Radius.circular(22)),
+                      ),
+                      child: const Text('重置',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFF5000),
+                        borderRadius: BorderRadius.horizontal(
+                            right: Radius.circular(22)),
+                      ),
+                      child: const Text('确认',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _addrBox(String region, String detail) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F6F8),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(region,
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF999999))),
+          const SizedBox(height: 2),
+          Text(detail,
+              style: const TextStyle(
+                  fontSize: 13, color: Colors.black87)),
         ],
       ),
     );
