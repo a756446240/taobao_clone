@@ -1289,28 +1289,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   color: Colors.black)),
           if (co > 0) ...[
             const SizedBox(width: 6),
-            Text('共减¥${co.toStringAsFixed(2)}',
+            // v1.9.110：对齐真实淘宝——「共减」浅橘色细体，¥+金额深橘色；
+            // 金额去尾零（¥3 / ¥8.95 / ¥109.8）
+            const Text('共减',
+                style: TextStyle(fontSize: 12, color: Color(0xFFF48B54))),
+            Text('¥${_trimZero(co)}',
                 style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: Color(0xFFff5000))),
             const SizedBox(width: 4),
+            // v1.9.110：优惠解析改淡粉色内嵌框（#FEEFEB 无描边）+
+            // 橘→粉渐变文字（ShaderMask），对齐真实淘宝
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1EC),
+                color: const Color(0xFFFEEFEB),
                 borderRadius: BorderRadius.circular(3),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('优惠解析',
-                      style: TextStyle(
-                          fontSize: 10, color: Color(0xFFff5000))),
-                  Icon(Icons.chevron_right,
-                      size: 12, color: Color(0xFFff5000)),
-                ],
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFFF07848), Color(0xFFE83870)],
+                ).createShader(bounds),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('优惠解析',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white)),
+                    Icon(Icons.chevron_right,
+                        size: 12, color: Colors.white),
+                  ],
+                ),
               ),
             ),
           ],
@@ -1330,6 +1344,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     ];
+  }
+
+  /// 金额去尾零：3.00→3，8.95→8.95，109.80→109.8（对齐真实淘宝共减金额）
+  static String _trimZero(num v) {
+    final s = v.toStringAsFixed(2);
+    if (s.endsWith('.00')) return s.substring(0, s.length - 3);
+    if (s.endsWith('0')) return s.substring(0, s.length - 1);
+    return s;
   }
 
   Widget _taxRow() {
@@ -1519,14 +1541,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 _discountIcon(icon),
                 Text(label, style: AppTextStyles.small),
-                // v1.9.97：优惠标签（超级立减/官方立减等）橙色字体，双击可选择
+                // v1.9.110：店铺优惠标签（超级立减/官方立减）改黑色细体无框；
+                // 平台优惠标签（满60元可减/淘金币已抵X）加橘色描边小框
+                // （对齐真实淘宝），双击均可换标签
                 if (sub.isNotEmpty)
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onDoubleTap: onEditLabel,
-                    child: Text('  $sub',
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFFff5000))),
+                    child: group == 'platform'
+                        ? Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 3, vertical: 0.5),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: const Color(0xFFff5000),
+                                  width: 0.7),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(sub,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFFff5000))),
+                          )
+                        : Text('  $sub',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Color(0xFF333333))),
                   ),
                 const Spacer(),
                 Text('-¥${total.toStringAsFixed(2)}',
