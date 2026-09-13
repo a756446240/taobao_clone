@@ -324,20 +324,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               fontSize: 10, color: Color(0xFF999999))),
                     ),
                     const SizedBox(width: 6),
-                    // v1.9.111：取件出示虚拟号加橘色虚线框（对齐真实淘宝）
-                    CustomPaint(
-                      painter: _DashedBorderPainter(
-                        color: const Color(0xFFFF5000),
-                        borderRadius: 3,
+                    // v1.9.113：取件出示虚拟号改橘色实线框（对齐真实淘宝，
+                    // 用户反馈虚线框不对）
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: const Color(0xFFFF5000), width: 0.8),
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
-                        child: Text('取件出示虚拟号 ›',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFFFF5000))),
-                      ),
+                      child: const Text('取件出示虚拟号 ›',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFFFF5000))),
                     ),
                     const Spacer(),
                     Icon(
@@ -1584,8 +1583,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _discountIcon(icon),
                 Text(label, style: AppTextStyles.small),
                 // v1.9.110：店铺优惠标签（超级立减/官方立减）改黑色细体无框；
-                // 平台优惠标签（满60元可减/淘金币已抵X）加橘色描边小框
-                // （对齐真实淘宝），双击均可换标签
+                // v1.9.113：平台优惠标签（满60元可减/淘金币已抵X）改浅橘打底
+                // 涂满+深橘字（对齐真实淘宝，此前橘色描边被驳回），双击均可换标签
                 if (sub.isNotEmpty)
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -1594,17 +1593,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ? Container(
                             margin: const EdgeInsets.only(left: 6),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 3, vertical: 0.5),
+                                horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              border: Border.all(
-                                  color: const Color(0xFFff5000),
-                                  width: 0.7),
-                              borderRadius: BorderRadius.circular(3),
+                              color: const Color(0xFFFDEBDC),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                             child: Text(sub,
                                 style: const TextStyle(
                                     fontSize: 11,
-                                    color: Color(0xFFff5000))),
+                                    color: Color(0xFFFF5000))),
                           )
                         : Text('  $sub',
                             style: const TextStyle(
@@ -3229,38 +3226,4 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ),
     );
   }
-}
-
-/// v1.9.111：虚线圆角边框（取件出示虚拟号橘色虚线框）
-class _DashedBorderPainter extends CustomPainter {
-  _DashedBorderPainter({required this.color, this.borderRadius = 3});
-
-  final Color color;
-  final double borderRadius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    final rrect = RRect.fromRectAndRadius(
-        Offset.zero & size, Radius.circular(borderRadius));
-    final path = Path()..addRRect(rrect);
-    // v1.9.112：加大间隙让虚线肉眼可辨（0.8 宽 3/2 在小框上看着实线）
-    const dashWidth = 2.5;
-    const dashGap = 2.2;
-    for (final metric in path.computeMetrics()) {
-      double distance = 0;
-      while (distance < metric.length) {
-        final end = (distance + dashWidth).clamp(0.0, metric.length);
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance = end + dashGap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.borderRadius != borderRadius;
 }
