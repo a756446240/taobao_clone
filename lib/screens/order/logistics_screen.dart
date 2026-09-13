@@ -145,10 +145,13 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         return;
       }
       final provider = context.read<CartProvider>();
+      // v1.9.110：摘要写「派送中 预计今天送达」式短文案（对齐真实淘宝），
+      // 不再把首条原始轨迹长文塞进订单列表
+      final summary = ExpressOnline.summarize(list);
       provider.updateOrderItem(
         it,
         logisticsTraces: jsonEncode(list),
-        logistics: list.first['text'] ?? it.logistics,
+        logistics: summary.isNotEmpty ? summary : it.logistics,
         // 公司/头像只在缺省时补，用户手动改过的绝不覆盖
         shipCompany:
             it.shipCompany.isEmpty && detected.$2.isNotEmpty ? detected.$2 : null,
@@ -504,9 +507,9 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                             ? _logoForComCode(comCode)
                             : '',
                         logisticsTraces: traces,
+                        // v1.9.110：摘要用「派送中 预计今天送达」式短文案
                         logistics: gotReal
-                            ? (jsonDecode(traces).first['text'] ?? '')
-                                .toString()
+                            ? ExpressOnline.summarize(list!)
                             : it.logistics,
                       );
                       // 3) 实时轨迹已签收 → 订单自动跳「待确认收货」（v1.9.88）
