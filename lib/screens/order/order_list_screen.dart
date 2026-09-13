@@ -2028,10 +2028,9 @@ class _OrderStatusFrame extends StatelessWidget {
   bool get _isTransitLine {
     final line = _statusLine;
     if (line == null) return false;
-    return line.startsWith('派送中') ||
-        line.startsWith('运输中') ||
-        line.startsWith('已发货') ||
-        (line.contains('预计') && line.contains('送达'));
+    // v1.9.112：只有「今天送达」的物流行才整行橙色（对齐真实淘宝），
+    // 已发货/已揽件/预计明天送达等保持原灰黑样式
+    return line.contains('今天送达');
   }
 
   /// 状态行富文本：首个词（已发货/运输中/派送中…）粗体深色，其余灰色（对齐真实淘宝灰框样式）
