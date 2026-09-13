@@ -129,50 +129,68 @@ class DoubaoService {
   }
 
   /// 通用 chat/completions 调用（429 自动重试），返回文本内容
+  /// v1.9.115：Key 候选链——用户手动保存的 Key 失效（401/403）时
+  /// 自动回退到内嵌默认 Key 重试，避免因保存过错误/过期 Key 导致全部失败
   static Future<String> _chat(Map<String, dynamic> payload,
       {int retries = 3}) async {
-    final key = await getApiKey();
-    if (key.isEmpty) throw Exception('请先在素材库页面配置豆包 API Key');
+    final p = await SharedPreferences.getInstance();
+    final custom = p.getString(_keyApiKey)?.trim() ?? '';
+    final keys = <String>[
+      if (custom.isNotEmpty) custom,
+      if (!defaultApiKey.contains('PLACEHOLDER') &&
+          defaultApiKey != custom)
+        defaultApiKey,
+    ];
+    if (keys.isEmpty) throw Exception('请先在素材库页面配置豆包 API Key');
     payload['model'] = await getModel();
     final body = jsonEncode(payload);
 
     Object? lastError;
-    for (var attempt = 0; attempt < retries; attempt++) {
-      if (attempt > 0) {
-        await Future.delayed(Duration(seconds: 4 * attempt));
-      }
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 30);
-      try {
-        final req = await client.postUrl(Uri.parse(_endpoint));
-        req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-        req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
-        req.add(utf8.encode(body));
-        final resp = await req.close().timeout(const Duration(seconds: 90));
-        final text = await resp.transform(utf8.decoder).join();
-        if (resp.statusCode == 429) {
-          lastError = Exception('服务器繁忙，请稍后再试');
-          continue; // 429 重试
+    for (final key in keys) {
+      var tryNextKey = false;
+      for (var attempt = 0; attempt < retries && !tryNextKey; attempt++) {
+        if (attempt > 0) {
+          await Future.delayed(Duration(seconds: 4 * attempt));
         }
-        if (resp.statusCode != 200) {
-          String msg = 'HTTP ${resp.statusCode}';
-          try {
-            final j = jsonDecode(text);
-            msg = j['error']?['message']?.toString() ?? msg;
-          } catch (_) {}
-          throw Exception('豆包接口报错：$msg');
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 30);
+        try {
+          final req = await client.postUrl(Uri.parse(_endpoint));
+          req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+          req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+          req.add(utf8.encode(body));
+          final resp = await req.close().timeout(const Duration(seconds: 90));
+          final text = await resp.transform(utf8.decoder).join();
+          if (resp.statusCode == 429) {
+            lastError = Exception('服务器繁忙，请稍后再试');
+            continue; // 429 重试
+          }
+          if (resp.statusCode == 401 || resp.statusCode == 403) {
+            // Key 失效/无权限：换下一个候选 Key
+            lastError = Exception('豆包 API Key 无效或已过期（HTTP ${resp.statusCode}）');
+            tryNextKey = true;
+            continue;
+          }
+          if (resp.statusCode != 200) {
+            String msg = 'HTTP ${resp.statusCode}';
+            try {
+              final j = jsonDecode(text);
+              msg = j['error']?['message']?.toString() ?? msg;
+            } catch (_) {}
+            throw Exception('豆包接口报错：$msg');
+          }
+          final j = jsonDecode(text);
+          final content =
+              j['choices']?[0]?['message']?['content']?.toString().trim() ?? '';
+          if (content.isEmpty) throw Exception('豆包没有返回内容');
+          return content;
+        } catch (e) {
+          lastError = e;
+          // 非 429 类错误（图片不合规等）不重试，直接抛出
+          if (e is Exception && !e.toString().contains('服务器繁忙')) rethrow;
+        } finally {
+          client.close();
         }
-        final j = jsonDecode(text);
-        final content =
-            j['choices']?[0]?['message']?['content']?.toString().trim() ?? '';
-        if (content.isEmpty) throw Exception('豆包没有返回内容');
-        return content;
-      } catch (e) {
-        lastError = e;
-        // 非 429 类错误（图片不合规等）不重试，直接抛出
-        if (e is Exception && !e.toString().contains('服务器繁忙')) rethrow;
-      } finally {
-        client.close();
       }
     }
     throw lastError ?? Exception('请求失败');
