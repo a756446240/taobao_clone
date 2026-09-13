@@ -1907,7 +1907,11 @@ class _OrderStatusFrame extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(_statusIcon, color: const Color(0xFF999999), size: 14),
+              Icon(_statusIcon,
+                  color: _isTransitLine
+                      ? const Color(0xFFff5000)
+                      : const Color(0xFF999999),
+                  size: 14),
               const SizedBox(width: 4),
               Expanded(
                 child: Text.rich(
@@ -2019,10 +2023,35 @@ class _OrderStatusFrame extends StatelessWidget {
   /// 是否交易成功（此类订单下方不显示任何物流/状态框架）
   bool get _isTradeSuccess => orderStatus.contains('交易成功');
 
+  /// 运输中/派送中物流行（联网更新后的「预计xx送达」摘要）：
+  /// v1.9.110 起整行橙色（对齐真实淘宝物流条）
+  bool get _isTransitLine {
+    final line = _statusLine;
+    if (line == null) return false;
+    return line.startsWith('派送中') ||
+        line.startsWith('运输中') ||
+        line.startsWith('已发货') ||
+        (line.contains('预计') && line.contains('送达'));
+  }
+
   /// 状态行富文本：首个词（已发货/运输中/派送中…）粗体深色，其余灰色（对齐真实淘宝灰框样式）
   List<TextSpan> get _statusLineSpans {
     final line = _statusLine!;
     final idx = line.indexOf(' ');
+    // v1.9.110：运输中/派送中（预计xx送达）整行橙色，对齐真实淘宝
+    if (_isTransitLine) {
+      const orange = TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFFff5000));
+      const orangeTail =
+          TextStyle(fontSize: 12, color: Color(0xFFff5000));
+      if (idx <= 0) return [TextSpan(text: line, style: orange)];
+      return [
+        TextSpan(text: line.substring(0, idx), style: orange),
+        TextSpan(text: line.substring(idx), style: orangeTail),
+      ];
+    }
     const head = TextStyle(
         fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A));
     const tail = TextStyle(fontSize: 12, color: Color(0xFF999999));
