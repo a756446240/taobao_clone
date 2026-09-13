@@ -25,7 +25,17 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
 
   Future<void> _pickAndAnalyze() async {
     final picker = ImagePicker();
-    final picked = await picker.pickMultiImage();
+    List<XFile> picked;
+    try {
+      // v1.9.115：选图时直接压到 1600px/JPG85——原图常超 4MB 上限
+      // （iPhone 相册大图），此前因此识别全部失败
+      picked = await picker.pickMultiImage(
+          maxWidth: 1600, maxHeight: 1600, imageQuality: 85);
+    } catch (e) {
+      // v1.9.115：相册打开失败此前无提示（异常未捕获），现弹窗给出原因
+      _showError('打开相册失败', e);
+      return;
+    }
     if (picked.isEmpty) return;
 
     setState(() => _parsing = true);
@@ -47,16 +57,39 @@ class _AiOrderImportScreenState extends State<AiOrderImportScreen> {
               if (parsed != null) _queue.add(parsed);
               continue;
             } catch (e2) {
-              _toast('第 ${_queue.length + 1} 张识别失败：$e2');
+              _showError('第 ${_queue.length + 1} 张识别失败', e2);
               continue;
             }
           }
           setState(() => _parsing = true);
         }
-        _toast('第 ${_queue.length + 1} 张识别失败：$e');
+        // v1.9.115：识别失败弹窗显示完整原因（此前 2 秒 toast 看不清）
+        _showError('第 ${_queue.length + 1} 张识别失败', e);
       }
     }
     setState(() => _parsing = false);
+  }
+
+  /// v1.9.115：错误弹窗——完整展示失败原因，便于排障
+  void _showError(String title, Object e) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Text('$e',
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFF666666))),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('知道了',
+                  style: TextStyle(color: Color(0xFFFF5000)))),
+        ],
+      ),
+    );
   }
 
   /// 页内配置豆包 API Key（不用跳转素材库页），返回是否已保存
