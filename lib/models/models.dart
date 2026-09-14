@@ -190,6 +190,7 @@ class OrderItem {
 
   // ===== 3.4 订单详情页字段 =====
   String deliveryPromise; // 待发货承诺文案，如"承诺48小时内发货"（显示在地址下方）
+  String deliveryPromiseSub; // 承诺行灰色副标题，如"本月平均4天内发货"（空=隐藏）
   bool showDeliveryPromise; // 是否显示"承诺发货"行
   String shipPromise; // 待发货灰框时间文案，如"今天13:46前发货"/"预计明天到达"/"预售，9月17日13:39前发货"（空=按标题确定性生成）
   String paymentMethod; // 支付方式
@@ -305,6 +306,7 @@ class OrderItem {
     this.onTimeStyle = -1,
     this.onTimeText2 = '送货上门',
     this.deliveryPromise = '承诺48小时内发货',
+    this.deliveryPromiseSub = '',
     this.showDeliveryPromise = true,
     this.shipPromise = '',
     this.paymentMethod = '微信支付',
