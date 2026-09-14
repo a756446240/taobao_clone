@@ -69,6 +69,17 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
       return;
     }
     final provider = context.read<CartProvider>();
+    // v1.9.116：备份文件里带已删除订单黑名单时一并恢复（合并去重），
+    // 防掉签重装后旧备份恢复完、之前删掉的订单又被抓包导入复活
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        final nos = decoded['deletedTradeNos'];
+        if (nos is List && nos.isNotEmpty) {
+          provider.restoreDeletedTradeNos(nos.map((e) => e.toString()));
+        }
+      }
+    } catch (_) {}
     final existingNos = <String>{
       for (final s in provider.shops)
         for (final it in s.items) it.orderNo,
@@ -594,6 +605,9 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
         'version': 1,
         'orders':
             provider.shops.map(PersistenceService.shopToJson).toList(),
+        // v1.9.116：已删除订单黑名单一起进备份——换签重装恢复后，
+        // 之前手动删掉的订单不会被抓包导入复活
+        'deletedTradeNos': provider.deletedTradeNos,
       };
       final dir = await getApplicationDocumentsDirectory();
       final now = DateTime.now();
@@ -645,7 +659,8 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
           title: const Text('备份已生成', style: TextStyle(fontSize: 16)),
           content: Text(
             '文件：$zipName\n'
-            '（${provider.shops.length} 家店铺 + $imgCount 张本地图片）\n\n'
+            '（${provider.shops.length} 家店铺 + $imgCount 张本地图片'
+            ' + 已删除黑名单 ${provider.deletedTradeNosCount} 条）\n\n'
             '发送到微信保存：打开系统「文件」App → 我的 iPhone → 淘宝 → '
             '长按该文件 → 共享 → 微信（文件传输助手）。\n\n'
             '证书过期换签重装后：回到本页点「选择文件导入」，选中这个 ZIP，'
