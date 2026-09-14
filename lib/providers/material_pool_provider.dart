@@ -403,9 +403,16 @@ class MaterialPoolProvider extends ChangeNotifier {
     if (has(['牙膏', '牙刷', '漱口水', '牙线'])) return (15, 69);
     // v1.9.116：细化几类此前被宽泛区间误伤的品类（蜂胶喷剂被"喷雾"归到
     // 护肤 49-229、VC含片匹配不到"维c"落入默认 29-159 等）
-    if (has(['蜂胶'])) return (89, 269);
+    // v1.9.119：按真实淘宝售价二次校准（zirkulin蜂胶润喉糖¥266、
+    // Noromega 6瓶海豹油¥2041、陪伴机器人¥9800、小青柠果汁¥78.81、
+    // fit防护乳膏¥87.81），并新增数量词倍乘
+    if (has(['机器人'])) return (1599, 9999);
+    if (has(['海豹油'])) return (399, 2299);
+    if (has(['蜂胶', '润喉糖', '润嗓'])) return (39, 269);
     if (has(['口腔喷雾', '口喷', '喷剂'])) return (29, 129);
     if (has(['含片', '咀嚼片', '泡腾片'])) return (19.9, 79);
+    if (has(['乳膏', '防护膏', '热身膏'])) return (39, 129);
+    if (has(['果汁', '小青柠', '柠檬饮', '饮料'])) return (19.9, 89);
     if (has(['口罩', '消毒', '洗手'])) return (15, 69);
     if (has(['面膜'])) return (39, 129);
     if (has(['面霜', '乳液', '精华', '爽肤水', '喷雾', '保湿', '护肤', '防晒', '眼霜', '洁面', '洗面奶'])) return (49, 229);
@@ -418,7 +425,7 @@ class MaterialPoolProvider extends ChangeNotifier {
     if (has(['褪黑素', '睡眠'])) return (69, 169);
     if (has(['辅酶', 'q10'])) return (99, 299);
     if (has(['鱼油', 'dha'])) return (89, 269);
-    if (has(['益生菌', '活菌'])) return (69, 199);
+    if (has(['益生菌', '活菌', '通便', 'miralax'])) return (59, 259);
     if (has(['维生素', '钙片', '维c', ' vc', 'vc ', '维b', '甲钴胺', '叶黄素', '胶囊', '片剂', '保健', '酵素', '酵母', '蛋白粉', '氨糖', '软糖'])) return (59, 259);
     if (has(['咖啡', '奶茶', '茶饮', '零食', '饼干', '巧克力', '坚果', '麦片'])) return (19.9, 99);
     if (has(['眼镜', '隐形眼镜', '美瞳', '滴眼液', '人工泪液'])) return (39, 199);
@@ -427,12 +434,30 @@ class MaterialPoolProvider extends ChangeNotifier {
     return (29, 159);
   }
 
+  /// 数量词倍乘：标题含「6瓶/2盒/3罐」等多件装时价格上浮
+  /// （真实淘宝 6 瓶海豹油¥2041 vs 单瓶~¥349）。每件按 0.72 折算累进，
+  /// 上限 7.5 倍；低价品类（区间下限<300）才乘，高端区间本身已含多瓶装
+  static double _qtyFactorOf(String title, double lo) {
+    if (lo >= 300) return 1;
+    final matches =
+        RegExp(r'(\d{1,2})\s*(瓶|盒|罐|袋|支|条|件|组|箱)').allMatches(title);
+    var n = 1;
+    for (final m in matches) {
+      final v = int.tryParse(m.group(1) ?? '1') ?? 1;
+      if (v > n) n = v;
+    }
+    if (n <= 1) return 1;
+    final f = 1 + 0.72 * (n - 1);
+    return f > 7.5 ? 7.5 : f;
+  }
+
   /// 推荐价：按标题哈希确定性取区间内的价格（同一商品各处展示一致），
   /// 尾数用 .9 / .9x 电商常见定价
   static String marketPriceOf(String title) {
     final (lo, hi) = _priceRangeOf(title);
     final h = title.codeUnits.fold<int>(0, (a, c) => (a * 31 + c) & 0x7fffffff);
-    final base = lo + (hi - lo) * (h % 1000) / 1000;
+    var base = lo + (hi - lo) * (h % 1000) / 1000;
+    base *= _qtyFactorOf(title, lo);
     // 取整到个位再减 0.1，得到 x9 / x9.9 风格定价
     final whole = base.floor();
     final price = base < 100 ? whole + 0.9 * ((h ~/ 7) % 2 == 0 ? 1 : 0.9) : whole.toDouble();
