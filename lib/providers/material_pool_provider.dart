@@ -17,11 +17,15 @@ class MaterialEntry {
   final String imagePath; // assets/... 或本地文件绝对路径
   final String title; // 空串表示未匹配名称（沿用原商品名）
   final bool bundled; // 是否打包内置（内置不可删除）
+  /// 抓包素材自带的真实售价（v1.9.116 起持久化，0 = 未知走估价）。
+  /// 推荐/收藏列表优先用它，避免估价与商品真实价差离谱。
+  final double price;
 
   const MaterialEntry({
     required this.imagePath,
     this.title = '',
     this.bundled = false,
+    this.price = 0,
   });
 }
 
@@ -32,6 +36,7 @@ class MaterialEntry {
 class MaterialPoolProvider extends ChangeNotifier {
   static const _assetJson = 'assets/materials/materials.json';
   static const _titlesKey = 'material_titles'; // 用户导入素材的文件名→名称
+  static const _pricesKey = 'material_prices'; // 用户导入素材的文件名→真实售价
 
   final List<MaterialEntry> _entries = [];
   bool _loading = true;
@@ -67,12 +72,14 @@ class MaterialPoolProvider extends ChangeNotifier {
           imagePath: 'assets/materials/$file',
           title: m['title']?.toString() ?? '',
           bundled: true,
+          price: (m['price'] as num?)?.toDouble() ?? 0,
         ));
       }
     } catch (_) {}
-    // 2. 用户导入素材（应用已保存的名称）
+    // 2. 用户导入素材（应用已保存的名称 + 真实售价）
     try {
       final titles = await _loadTitles();
+      final prices = await _loadPrices();
       final dir = await _materialsDir();
       final files = dir
           .listSync()
@@ -85,6 +92,7 @@ class MaterialPoolProvider extends ChangeNotifier {
         _entries.add(MaterialEntry(
           imagePath: f.path,
           title: titles[name] ?? '',
+          price: prices[name] ?? 0,
         ));
       }
     } catch (_) {}
@@ -109,6 +117,24 @@ class MaterialPoolProvider extends ChangeNotifier {
     await p.setString(_titlesKey, jsonEncode(titles));
   }
 
+  /// 文件名 → 真实售价（抓包素材 JSON 自带 price 字段，v1.9.116 起持久化）
+  static Future<Map<String, double>> _loadPrices() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_pricesKey);
+      if (raw == null || raw.isEmpty) return {};
+      return (jsonDecode(raw) as Map).map(
+          (k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> _savePrices(Map<String, double> prices) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_pricesKey, jsonEncode(prices));
+  }
+
   static String _fileName(String path) =>
       path.replaceAll('\\', '/').split('/').last;
 
@@ -120,6 +146,7 @@ class MaterialPoolProvider extends ChangeNotifier {
       imagePath: e.imagePath,
       title: title,
       bundled: e.bundled,
+      price: e.price,
     );
     if (!e.bundled) {
       final titles = await _loadTitles();
@@ -216,18 +243,34 @@ class MaterialPoolProvider extends ChangeNotifier {
     }
     final dir = await _materialsDir();
     final titles = await _loadTitles();
+    final prices = await _loadPrices();
     var added = 0, skipped = 0;
     var firstErr = '';
     for (var i = 0; i < list.length; i++) {
       final m = list[i] as Map<String, dynamic>;
       final url = m['imageUrl']?.toString() ?? '';
       final title = m['title']?.toString() ?? '';
+      final price = (m['price'] as num?)?.toDouble() ?? 0;
       if (url.isEmpty) {
         skipped++;
         continue;
       }
-      // 同名素材已存在（内置或导入过）→ 跳过
+      // 同名素材已存在（内置或导入过）→ 跳过；
+      // v1.9.116：已有素材没存过真实售价而本次 JSON 带价格时，回填价格
       if (title.isNotEmpty && _entries.any((e) => e.title == title)) {
+        if (price > 0) {
+          final idx = _entries.indexWhere((e) => e.title == title);
+          final old = _entries[idx];
+          if (old.price <= 0) {
+            _entries[idx] = MaterialEntry(
+              imagePath: old.imagePath,
+              title: old.title,
+              bundled: old.bundled,
+              price: price,
+            );
+            if (!old.bundled) prices[_fileName(old.imagePath)] = price;
+          }
+        }
         skipped++;
         continue;
       }
@@ -256,8 +299,9 @@ class MaterialPoolProvider extends ChangeNotifier {
             'mat_${DateTime.now().millisecondsSinceEpoch}_$added$ext';
         final f = File('${dir.path}/$name');
         await f.writeAsBytes(bytes, flush: true);
-        _entries.add(MaterialEntry(imagePath: f.path, title: title));
+        _entries.add(MaterialEntry(imagePath: f.path, title: title, price: price));
         if (title.isNotEmpty) titles[name] = title;
+        if (price > 0) prices[name] = price;
         added++;
       } catch (e) {
         skipped++;
@@ -265,6 +309,7 @@ class MaterialPoolProvider extends ChangeNotifier {
       }
     }
     await _saveTitles(titles);
+    await _savePrices(prices);
     notifyListeners();
     return (added, skipped, firstErr);
   }
@@ -279,6 +324,9 @@ class MaterialPoolProvider extends ChangeNotifier {
       final titles = await _loadTitles();
       titles.remove(_fileName(e.imagePath));
       await _saveTitles(titles);
+      final prices = await _loadPrices();
+      prices.remove(_fileName(e.imagePath));
+      await _savePrices(prices);
     } catch (_) {}
     notifyListeners();
   }
@@ -353,6 +401,11 @@ class MaterialPoolProvider extends ChangeNotifier {
     bool has(List<String> kws) => kws.any((k) => t.contains(k));
     if (has(['手帕纸', '抽纸', '纸巾', '湿巾', '卷纸', '棉柔巾'])) return (9.9, 39.9);
     if (has(['牙膏', '牙刷', '漱口水', '牙线'])) return (15, 69);
+    // v1.9.116：细化几类此前被宽泛区间误伤的品类（蜂胶喷剂被"喷雾"归到
+    // 护肤 49-229、VC含片匹配不到"维c"落入默认 29-159 等）
+    if (has(['蜂胶'])) return (89, 269);
+    if (has(['口腔喷雾', '口喷', '喷剂'])) return (29, 129);
+    if (has(['含片', '咀嚼片', '泡腾片'])) return (19.9, 79);
     if (has(['口罩', '消毒', '洗手'])) return (15, 69);
     if (has(['面膜'])) return (39, 129);
     if (has(['面霜', '乳液', '精华', '爽肤水', '喷雾', '保湿', '护肤', '防晒', '眼霜', '洁面', '洗面奶'])) return (49, 229);
@@ -366,7 +419,7 @@ class MaterialPoolProvider extends ChangeNotifier {
     if (has(['辅酶', 'q10'])) return (99, 299);
     if (has(['鱼油', 'dha'])) return (89, 269);
     if (has(['益生菌', '活菌'])) return (69, 199);
-    if (has(['维生素', '钙片', '维c', '维b', '甲钴胺', '叶黄素', '胶囊', '片剂', '保健', '酵素', '酵母', '蛋白粉', '氨糖', '软糖'])) return (59, 259);
+    if (has(['维生素', '钙片', '维c', ' vc', 'vc ', '维b', '甲钴胺', '叶黄素', '胶囊', '片剂', '保健', '酵素', '酵母', '蛋白粉', '氨糖', '软糖'])) return (59, 259);
     if (has(['咖啡', '奶茶', '茶饮', '零食', '饼干', '巧克力', '坚果', '麦片'])) return (19.9, 99);
     if (has(['眼镜', '隐形眼镜', '美瞳', '滴眼液', '人工泪液'])) return (39, 199);
     if (has(['净化器', '挂脖'])) return (199, 399);
@@ -385,6 +438,19 @@ class MaterialPoolProvider extends ChangeNotifier {
     final price = base < 100 ? whole + 0.9 * ((h ~/ 7) % 2 == 0 ? 1 : 0.9) : whole.toDouble();
     return price < 100 ? price.toStringAsFixed(2) : price.toStringAsFixed(0);
   }
+
+  /// 真实售价格式化（抓包素材自带的 price）：去尾零，279.04→279.04、89.0→89
+  static String fmtPrice(double p) {
+    if (p <= 0) return '';
+    final s = p.toStringAsFixed(2);
+    if (s.endsWith('.00')) return s.substring(0, s.length - 3);
+    if (s.endsWith('0')) return s.substring(0, s.length - 1);
+    return s;
+  }
+
+  /// 素材展示价：有真实售价格式化返回，没有走品类估价（对外统一入口）
+  static String displayPriceOf(MaterialEntry e) =>
+      e.price > 0 ? fmtPrice(e.price) : marketPriceOf(e.title);
 
   /// 推荐区商品流：优先用素材池（图+名严格对应，按名称去重），不足时用内置 mock 补齐
   List<SearchResultItem> recommendGoods(int count, {Random? rand}) {
@@ -410,7 +476,7 @@ class MaterialPoolProvider extends ChangeNotifier {
           imageUrl: e.imagePath,
           title: e.title,
           shopName: '${_brandOf(e.title)}${_shopSuffixes[r.nextInt(_shopSuffixes.length)]}',
-          price: marketPriceOf(e.title),
+          price: displayPriceOf(e),
           commentCount: _sales[r.nextInt(_sales.length)],
           goodRate: '${96 + r.nextInt(4)}%好评',
         ));
