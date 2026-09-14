@@ -759,6 +759,7 @@ class CartProvider extends ChangeNotifier {
     String? onTimeText2,
     String? imageUrl,
     String? deliveryPromise,
+    String? deliveryPromiseSub,
     bool? showDeliveryPromise,
     String? shipPromise,
     String? paymentMethod,
@@ -843,6 +844,7 @@ class CartProvider extends ChangeNotifier {
     if (onTimeText2 != null) item.onTimeText2 = onTimeText2;
     if (imageUrl != null) item.imageUrl = imageUrl;
     if (deliveryPromise != null) item.deliveryPromise = deliveryPromise;
+    if (deliveryPromiseSub != null) item.deliveryPromiseSub = deliveryPromiseSub;
     if (showDeliveryPromise != null) item.showDeliveryPromise = showDeliveryPromise;
     if (shipPromise != null) item.shipPromise = shipPromise;
     if (paymentMethod != null) {
