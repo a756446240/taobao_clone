@@ -115,6 +115,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   children: [
                     _buildStatusHeader(),
+                    // v1.9.120：承诺发货行独立白卡（对齐真实淘宝待发货详情页，
+                    // 绿色闪电贴图 + ›，灰条间隔）
+                    if (_isPendingShip && _item.showDeliveryPromise) ...[
+                      _greyBar(),
+                      _buildDeliveryPromiseCard(),
+                    ],
                     // 准时送达卡：独立白色框架，上下灰条间隔（可隐藏）
                     if (_item.showOnTime) ...[
                       _greyBar(),
@@ -385,35 +391,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ),
           ),
-          // 承诺发货行（移到地址下方，可编辑文字，可隐藏）
-          if (_isPendingShip && _item.showDeliveryPromise) ...[
-            const SizedBox(height: 12),
-            GestureDetector(
-              onDoubleTap: () => _editText('修改发货承诺', _item.deliveryPromise, (v) {
-                provider.updateOrderItem(_item, deliveryPromise: v);
-              }),
-              child: Row(
-                children: [
-                  const Icon(Icons.bolt, color: Color(0xFF4caf50), size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _item.deliveryPromise.isEmpty
-                          ? '承诺48小时内发货'
-                          : _item.deliveryPromise,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF333333)),
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right,
-                      size: 14, color: Color(0xFF999999)),
-                ],
+          // v1.9.120：承诺发货行移出地址卡，独立白卡见 _buildDeliveryPromiseCard
+        ],
+      ),
+    );
+  }
+
+  // ============ 承诺发货卡（v1.9.120：独立白卡，绿色闪电贴图，对齐真实淘宝） ============
+  Widget _buildDeliveryPromiseCard() {
+    final provider = context.read<CartProvider>();
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onDoubleTap: () => _editText('修改发货承诺', _item.deliveryPromise, (v) {
+          provider.updateOrderItem(_item, deliveryPromise: v);
+        }),
+        child: Row(
+          children: [
+            const Image(
+                image: AssetImage('assets/images/icons/bolt_promise.png'),
+                width: 15,
+                height: 15),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _item.deliveryPromise.isEmpty
+                    ? '承诺48小时内发货'
+                    : _item.deliveryPromise,
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A)),
               ),
             ),
+            const Icon(Icons.chevron_right,
+                size: 16, color: Color(0xFF999999)),
           ],
-        ],
+        ),
       ),
     );
   }
