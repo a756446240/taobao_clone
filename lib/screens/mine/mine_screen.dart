@@ -146,11 +146,10 @@ class _MineScreenState extends State<MineScreen> {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // v1.9.116 布局对齐真实淘宝：
-          // 渐变头（含会员卡+权益栏）→ 农场横幅 → 快递/收藏/关注店铺/足迹
+          // v1.9.118：农场横幅已收进黑框会员区（v1.9.117 重复展示问题修复）
+          // 渐变头（含黑框会员区）→ 快递/收藏/关注店铺/足迹
           // → 我的订单 → 芭芭农场等圆圈 → 领券中心 → 推荐流
           _buildHeaderSection(),
-          _buildFarmBanner(),
           _buildToolCards(),
           _buildOrderSection(),
           _buildAppGrid(),
@@ -1070,42 +1069,53 @@ class _MineScreenState extends State<MineScreen> {
   // ============ App 圆圈入口（真实淘宝图标，素材库 icons/） ============
   // 单击进入对应频道落地页（复用首页金刚区的 ChannelScreen）
   Widget _buildAppGrid() {
-    // v1.9.117：对齐真实淘宝五项（芭芭农场/领淘金币/红包签到/连连消/试用领取）
+    // v1.9.118：圆圈行换真淘宝高清贴图（图标+文字一体抠自真淘宝截图，
+    // App 不再渲染文字——旧 assets/images/icons 下的 PNG 自带文字导致双标签）
     final apps = [
-      const HomeIconEntry(
-          '芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png'),
-      const HomeIconEntry(
-          '领淘金币', '币', 0xFFf7b500, 'assets/images/icons/coin.png'),
-      const HomeIconEntry(
-          '红包签到', '签', 0xFFff2d2d, 'assets/images/icons/redpacket.png'),
-      const HomeIconEntry(
-          '连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png'),
-      const HomeIconEntry(
-          '试用领取', 'U', 0xFFef4444, 'assets/images/icons/tryout.png'),
+      ('芭芭农场', 'assets/icons/mine/cir_farm.png'),
+      ('领淘金币', 'assets/icons/mine/cir_coin.png'),
+      ('红包签到', 'assets/icons/mine/cir_redpacket.png'),
+      ('连连消', 'assets/icons/mine/cir_lianxiao.png'),
+      ('试用领取', 'assets/icons/mine/cir_tryout.png'),
     ];
+    // 频道页入口沿用原 HomeIconEntry（图标在频道页内单独展示）
+    HomeIconEntry entryOf(String title) {
+      switch (title) {
+        case '芭芭农场':
+          return const HomeIconEntry(
+              '芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png');
+        case '领淘金币':
+          return const HomeIconEntry(
+              '领淘金币', '币', 0xFFf7b500, 'assets/images/icons/coin.png');
+        case '红包签到':
+          return const HomeIconEntry(
+              '红包签到', '签', 0xFFff2d2d, 'assets/images/icons/redpacket.png');
+        case '连连消':
+          return const HomeIconEntry(
+              '连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png');
+        default:
+          return const HomeIconEntry(
+              '试用领取', 'U', 0xFFef4444, 'assets/images/icons/tryout.png');
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: apps.map((a) => Expanded(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ChannelScreen(entry: a)),
+              MaterialPageRoute(
+                  builder: (_) => ChannelScreen(entry: entryOf(a.$1))),
             ),
-            child: Column(
-              children: [
-                Image.asset(a.asset!, width: 44, height: 44),
-                const SizedBox(height: 4),
-                Text(a.title,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF333333))),
-              ],
-            ),
+            child: Image.asset(a.$2, height: 58, fit: BoxFit.contain),
           ),
         )).toList(),
       ),
