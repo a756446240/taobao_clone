@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -44,6 +45,62 @@ class MineScreen extends StatefulWidget {
 }
 
 class _MineScreenState extends State<MineScreen> {
+  // ============ 农场横幅倒计时（v1.9.117：逐位滚动，到底自动循环） ============
+  static const int _farmInitSeconds = 10 * 3600 + 44 * 60 + 20;
+  int _farmSeconds = _farmInitSeconds;
+  Timer? _farmTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _farmTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _farmSeconds--;
+        if (_farmSeconds < 0) _farmSeconds = _farmInitSeconds; // 滚完自动循环
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _farmTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 单个字符的滚动切换（新字符从下方滚入，旧字符向上滚出）
+  Widget _rollChar(String ch, TextStyle style) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      transitionBuilder: (child, anim) {
+        final offset = Tween<Offset>(
+          begin: const Offset(0, 0.7),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut));
+        return ClipRect(
+          child: SlideTransition(position: offset, child: child),
+        );
+      },
+      child: SizedBox(
+        key: ValueKey(ch),
+        width: ch == ':' ? 4 : 7.5,
+        child: Text(ch, style: style, textAlign: TextAlign.center),
+      ),
+    );
+  }
+
+  /// 滚动倒计时文本：hh:mm:ss 逐位滚动
+  Widget _rollingCountdown(TextStyle style) {
+    final h = (_farmSeconds ~/ 3600).toString().padLeft(2, '0');
+    final m = ((_farmSeconds % 3600) ~/ 60).toString().padLeft(2, '0');
+    final s = (_farmSeconds % 60).toString().padLeft(2, '0');
+    final chars = '$h:$m:$s'.split('');
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: chars.map((c) => _rollChar(c, style)).toList(),
+    );
+  }
+
   // ============ 相册选图 ============
   Future<String?> _pickImageToLocal(String subDir) async {
     try {
@@ -128,8 +185,7 @@ class _MineScreenState extends State<MineScreen> {
       child: Column(
         children: [
           _buildHeaderContent(profile),
-          _buildTopCards(),
-          _buildWalletBar(),
+          _buildMemberFrame(),
           const SizedBox(height: 10),
         ],
       ),
@@ -332,178 +388,162 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  /// 专属客服标：88VIP 耳机（v1.9.116 对齐真实淘宝）
+  /// 专属客服标：真实淘宝 88VIP 耳机贴图（v1.9.117 从真淘宝截图抠取）
   Widget _vipServiceIcon() {
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: 21,
-          child: Stack(
-            alignment: Alignment.topCenter,
-            children: [
-              Icon(Icons.headphones, size: 19, color: Colors.black87),
-              Padding(
-                padding: EdgeInsets.only(top: 11),
-                child: Text('88VIP',
-                    style: TextStyle(
-                        fontSize: 6.5,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87,
-                        letterSpacing: -0.2,
-                        height: 1)),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 2),
-        Text('专属客服', style: TextStyle(fontSize: 10, color: Colors.black87)),
+        Image.asset('assets/icons/mine/ic_service_vip.png',
+            height: 22, fit: BoxFit.contain),
+        const SizedBox(height: 2),
+        const Text('专属客服',
+            style: TextStyle(fontSize: 10, color: Colors.black87)),
       ],
     );
   }
 
-  // ============ 顶部深金会员卡 + 白色立体卡（v1.9.116 对齐真实淘宝） ============
-  // 深金条「本月已省」在上，白色立体卡（会员中心/88VIP/红包）叠压其下缘
-  Widget _buildTopCards() {
+  // ============ 整体黑框会员区（v1.9.117 对齐真实淘宝） ============
+  // 深棕黑框内含：上行（本月已省 + 右上白色立体卡）→ 权益行（白字）→ 农场横幅
+  Widget _buildMemberFrame() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-      child: Stack(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF2A1E0C),
+            Color(0xFF4C3714),
+            Color(0xFF7A5C24),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
+      ),
+      child: Column(
         children: [
-          // 深金条（底部留白给白卡叠上来）
-          Padding(
-            padding: const EdgeInsets.only(bottom: 22),
+          // 上行：本月已省（左）+ 右上白色立体卡
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text.rich(
+                          TextSpan(children: [
+                            TextSpan(
+                              text: '本月已省',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: '1296',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(
+                              text: '元',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ]),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(Icons.chevron_right,
+                            size: 14, color: Color(0xFFD9BE8A)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              _memberWhiteCard(),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildWalletRowInDark(),
+          const SizedBox(height: 12),
+          _buildFarmBanner(),
+        ],
+      ),
+    );
+  }
+
+  /// 右上白色立体卡：会员中心 | 88VIP | ¥2红包（对齐真实淘宝立体框架）
+  Widget _memberWhiteCard() {
+    void gotoBenefits() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+        );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: gotoBenefits,
+            child: _memberCol('会员中心', '去解锁会员权益'),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: gotoBenefits,
+            child: _memberCol('88VIP', '2元红包'),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _openCouponCenter,
             child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF2A1E0C),
-                    Color(0xFF4C3714),
-                    Color(0xFF7A5C24),
-                  ],
+                  colors: [Color(0xFFFF5A4E), Color(0xFFE8211A)],
                 ),
-                border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BenefitsScreen()),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text.rich(
-                      TextSpan(children: [
-                        TextSpan(
-                          text: '本月已省',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(
-                          text: '1296',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(
-                          text: '元',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ]),
-                    ),
-                    SizedBox(width: 2),
-                    Icon(Icons.chevron_right,
-                        size: 14, color: Color(0xFFD9BE8A)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // 白色立体卡：会员中心 | 88VIP | ¥2红包
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 0,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.16),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 会员中心（单击 → 权益钱包页）
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                            builder: (_) => const BenefitsScreen()),
-                      ),
-                      child: _memberCol('会员中心', '去解锁会员权益'),
-                    ),
-                  ),
-                  // 88VIP（单击 → 权益钱包页）
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const BenefitsScreen()),
-                    ),
-                    child: _memberCol('88VIP', '2元红包'),
-                  ),
-                  const SizedBox(width: 12),
-                  // ¥2 红包（单击 → 领券中心）
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _openCouponCenter,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFFF5A4E), Color(0xFFE8211A)],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('¥2',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  height: 1.1)),
-                          Text('红包',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  height: 1.1)),
-                        ],
-                      ),
-                    ),
-                  ),
+                  Text('¥2',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1)),
+                  Text('红包',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          height: 1.1)),
                 ],
               ),
             ),
@@ -542,78 +582,70 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  // ============ 红包/优惠券/积分 整合区（对齐 image#6） ============
-  Widget _buildWalletBar() {
+  // ============ 权益行（v1.9.117：黑框内白字版，对齐真实淘宝） ============
+  Widget _buildWalletRowInDark() {
     final items = [
-      _WalletItem('红包', '领红包', Colors.red),
-      _WalletItem('优惠券', '领优惠', const Color(0xFFff7043)),
-      _WalletItem('淘金币抵', '¥1.30', const Color(0xFFff8f00)),
-      _WalletItem('天猫积分', '5', const Color(0xFFff5252)),
-      _WalletItem('充值金', '¥0.00', const Color(0xFF8d6e63)),
+      _WalletItem('红包', '领红包', Colors.white),
+      _WalletItem('优惠券', '领优惠', Colors.white),
+      _WalletItem('淘金币抵', '¥1.30', const Color(0xFFFFD28A)),
+      _WalletItem('天猫积分', '5', const Color(0xFFFFD28A)),
+      _WalletItem('充值金', '¥0.00', Colors.white),
     ];
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        // 半透明白，让顶部渐变微微透出来（对齐真实淘宝权益栏观感）
-        color: Colors.white.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          ...items.asMap().entries.expand((e) {
-            final w = Expanded(
-              child: GestureDetector(
-                // 单击进入权益钱包页对应标签
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          BenefitsScreen(initialIndex: e.key)),
-                ),
-                child: Column(
-                  children: [
-                    Text(e.value.label,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFF666666))),
-                    const SizedBox(height: 4),
-                    Text(e.value.value,
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: e.value.color)),
-                  ],
-                ),
+    return Row(
+      children: [
+        ...items.asMap().entries.expand((e) {
+          final w = Expanded(
+            child: GestureDetector(
+              // 单击进入权益钱包页对应标签
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => BenefitsScreen(initialIndex: e.key)),
               ),
-            );
-            if (e.key == items.length - 1) return [w];
-            return [
-              w,
-              Container(width: 1, height: 24, color: const Color(0xFFeeeeee)),
-            ];
-          }).toList(),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const BenefitsScreen()),
-            ),
-            child: Container(
-              padding: const EdgeInsets.only(left: 6, right: 4),
-              child: const Column(
+              child: Column(
                 children: [
-                  Text('全部权益',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF666666))),
-                  SizedBox(height: 4),
-                  Icon(Icons.chevron_right, size: 16, color: Color(0xFF999999)),
+                  Text(e.value.label,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xCCFFFFFF))),
+                  const SizedBox(height: 4),
+                  Text(e.value.value,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: e.value.color)),
                 ],
               ),
             ),
+          );
+          if (e.key == items.length - 1) return [w];
+          return [
+            w,
+            Container(width: 1, height: 24, color: const Color(0x33FFFFFF)),
+          ];
+        }).toList(),
+        GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BenefitsScreen()),
           ),
-        ],
-      ),
+          child: Container(
+            padding: const EdgeInsets.only(left: 6, right: 2),
+            child: const Column(
+              children: [
+                Text('全部权益',
+                    style: TextStyle(fontSize: 12, color: Color(0xCCFFFFFF))),
+                SizedBox(height: 4),
+                Icon(Icons.chevron_right,
+                    size: 16, color: Color(0x99FFFFFF)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  // ============ 农场横幅（v1.9.116 对齐真实淘宝：肥料到账提醒，单击进芭芭农场） ============
+  // ============ 农场横幅（v1.9.117：黑框内版，倒计时逐位滚动、到底自动循环） ============
   Widget _buildFarmBanner() {
+    const textStyle = TextStyle(fontSize: 12, color: Color(0xFF6E6117));
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).push(
@@ -625,8 +657,7 @@ class _MineScreenState extends State<MineScreen> {
         ),
       ),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: const Color(0xFFF6F3D8),
           borderRadius: BorderRadius.circular(8),
@@ -644,11 +675,20 @@ class _MineScreenState extends State<MineScreen> {
                   size: 13, color: Color(0xFF8A7B1E)),
             ),
             const SizedBox(width: 8),
-            const Expanded(
-              child: Text('3000肥料已到账，10:44:20后失效',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: Color(0xFF6E6117))),
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Flexible(
+                    child: Text('3000肥料已到账，',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textStyle),
+                  ),
+                  _rollingCountdown(textStyle),
+                  const Text('后失效', style: textStyle),
+                ],
+              ),
             ),
             Container(
               padding:
@@ -676,8 +716,8 @@ class _MineScreenState extends State<MineScreen> {
     final counts =
         CartProvider.statusCounts(context.watch<CartProvider>().shops);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -725,25 +765,25 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   Widget _orderIcon(String label, [int badge = 0]) {
-    IconData icon;
+    // v1.9.117：图标换真实淘宝 1:1 贴图（从真淘宝截图抠取，透明底）
+    String asset;
     switch (label) {
       case '待付款':
-        icon = Icons.account_balance_wallet_outlined;
+        asset = 'assets/icons/mine/ic_daifukuan.png';
         break;
       case '待发货':
-        icon = Icons.inventory_2_outlined;
+        asset = 'assets/icons/mine/ic_daifahuo.png';
         break;
       case '待收货':
-        icon = Icons.local_shipping_outlined;
+        asset = 'assets/icons/mine/ic_daishouhuo.png';
         break;
       case '待评价':
-        icon = Icons.chat_bubble_outline;
+        asset = 'assets/icons/mine/ic_daipingjia.png';
         break;
       default:
-        icon = Icons.currency_yuan;
+        asset = 'assets/icons/mine/ic_tuikuan.png';
     }
-    // v1.9.116：图标改黑色线框（对齐真实淘宝），角标保留橙色
-    final ic = Icon(icon, color: Colors.black87, size: 26);
+    final ic = Image.asset(asset, height: 26, fit: BoxFit.contain);
     if (badge <= 0) return ic;
     // 橙色数字角标（对齐真实淘宝：图标右上角橙色圆底白字，>99 显示 99+）
     return Stack(
@@ -779,21 +819,21 @@ class _MineScreenState extends State<MineScreen> {
   // ============ 工具卡片 ============
   Widget _buildToolCards() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          _toolIcon(Icons.local_shipping_outlined, '快递', '暂无在途包裹',
+          _toolIcon('assets/icons/mine/ic_kuaidi.png', '快递',
               onTap: _openLogistics),
-          _toolIcon(Icons.star_border, '收藏的宝贝', '逛逛多宝贝',
+          _toolIcon('assets/icons/mine/ic_shoucang.png', '收藏',
               onTap: _openFavorites),
-          _toolIcon(Icons.storefront_outlined, '关注店铺', '看店铺动态',
+          _toolIcon('assets/icons/mine/ic_guanzhu.png', '关注店铺',
               onTap: _openFollowedShops, onDoubleTap: _openAiAudit),
-          _toolIcon(Icons.access_time, '足迹', '看过的内容',
+          _toolIcon('assets/icons/mine/ic_zuji.png', '足迹',
               onTap: _openFootprints,
               onDoubleTap: _openAiImport,
               onLongPress: _openTaobaoSync),
@@ -875,7 +915,8 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  Widget _toolIcon(IconData icon, String title, String subtitle,
+  /// 快捷入口：真实淘宝 1:1 贴图图标（v1.9.117），下方灰字已按需求删除
+  Widget _toolIcon(String asset, String title,
       {VoidCallback? onTap,
       VoidCallback? onDoubleTap,
       VoidCallback? onLongPress}) {
@@ -887,12 +928,9 @@ class _MineScreenState extends State<MineScreen> {
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
-            // v1.9.116：图标改黑色（对齐真实淘宝）
-            Icon(icon, color: Colors.black87, size: 26),
+            Image.asset(asset, height: 26, fit: BoxFit.contain),
             const SizedBox(height: 6),
             Text(title, style: AppTextStyles.small),
-            Text(subtitle,
-                style: const TextStyle(color: Color(0xFF999999), fontSize: 10)),
           ],
         ),
       ),
@@ -905,7 +943,7 @@ class _MineScreenState extends State<MineScreen> {
       onTap: _openCouponCenter,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1032,6 +1070,7 @@ class _MineScreenState extends State<MineScreen> {
   // ============ App 圆圈入口（真实淘宝图标，素材库 icons/） ============
   // 单击进入对应频道落地页（复用首页金刚区的 ChannelScreen）
   Widget _buildAppGrid() {
+    // v1.9.117：对齐真实淘宝五项（芭芭农场/领淘金币/红包签到/连连消/试用领取）
     final apps = [
       const HomeIconEntry(
           '芭芭农场', '领', 0xFFff4d4f, 'assets/images/icons/farm.png'),
@@ -1040,12 +1079,12 @@ class _MineScreenState extends State<MineScreen> {
       const HomeIconEntry(
           '红包签到', '签', 0xFFff2d2d, 'assets/images/icons/redpacket.png'),
       const HomeIconEntry(
-          '游戏中心', '游', 0xFFf97316, 'assets/images/icons/game.png'),
-      const HomeIconEntry(
           '连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png'),
+      const HomeIconEntry(
+          '试用领取', 'U', 0xFFef4444, 'assets/images/icons/tryout.png'),
     ];
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1060,8 +1099,11 @@ class _MineScreenState extends State<MineScreen> {
             ),
             child: Column(
               children: [
-                Image.asset(a.asset!, width: 48, height: 48),
-                // 图标下方文字已按需求删除
+                Image.asset(a.asset!, width: 44, height: 44),
+                const SizedBox(height: 4),
+                Text(a.title,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF333333))),
               ],
             ),
           ),
