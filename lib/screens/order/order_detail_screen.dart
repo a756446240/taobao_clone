@@ -397,40 +397,60 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 承诺发货卡（v1.9.120：独立白卡，绿色闪电贴图，对齐真实淘宝） ============
+  // ============ 承诺发货卡（v1.9.121：高清圆环闪电贴图 + 深黑粗体，可带灰色副标题） ============
   Widget _buildDeliveryPromiseCard() {
     final provider = context.read<CartProvider>();
     return Container(
       width: double.infinity,
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onDoubleTap: () => _editText('修改发货承诺', _item.deliveryPromise, (v) {
-          provider.updateOrderItem(_item, deliveryPromise: v);
-        }),
-        child: Row(
-          children: [
-            const Image(
-                image: AssetImage('assets/images/icons/bolt_promise.png'),
-                width: 15,
-                height: 15),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _item.deliveryPromise.isEmpty
-                    ? '承诺48小时内发货'
-                    : _item.deliveryPromise,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A)),
+      child: Row(
+        children: [
+          const Image(
+              image: AssetImage('assets/images/icons/bolt_promise.png'),
+              width: 17,
+              height: 17),
+          const SizedBox(width: 8),
+          Expanded(
+            // 双击改主文案，长按改副标题（清空即隐藏副标题）
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: () =>
+                  _editText('修改发货承诺', _item.deliveryPromise, (v) {
+                provider.updateOrderItem(_item, deliveryPromise: v);
+              }),
+              onLongPress: () => _editText(
+                  '修改承诺副标题（清空隐藏）', _item.deliveryPromiseSub, (v) {
+                provider.updateOrderItem(_item, deliveryPromiseSub: v);
+              }),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _item.deliveryPromise.isEmpty
+                        ? '承诺48小时内发货'
+                        : _item.deliveryPromise,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF101010)),
+                  ),
+                  if (_item.deliveryPromiseSub.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        _item.deliveryPromiseSub,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF999999)),
+                      ),
+                    ),
+                ],
               ),
             ),
-            const Icon(Icons.chevron_right,
-                size: 16, color: Color(0xFF999999)),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right,
+              size: 16, color: Color(0xFF999999)),
+        ],
       ),
     );
   }
