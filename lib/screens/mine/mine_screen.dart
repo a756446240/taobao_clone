@@ -50,6 +50,12 @@ class _MineScreenState extends State<MineScreen> {
   int _farmSeconds = _farmInitSeconds;
   Timer? _farmTimer;
 
+  // v1.9.119：页面滚动控制器（下滑出吸顶栏）+ 圆圈行横向滚动（指示条联动）
+  final ScrollController _scrollCtrl = ScrollController();
+  final ScrollController _circleCtrl = ScrollController();
+  bool _showTopBar = false;
+  double _circleRatio = 0;
+
   @override
   void initState() {
     super.initState();
@@ -60,11 +66,24 @@ class _MineScreenState extends State<MineScreen> {
         if (_farmSeconds < 0) _farmSeconds = _farmInitSeconds; // 滚完自动循环
       });
     });
+    _scrollCtrl.addListener(() {
+      final show = _scrollCtrl.offset > 110;
+      if (show != _showTopBar) setState(() => _showTopBar = show);
+    });
+    _circleCtrl.addListener(() {
+      if (!_circleCtrl.hasClients) return;
+      final max = _circleCtrl.position.maxScrollExtent;
+      if (max <= 0) return;
+      setState(() =>
+          _circleRatio = (_circleCtrl.offset / max).clamp(0.0, 1.0));
+    });
   }
 
   @override
   void dispose() {
     _farmTimer?.cancel();
+    _scrollCtrl.dispose();
+    _circleCtrl.dispose();
     super.dispose();
   }
 
@@ -143,21 +162,119 @@ class _MineScreenState extends State<MineScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: ListView(
-        padding: EdgeInsets.zero,
+      body: Stack(
         children: [
-          // v1.9.118：农场横幅已收进黑框会员区（v1.9.117 重复展示问题修复）
-          // 渐变头（含黑框会员区）→ 快递/收藏/关注店铺/足迹
-          // → 我的订单 → 芭芭农场等圆圈 → 领券中心 → 推荐流
-          _buildHeaderSection(),
-          _buildToolCards(),
-          _buildOrderSection(),
-          _buildAppGrid(),
-          _buildCouponCards(),
-          _buildFeedSection(),
-          const SizedBox(height: 16),
+          ListView(
+            controller: _scrollCtrl,
+            padding: EdgeInsets.zero,
+            children: [
+              // v1.9.118：农场横幅已收进黑框会员区（v1.9.117 重复展示问题修复）
+              // 渐变头（含黑框会员区）→ 快递/收藏/关注店铺/足迹
+              // → 我的订单 → 芭芭农场等圆圈（横向翻页）→ 领券中心 → 推荐流
+              _buildHeaderSection(),
+              _buildToolCards(),
+              _buildOrderSection(),
+              _buildAppGrid(),
+              _buildCouponCards(),
+              _buildFeedSection(),
+              const SizedBox(height: 16),
+            ],
+          ),
+          // v1.9.119：下滑时吸顶栏（淘宝名字 + 地址/专属客服/设置）
+          _buildStickyBar(),
         ],
       ),
+    );
+  }
+
+  /// 下滑吸顶栏：头像+昵称 左，地址/专属客服/设置 右（对齐真实淘宝）
+  Widget _buildStickyBar() {
+    final profile = context.watch<ProfileProvider>();
+    final top = MediaQuery.of(context).padding.top;
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      top: _showTopBar ? 0 : -(top + 64),
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(14, top + 8, 14, 10),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFE0CC), Color(0xFFFFB088)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipOval(
+              child: Container(
+                width: 30,
+                height: 30,
+                color: const Color(0xFFffd180),
+                child: profile.avatar.isEmpty
+                    ? const Icon(Icons.person, color: Colors.white, size: 20)
+                    : AppImage(url: profile.avatar, width: 30, height: 30),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                profile.nickname,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            GestureDetector(
+              onTap: _gotoAddress,
+              behavior: HitTestBehavior.opaque,
+              child: _stickyBtn(
+                  icon: Icons.location_on_outlined, label: '地址'),
+            ),
+            const SizedBox(width: 16),
+            GestureDetector(
+              onTap: _openOfficialService,
+              behavior: HitTestBehavior.opaque,
+              child: _stickyBtn(
+                  asset: 'assets/icons/mine/ic_service_vip.png', label: '专属客服'),
+            ),
+            const SizedBox(width: 16),
+            GestureDetector(
+              onTap: _openSettings,
+              behavior: HitTestBehavior.opaque,
+              child: _stickyBtn(
+                  icon: Icons.settings_outlined, label: '设置'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stickyBtn({IconData? icon, String? asset, required String label}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 20,
+          child: asset != null
+              ? Image.asset(asset, height: 20, fit: BoxFit.contain)
+              : Icon(icon, size: 19, color: Colors.black87),
+        ),
+        const SizedBox(height: 2),
+        Text(label,
+            style: const TextStyle(fontSize: 10, color: Colors.black87)),
+      ],
     );
   }
 
@@ -1069,14 +1186,14 @@ class _MineScreenState extends State<MineScreen> {
   // ============ App 圆圈入口（真实淘宝图标，素材库 icons/） ============
   // 单击进入对应频道落地页（复用首页金刚区的 ChannelScreen）
   Widget _buildAppGrid() {
-    // v1.9.118：圆圈行换真淘宝高清贴图（图标+文字一体抠自真淘宝截图，
-    // App 不再渲染文字——旧 assets/images/icons 下的 PNG 自带文字导致双标签）
+    // v1.9.119：横向翻页（第 2 页露出游戏中心）+ 橙色滚动指示条（对齐真实淘宝）
     final apps = [
       ('芭芭农场', 'assets/icons/mine/cir_farm.png'),
       ('领淘金币', 'assets/icons/mine/cir_coin.png'),
       ('红包签到', 'assets/icons/mine/cir_redpacket.png'),
-      ('连连消', 'assets/icons/mine/cir_lianxiao.png'),
+      ('连连消', 'assets/icons/mine/cir_lianlian.png'),
       ('试用领取', 'assets/icons/mine/cir_tryout.png'),
+      ('游戏中心', 'assets/icons/mine/cir_game.png'),
     ];
     // 频道页入口沿用原 HomeIconEntry（图标在频道页内单独展示）
     HomeIconEntry entryOf(String title) {
@@ -1093,31 +1210,77 @@ class _MineScreenState extends State<MineScreen> {
         case '连连消':
           return const HomeIconEntry(
               '连连消', '消', 0xFFa855f7, 'assets/images/icons/lianlian.png');
+        case '游戏中心':
+          return const HomeIconEntry(
+              '游戏中心', '游', 0xFFf97316, 'assets/images/icons/game.png');
         default:
           return const HomeIconEntry(
               '试用领取', 'U', 0xFFef4444, 'assets/images/icons/tryout.png');
       }
     }
 
+    final itemWidth = (MediaQuery.of(context).size.width - 24) / 5;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(top: 8, bottom: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: apps.map((a) => Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => ChannelScreen(entry: entryOf(a.$1))),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 62,
+            child: ListView.builder(
+              controller: _circleCtrl,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: apps.length,
+              itemBuilder: (_, i) {
+                final a = apps[i];
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => ChannelScreen(entry: entryOf(a.$1))),
+                  ),
+                  child: SizedBox(
+                    width: itemWidth,
+                    child: Image.asset(a.$2, height: 58, fit: BoxFit.contain),
+                  ),
+                );
+              },
             ),
-            child: Image.asset(a.$2, height: 58, fit: BoxFit.contain),
           ),
-        )).toList(),
+          const SizedBox(height: 4),
+          // 橙色滚动指示条（对齐真实淘宝：灰轨 + 橙拇指随滚动移动）
+          SizedBox(
+            width: 36,
+            height: 4,
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8E8E8),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Positioned(
+                  left: 18 * _circleRatio,
+                  top: 0,
+                  bottom: 0,
+                  width: 18,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5000),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
