@@ -28,7 +28,7 @@ class MessageScreen extends StatefulWidget {
 }
 
 class _MessageScreenState extends State<MessageScreen> {
-  late final List<_HistoryMsg> _history;
+  late List<_HistoryMsg> _history = [];
   final _rand = Random();
 
   /// 会话搜索
@@ -87,11 +87,32 @@ class _MessageScreenState extends State<MessageScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCustomAvatars();
-    _history = _generateHistory();
+    _init();
+  }
+
+  /// v1.9.116：初始化改为「先读持久化会话列表，没有再随机生成」。
+  /// 旧版每次启动都 _generateHistory() 全量重摇——换过的头像对应的店铺
+  /// 下次启动可能直接不在列表里、删掉的会话也会复活，用户看到的就是
+  /// 「头像不能更新不保留」。现在会话列表落 SP，增删改全部持久化。
+  Future<void> _init() async {
+    await _loadCustomAvatars();
+    final saved = await _loadHistory();
+    if (saved != null && saved.isNotEmpty) {
+      _history = saved;
+    } else {
+      _history = _generateHistory();
+      _saveHistory();
+    }
+    // 回填自定义头像（会话列表确定后统一做）
+    for (final m in _history) {
+      final custom = _customAvatars[m.shopName];
+      if (custom != null) m.avatarUrl = custom;
+    }
+    if (mounted) setState(() {});
   }
 
   static const _avatarPrefKey = 'message_custom_avatars';
+  static const _historyPrefKey = 'message_history_v2';
   final Map<String, String> _customAvatars = {};
 
   /// 读取已保存的自定义头像（按店铺名持久化，重启不丢）
@@ -111,14 +132,50 @@ class _MessageScreenState extends State<MessageScreen> {
         final resolved = '${saveDir.path}/$name';
         if (File(resolved).existsSync()) _customAvatars[k] = resolved;
       });
-      // v1.9.102：加载完成后回填已生成会话的头像——_history 在 initState
-      // 同步生成时自定义头像尚未读完，不回填的话重启后手动换的头像"消失"
-      for (final m in _history) {
-        final custom = _customAvatars[m.shopName];
-        if (custom != null) m.avatarUrl = custom;
-      }
-      if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  /// 会话列表持久化：店铺/消息/日期/未读/颜色全存，重启原样恢复
+  Future<void> _saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = [
+        for (final m in _history)
+          {
+            'shop': m.shopName,
+            'msg': m.message,
+            'date': m.date,
+            'unread': m.unread,
+            'color': m.color.value,
+          }
+      ];
+      await prefs.setString(_historyPrefKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  Future<List<_HistoryMsg>?> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_historyPrefKey);
+      if (raw == null || raw.isEmpty) return null;
+      final list = jsonDecode(raw) as List;
+      return [
+        for (final e in list)
+          if (e is Map)
+            _HistoryMsg(
+              shopName: e['shop']?.toString() ?? '',
+              message: e['msg']?.toString() ?? '',
+              date: e['date']?.toString() ?? '',
+              unread: e['unread'] == true,
+              color: Color(e['color'] is int
+                  ? e['color'] as int
+                  : 0xFFFF5000),
+              avatarUrl: '',
+            )
+      ];
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _saveCustomAvatars() async {
@@ -195,6 +252,7 @@ class _MessageScreenState extends State<MessageScreen> {
   }) {
     if (markRead != null && markRead.unread) {
       setState(() => markRead.unread = false);
+      _saveHistory();
     }
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -705,6 +763,7 @@ class _MessageScreenState extends State<MessageScreen> {
 
   void _markRead(_HistoryMsg m) {
     setState(() => m.unread = false);
+    _saveHistory();
   }
 
   void _deleteHistory(_HistoryMsg m) {
@@ -720,7 +779,9 @@ class _MessageScreenState extends State<MessageScreen> {
           ),
           TextButton(
             onPressed: () {
+              // v1.9.116：删除同步落盘，重启后不再复活
               setState(() => _history.remove(m));
+              _saveHistory();
               Navigator.of(ctx).pop();
             },
             child: const Text('删除', style: TextStyle(color: Colors.red)),
