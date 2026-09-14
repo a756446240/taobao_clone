@@ -109,6 +109,15 @@ class CartProvider extends ChangeNotifier {
   /// 判断订单号是否在已删除黑名单里
   bool isTradeNoDeleted(String orderNo) => _deletedTradeNos.contains(orderNo);
 
+  /// 已删除黑名单快照（导出备份用，v1.9.116）
+  List<String> get deletedTradeNos => _deletedTradeNos.toList();
+
+  /// 从备份恢复已删除黑名单（合并去重后落盘，v1.9.116）
+  void restoreDeletedTradeNos(Iterable<String> orderNos) {
+    _markDeleted(orderNos);
+    notifyListeners();
+  }
+
   /// 把订单号记入已删除黑名单并持久化
   void _markDeleted(Iterable<String> orderNos) {
     var changed = false;
