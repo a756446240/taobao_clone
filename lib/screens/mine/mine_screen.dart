@@ -215,17 +215,7 @@ class _MineScreenState extends State<MineScreen> {
         ),
         child: Row(
           children: [
-            ClipOval(
-              child: Container(
-                width: 30,
-                height: 30,
-                color: const Color(0xFFffd180),
-                child: profile.avatar.isEmpty
-                    ? const Icon(Icons.person, color: Colors.white, size: 20)
-                    : AppImage(url: profile.avatar, width: 30, height: 30),
-              ),
-            ),
-            const SizedBox(width: 8),
+            // v1.9.120：吸顶栏不带头像（用户要求，对齐真实淘宝只留名字+按钮）
             Expanded(
               child: Text(
                 profile.nickname,
