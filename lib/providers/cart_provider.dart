@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -1121,6 +1122,24 @@ class CartProvider extends ChangeNotifier {
     _shops.removeWhere((shop) => shop.items.isEmpty);
     _persist();
     notifyListeners();
+  }
+
+  /// v1.9.127：克隆订单——整店卡片 JSON 往返深拷贝，分配新订单号，
+  /// 插入列表顶部并持久化。返回克隆出的店铺（便于跳转到它的详情页继续编辑）
+  ShoppingCartShop cloneShop(ShoppingCartShop shop) {
+    final cloned = PersistenceService.shopFromJson(
+      jsonDecode(jsonEncode(PersistenceService.shopToJson(shop)))
+          as Map<String, dynamic>,
+    );
+    final rng = Random();
+    for (final it in cloned.items) {
+      it.orderNo =
+          '5127${List.generate(15, (_) => rng.nextInt(10)).join()}';
+    }
+    _shops.insert(0, cloned);
+    _persist();
+    notifyListeners();
+    return cloned;
   }
 
   /// 删除整单（订单管理页左滑删除）
