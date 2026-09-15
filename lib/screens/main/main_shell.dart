@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/theme/app_icons.dart';
 import '../../providers/cart_provider.dart';
 import '../cart/cart_screen.dart';
 import '../home/home_screen.dart';
@@ -56,85 +55,104 @@ class _MainShellState extends State<MainShell> {
           return const SizedBox.shrink();
         }),
       ),
+      // v1.9.123：底栏按真实淘宝重做——图标全部换真淘宝截图抠取的高清贴图
+      // （132px 透明画布），未激活黑线 / 激活橙色，购物车保留动态角标
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(
-            top: BorderSide(color: Color(0xFFF2F2F2), width: 0.5),
+            top: BorderSide(color: Color(0xFFF0F0F0), width: 0.5),
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() {
-            _currentIndex = index;
-            _visited.add(index);
-          }),
-          elevation: 0,
-          backgroundColor: Colors.white,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(AppIcons.home),
-              activeIcon: const Icon(AppIcons.homeActive),
-              label: '首页',
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 50,
+            child: Row(
+              children: [
+                _tab(0, 'tab_home', '首页'),
+                _tab(1, 'tab_video', '视频'),
+                _tab(2, 'tab_msg', '消息'),
+                _tab(3, 'tab_cart', '购物车', badge: cartCount),
+                _tab(4, 'tab_mine', '我的淘宝'),
+              ],
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(AppIcons.weTao),
-              activeIcon: Icon(AppIcons.weTaoFill),
-              label: '视频',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(AppIcons.message),
-              activeIcon: Icon(AppIcons.messageFill),
-              label: '消息',
-            ),
-            BottomNavigationBarItem(
-              icon: _CartIcon(count: cartCount, icon: AppIcons.cart),
-              activeIcon: _CartIcon(count: cartCount, icon: AppIcons.cartFill),
-              label: '购物车',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(AppIcons.my),
-              activeIcon: Icon(AppIcons.myFill),
-              label: '我的淘宝',
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
-}
 
-class _CartIcon extends StatelessWidget {
-  final int count;
-  final IconData icon;
-
-  const _CartIcon({required this.count, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Icon(icon),
-        if (count > 0)
-          Positioned(
-            right: -10,
-            top: -6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              constraints: const BoxConstraints(minWidth: 16),
-              child: Text(
-                count > 99 ? '99+' : '$count',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 10),
+  /// 单个 Tab：25px 贴图图标 + 10px 标签（激活橙色）
+  Widget _tab(int index, String iconName, String label, {int badge = 0}) {
+    final active = _currentIndex == index;
+    final asset = active
+        ? 'assets/images/tabbar/${iconName}_active.png'
+        : 'assets/images/tabbar/$iconName.png';
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() {
+          _currentIndex = index;
+          _visited.add(index);
+        }),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Image.asset(
+                  asset,
+                  height: 25,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.circle_outlined,
+                    size: 24,
+                    color: active
+                        ? const Color(0xFFFF5000)
+                        : Colors.black87,
+                  ),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    right: -12,
+                    top: -5,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF5000),
+                        borderRadius: BorderRadius.circular(9),
+                        border:
+                            Border.all(color: Colors.white, width: 1),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 17),
+                      child: Text(
+                        badge > 99 ? '99+' : '$badge',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: active
+                    ? const Color(0xFFFF5000)
+                    : const Color(0xFF1A1A1A),
+                fontWeight:
+                    active ? FontWeight.w500 : FontWeight.normal,
               ),
             ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
