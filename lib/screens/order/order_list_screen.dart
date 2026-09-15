@@ -3330,6 +3330,15 @@ class _ShortcutsSheet extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(items[i].$2,
                       style: const TextStyle(
+                          fontSize: 12, color: Colors.black87)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
 
 // ============ v1.9.122：真实淘宝同款订单搜索页 ============
 // 入口：订单列表顶栏搜索框（双击「筛选」按钮在经典/新版间切换）。
