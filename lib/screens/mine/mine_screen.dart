@@ -606,11 +606,13 @@ class _MineScreenState extends State<MineScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
-          // v1.9.123 立顶卡：投影加深，浮在黑框上缘更有立体感
+          // v1.9.124 立顶卡：深棕底上 0.30 黑影几乎不可见——
+          // 加深到 0.55 + 大模糊 + 扩散，白卡明显浮在黑框上缘
           BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.55),
+            blurRadius: 18,
+            spreadRadius: 1,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
