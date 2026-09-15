@@ -3330,3 +3330,919 @@ class _ShortcutsSheet extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(items[i].$2,
                       style: const TextStyle(
+
+// ============ v1.9.122：真实淘宝同款订单搜索页 ============
+// 入口：订单列表顶栏搜索框（双击「筛选」按钮在经典/新版间切换）。
+// 结构对齐真实淘宝：搜索栏（全部▾ + 输入框 + 筛选icon + 橙色搜索按钮）、
+// 历史搜索 chips、历史搜过的订单横滑、常买推荐/常买好店；
+// 输入时出联想（匹配商品 + 关键词橙色高亮）；提交后结果页
+// （全部/购物N/闪购/飞猪 tab + 时间排序 + 订单卡片复用 _OrderCard）。
+class OrderSearchScreen extends StatefulWidget {
+  const OrderSearchScreen({super.key});
+
+  @override
+  State<OrderSearchScreen> createState() => _OrderSearchScreenState();
+}
+
+class _OrderSearchScreenState extends State<OrderSearchScreen> {
+  static const _kHistoryKey = 'order_search_history_v1';
+  static const _kSeenKey = 'order_search_seen_v1';
+  static const _scopes = ['全部', '商品名', '订单号', '店铺名'];
+
+  final TextEditingController _ctrl = TextEditingController();
+  final FocusNode _focus = FocusNode();
+
+  String _scope = '全部';
+  bool _results = false; // false=搜索首页/联想  true=结果页
+  String _keyword = '';
+  int _resultTab = 0; // 0全部 1购物 2闪购 3飞猪
+  bool _timeDesc = true; // 时间排序：默认最新在前
+
+  List<String> _history = [];
+  List<Map<String, dynamic>> _seen = []; // {t:标题, i:图, ts:毫秒}
+  int _recTab = 0; // 0常买推荐 1常买好店
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+    // 进入页面自动弹键盘（对齐真实淘宝）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  Future<void> _loadPrefs() async {
+    final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _history = p.getStringList(_kHistoryKey) ?? [];
+      final raw = p.getString(_kSeenKey);
+      if (raw != null && raw.isNotEmpty) {
+        try {
+          _seen = (jsonDecode(raw) as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        } catch (_) {
+          _seen = [];
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// 全部订单店铺（排除购物车条目，与订单列表口径一致）
+  List<ShoppingCartShop> _orderShops() {
+    return context
+        .read<CartProvider>()
+        .shops
+        .where((s) => !s.orderSubStatus.contains('购物车'))
+        .toList();
+  }
+
+  bool _itemMatches(ShoppingCartShop shop, OrderItem it, String q) {
+    switch (_scope) {
+      case '商品名':
+        return it.title.toLowerCase().contains(q);
+      case '订单号':
+        return it.orderNo.toLowerCase().contains(q) ||
+            it.alipayTradeNo.toLowerCase().contains(q);
+      case '店铺名':
+        return shop.shopName.toLowerCase().contains(q);
+      case '全部':
+      default:
+        return it.title.toLowerCase().contains(q) ||
+            it.configuration.toLowerCase().contains(q) ||
+            it.orderNo.toLowerCase().contains(q) ||
+            shop.shopName.toLowerCase().contains(q);
+    }
+  }
+
+  /// 关键词匹配的 店铺+命中商品 分组
+  List<_ShopView> _matchGroups(String kw) {
+    final q = kw.trim().toLowerCase();
+    if (q.isEmpty) return [];
+    final out = <_ShopView>[];
+    for (final s in _orderShops()) {
+      final items = s.items.where((it) => _itemMatches(s, it, q)).toList();
+      if (items.isNotEmpty) out.add(_ShopView(s, items));
+    }
+    return out;
+  }
+
+  Future<void> _saveHistory(String kw) async {
+    final p = await SharedPreferences.getInstance();
+    _history.remove(kw);
+    _history.insert(0, kw);
+    if (_history.length > 10) _history = _history.sublist(0, 10);
+    await p.setStringList(_kHistoryKey, _history);
+  }
+
+  Future<void> _saveSeen(List<_ShopView> groups) async {
+    final p = await SharedPreferences.getInstance();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final g in groups) {
+      for (final it in g.items.take(2)) {
+        _seen.removeWhere((e) => e['t'] == it.title);
+        _seen.insert(0, {'t': it.title, 'i': it.imageUrl, 'ts': now});
+      }
+    }
+    if (_seen.length > 20) _seen = _seen.sublist(0, 20);
+    await p.setString(_kSeenKey, jsonEncode(_seen));
+  }
+
+  void _submit([String? kw]) {
+    final k = (kw ?? _ctrl.text).trim();
+    if (k.isEmpty) return;
+    if (kw != null) _ctrl.text = kw;
+    final groups = _matchGroups(k);
+    setState(() {
+      _keyword = k;
+      _results = true;
+      _resultTab = 0;
+    });
+    _focus.unfocus();
+    _saveHistory(k);
+    if (groups.isNotEmpty) _saveSeen(groups);
+  }
+
+  String _seenLabel(dynamic ts) {
+    final t = ts is int ? ts : int.tryParse('$ts') ?? 0;
+    if (t <= 0) return '近期搜过';
+    final d = DateTime.now()
+        .difference(DateTime.fromMillisecondsSinceEpoch(t))
+        .inDays;
+    if (d <= 0) return '今天搜过';
+    if (d == 1) return '昨天搜过';
+    return '$d天前搜过';
+  }
+
+  String _fmtP(double p) =>
+      p == p.roundToDouble() ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
+
+  /// 关键词橙色高亮（对齐真实淘宝联想）
+  Widget _hl(String text, String q, {TextStyle? style}) {
+    if (q.isEmpty) {
+      return Text(text,
+          style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+    }
+    final lower = text.toLowerCase();
+    final ql = q.toLowerCase();
+    final spans = <TextSpan>[];
+    var i = 0;
+    while (true) {
+      final j = lower.indexOf(ql, i);
+      if (j < 0) {
+        spans.add(TextSpan(text: text.substring(i)));
+        break;
+      }
+      if (j > i) spans.add(TextSpan(text: text.substring(i, j)));
+      spans.add(TextSpan(
+          text: text.substring(j, j + q.length),
+          style: const TextStyle(color: Color(0xFFFF5000))));
+      i = j + q.length;
+    }
+    return Text.rich(TextSpan(style: style, children: spans),
+        maxLines: 1, overflow: TextOverflow.ellipsis);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            if (_results) _buildResultTabs(),
+            Expanded(
+              child: _results
+                  ? _buildResults()
+                  : _ctrl.text.trim().isNotEmpty
+                      ? _buildSuggestions()
+                      : _buildHome(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 顶部搜索栏（全部▾ + 输入 + 筛选icon + 橙搜索按钮） ============
+  Widget _buildSearchBar() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              if (_results) {
+                // 结果页返回 → 回到搜索编辑态（再点返回才退出）
+                setState(() => _results = false);
+                _focus.requestFocus();
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.arrow_back_ios,
+                  color: Colors.black87, size: 20),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border:
+                    Border.all(color: const Color(0xFFFF5000), width: 1),
+                borderRadius: BorderRadius.circular(19),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: _pickScope,
+                    behavior: HitTestBehavior.opaque,
+                    child: Row(
+                      children: [
+                        Text(_scope,
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.black87)),
+                        const Icon(Icons.keyboard_arrow_down,
+                            size: 16, color: Color(0xFF999999)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                      width: 0.5,
+                      height: 18,
+                      color: const Color(0xFFDDDDDD),
+                      margin: const EdgeInsets.symmetric(horizontal: 8)),
+                  Expanded(
+                    child: TextField(
+                      controller: _ctrl,
+                      focusNode: _focus,
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _submit(),
+                      textInputAction: TextInputAction.search,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black87),
+                      decoration: const InputDecoration(
+                        hintText: '商品名/订单号/快递号',
+                        hintStyle: TextStyle(
+                            color: Color(0xFFBBBBBB), fontSize: 13),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
+                  if (_ctrl.text.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => setState(() => _ctrl.clear()),
+                      child: const Icon(Icons.cancel,
+                          size: 16, color: Color(0xFFCCCCCC)),
+                    ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.filter_list,
+                      size: 18, color: Color(0xFF999999)),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _submit(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF5000),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Text('搜索',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500)),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _pickScope() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+                padding: EdgeInsets.all(14),
+                child: Text('搜索范围',
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600))),
+            for (final s in _scopes)
+              ListTile(
+                dense: true,
+                title: Text(s,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: s == _scope
+                            ? const Color(0xFFFF5000)
+                            : Colors.black87)),
+                trailing: s == _scope
+                    ? const Icon(Icons.check,
+                        color: Color(0xFFFF5000), size: 18)
+                    : null,
+                onTap: () {
+                  setState(() => _scope = s);
+                  Navigator.pop(ctx);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============ 搜索首页（历史搜索 / 历史搜过的订单 / 常买推荐·好店） ============
+  Widget _buildHome() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
+      children: [
+        if (_history.isNotEmpty) ...[
+          _sectionTitle('历史搜索', onClear: () async {
+            final p = await SharedPreferences.getInstance();
+            await p.remove(_kHistoryKey);
+            setState(() => _history = []);
+          }),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final k in _history)
+                GestureDetector(
+                  onTap: () => _submit(k),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(15)),
+                    child: Text(k,
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.black87)),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+        if (_seen.isNotEmpty) ...[
+          _sectionTitle('历史搜过的订单', onClear: () async {
+            final p = await SharedPreferences.getInstance();
+            await p.remove(_kSeenKey);
+            setState(() => _seen = []);
+          }),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _seen.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, i) {
+                final e = _seen[i];
+                return GestureDetector(
+                  onTap: () => _submit((e['t'] ?? '').toString()),
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: AppImage(
+                            url: (e['i'] ?? '').toString(),
+                            width: 88,
+                            height: 88),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(_seenLabel(e['ts']),
+                          style: const TextStyle(
+                              fontSize: 10, color: Color(0xFF999999))),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        Row(
+          children: [
+            _recTabBtn('常买推荐', 0),
+            const SizedBox(width: 24),
+            _recTabBtn('常买好店', 1),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (_recTab == 0) ..._buildRecGoods() else ..._buildRecShops(),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String t, {VoidCallback? onClear}) {
+    return Row(
+      children: [
+        Text(t,
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1A1A))),
+        const Spacer(),
+        if (onClear != null)
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(Icons.delete_outline,
+                size: 18, color: Color(0xFF999999)),
+          ),
+      ],
+    );
+  }
+
+  Widget _recTabBtn(String t, int idx) {
+    final active = _recTab == idx;
+    return GestureDetector(
+      onTap: () => setState(() => _recTab = idx),
+      child: Column(
+        children: [
+          Text(t,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                  color: active
+                      ? const Color(0xFFFF5000)
+                      : Colors.black87)),
+          const SizedBox(height: 3),
+          Container(
+              width: 20,
+              height: 2.5,
+              decoration: BoxDecoration(
+                  color: active
+                      ? const Color(0xFFFF5000)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2))),
+        ],
+      ),
+    );
+  }
+
+  /// 常买推荐：按标题聚合全订单商品，购买次数降序
+  List<Widget> _buildRecGoods() {
+    final agg = <String, Map<String, dynamic>>{};
+    for (final s in _orderShops()) {
+      for (final it in s.items) {
+        final e = agg.putIfAbsent(it.title, () => {'it': it, 'n': 0});
+        e['n'] = (e['n'] as int) + it.quantity;
+      }
+    }
+    final list = agg.values.toList()
+      ..sort((a, b) => (b['n'] as int).compareTo(a['n'] as int));
+    if (list.isEmpty) {
+      return [
+        const Padding(
+            padding: EdgeInsets.symmetric(vertical: 30),
+            child: Center(
+                child: Text('暂无常买商品',
+                    style: TextStyle(
+                        fontSize: 12, color: Color(0xFFBBBBBB)))))
+      ];
+    }
+    return [
+      for (final e in list.take(8))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: AppImage(
+                    url: (e['it'] as OrderItem).imageUrl,
+                    width: 64,
+                    height: 64),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text((e['it'] as OrderItem).title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF1A1A1A))),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                            '¥${_fmtP((e['it'] as OrderItem).price)}',
+                            style: const TextStyle(
+                                color: Color(0xFFFF5000),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        Text('买过${e['n']}次',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF999999))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
+
+  /// 常买好店：店铺头像 + 名称 + 88VIP好评率 + 买过N次 + 进店
+  List<Widget> _buildRecShops() {
+    final shops = _orderShops();
+    if (shops.isEmpty) {
+      return [
+        const Padding(
+            padding: EdgeInsets.symmetric(vertical: 30),
+            child: Center(
+                child: Text('暂无常买店铺',
+                    style: TextStyle(
+                        fontSize: 12, color: Color(0xFFBBBBBB)))))
+      ];
+    }
+    return [
+      for (final s in shops.take(8))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            children: [
+              ClipOval(
+                child: s.shopAvatar.isNotEmpty
+                    ? AppImage(url: s.shopAvatar, width: 44, height: 44)
+                    : Container(
+                        width: 44,
+                        height: 44,
+                        color: const Color(0xFFB23A2E),
+                        alignment: Alignment.center,
+                        child: Text(
+                            s.shopName.isEmpty
+                                ? '店'
+                                : s.shopName.substring(0, 1),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 18))),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.shopName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1A1A1A))),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Text('88VIP好评率99%',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFFF5000))),
+                        const SizedBox(width: 8),
+                        Text(
+                            '买过${s.items.fold(0, (sum, it) => sum + it.quantity)}次',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF999999))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =>
+                        ShopHomeScreen(shopName: s.shopName))),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                      border:
+                          Border.all(color: const Color(0xFFDDDDDD)),
+                      borderRadius: BorderRadius.circular(14)),
+                  child: const Text('进店',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.black87)),
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+  }
+
+  // ============ 输入联想（匹配商品 + 关键词高亮） ============
+  Widget _buildSuggestions() {
+    final q = _ctrl.text.trim();
+    final ql = q.toLowerCase();
+    final matched = <(ShoppingCartShop, OrderItem)>[];
+    for (final s in _orderShops()) {
+      for (final it in s.items) {
+        if (_itemMatches(s, it, ql)) matched.add((s, it));
+        if (matched.length >= 3) break;
+      }
+      if (matched.length >= 3) break;
+    }
+    // 关键词联想：历史 + 店铺名 + 命中商品标题
+    final kws = <String>[];
+    for (final h in _history) {
+      if (h.toLowerCase().contains(ql) && h != q && !kws.contains(h)) {
+        kws.add(h);
+      }
+    }
+    for (final s in _orderShops()) {
+      if (s.shopName.toLowerCase().contains(ql) &&
+          !kws.contains(s.shopName)) {
+        kws.add(s.shopName);
+      }
+    }
+    for (final (_, it) in matched) {
+      if (it.title.toLowerCase().contains(ql) &&
+          !kws.contains(it.title) &&
+          kws.length < 8) {
+        kws.add(it.title);
+      }
+    }
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      children: [
+        const SizedBox(height: 4),
+        for (final (s, it) in matched)
+          GestureDetector(
+            onTap: () => _submit(),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 9),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: AppImage(
+                        url: it.imageUrl, width: 44, height: 44),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _hl(it.title, q,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF1A1A1A))),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            if (it.configuration.isNotEmpty)
+                              Flexible(
+                                child: Text(it.configuration,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF999999))),
+                              ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(s.shopName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF999999))),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      size: 18, color: Color(0xFFCCCCCC)),
+                ],
+              ),
+            ),
+          ),
+        for (final k in kws.take(6))
+          GestureDetector(
+            onTap: () => _submit(k),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(AppIcons.search,
+                      size: 16, color: Color(0xFFBBBBBB)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _hl(k, q,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A)))),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ============ 结果页（全部/购物N/闪购/飞猪 + 时间排序） ============
+  Widget _buildResultTabs() {
+    final n = _matchGroups(_keyword)
+        .fold(0, (sum, g) => sum + g.items.length);
+    final labels = ['全部', '购物${n > 0 ? ' $n' : ''}', '闪购', '飞猪'];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) _rtTab(labels[i], i),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => setState(() => _timeDesc = !_timeDesc),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 10),
+              child: Row(
+                children: [
+                  Text('时间',
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: _timeDesc
+                              ? Colors.black87
+                              : const Color(0xFFFF5000))),
+                  const Icon(Icons.swap_vert,
+                      size: 15, color: Colors.black87),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rtTab(String label, int idx) {
+    final active = _resultTab == idx;
+    return GestureDetector(
+      onTap: () => setState(() => _resultTab = idx),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:
+                        active ? FontWeight.w600 : FontWeight.normal,
+                    color: active
+                        ? const Color(0xFFFF5000)
+                        : Colors.black87)),
+            const SizedBox(height: 3),
+            Container(
+                width: 18,
+                height: 2.5,
+                decoration: BoxDecoration(
+                    color: active
+                        ? const Color(0xFFFF5000)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _actionTextOf(ShoppingCartShop shop) {
+    final st = shop.orderSubStatus;
+    if (st.contains('待付款') || st.contains('等待付款')) return '去支付';
+    if (st.contains('待发货') || st.contains('等待发货')) return '提醒发货';
+    if (st.contains('评价') && !st.contains('退款') && !st.contains('售后')) {
+      return '评价';
+    }
+    if (st.contains('已发货') ||
+        st.contains('运输中') ||
+        st.contains('派送中') ||
+        st.contains('签收')) {
+      return '确认收货';
+    }
+    return '查看详情';
+  }
+
+  Widget _buildResults() {
+    // 闪购/飞猪：购物频道外的订单不参与（对齐真实淘宝分频道）
+    if (_resultTab == 2 || _resultTab == 3) {
+      return _emptyHint('暂无相关订单');
+    }
+    final groups = _matchGroups(_keyword);
+    if (groups.isEmpty) return _emptyHint('未找到相关订单');
+    // 时间排序（付款时间优先，其次创建时间，字符串近似时间序）
+    String tOf(_ShopView g) {
+      final it = g.items.first;
+      return it.payTime.isNotEmpty ? it.payTime : it.createTime;
+    }
+
+    groups.sort((a, b) =>
+        _timeDesc ? tOf(b).compareTo(tOf(a)) : tOf(a).compareTo(tOf(b)));
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      child: ListView.builder(
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
+        itemCount: groups.length,
+        itemBuilder: (_, i) => _OrderCard(
+          shop: groups[i].shop,
+          items: groups[i].items,
+          actionText: _actionTextOf(groups[i].shop),
+          onEditItem: (item) => _editItem(groups[i].shop, item),
+          onDetail: (item) => _gotoDetail(groups[i].shop, item),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyHint(String msg) {
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      width: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.inbox_outlined,
+              size: 72, color: Color(0xFFC4C4C4)),
+          const SizedBox(height: 12),
+          Text(msg,
+              style: const TextStyle(
+                  fontSize: 13, color: Color(0xFF999999))),
+          const SizedBox(height: 6),
+          const Text('换个商品关键词或店铺名试试',
+              style: TextStyle(fontSize: 11, color: Color(0xFFBBBBBB))),
+        ],
+      ),
+    );
+  }
+
+  // ============ 进入订单/退款详情、编辑菜单（与订单列表同一套逻辑） ============
+  void _gotoDetail(ShoppingCartShop shop, OrderItem item) {
+    final isRefund = shop.orderSubStatus.contains('退款') ||
+        shop.orderSubStatus.contains('售后');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => isRefund
+            ? RefundDetailScreen(shop: shop, item: item)
+            : OrderDetailScreen(shop: shop, item: item),
+      ),
+    );
+  }
+
+  void _editItem(ShoppingCartShop shop, OrderItem item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) =>
+          _OrderEditSheet(shop: shop, item: item, parentContext: context),
+    );
+  }
+}
