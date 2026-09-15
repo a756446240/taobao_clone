@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../providers/cart_provider.dart';
 import '../cart/cart_screen.dart';
 import '../home/home_screen.dart';
 import '../message/message_screen.dart';
@@ -42,8 +40,6 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final cartCount = context.watch<CartProvider>().selectedCount;
-
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -56,7 +52,9 @@ class _MainShellState extends State<MainShell> {
         }),
       ),
       // v1.9.123：底栏按真实淘宝重做——图标全部换真淘宝截图抠取的高清贴图
-      // （132px 透明画布），未激活黑线 / 激活橙色，购物车保留动态角标
+      // （132px 透明画布），未激活黑线 / 激活橙色
+      // v1.9.128：角标对齐 13:16 真淘宝截图——消息挂 72（硬编码，同 ⋯67 先例），
+      // 购物车无角标（真淘宝截图该位置无角标，原 selectedCount 动态角标移除）
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -72,8 +70,8 @@ class _MainShellState extends State<MainShell> {
               children: [
                 _tab(0, 'tab_home', '首页'),
                 _tab(1, 'tab_video', '视频'),
-                _tab(2, 'tab_msg', '消息'),
-                _tab(3, 'tab_cart', '购物车', badge: cartCount),
+                _tab(2, 'tab_msg', '消息', badge: 72),
+                _tab(3, 'tab_cart', '购物车'),
                 _tab(4, 'tab_mine', '我的淘宝'),
               ],
             ),
