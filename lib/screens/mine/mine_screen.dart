@@ -576,7 +576,7 @@ class _MineScreenState extends State<MineScreen> {
                   ),
                 ),
               ),
-              // 与白卡底边错开：白卡 top12+高56=68，权益行从 16+26+26=68 起
+              // v1.9.127 白卡探出后底边在黑框内 y≈50，权益行 16+26+26=68 起，不重叠
               const SizedBox(height: 26),
               _buildWalletRowInDark(),
               const SizedBox(height: 12),
@@ -584,15 +584,19 @@ class _MineScreenState extends State<MineScreen> {
             ],
           ),
         ),
-        // 白卡：黑框内部右上（不探出黑框），垂直对齐「本月已省」行
-        // v1.9.126：白卡左上角外侧加折纸三角瓣，对齐真实淘宝 88VIP 黑框折角
+        // 白卡：右上，顶部探出黑框上缘 6pt（16:01 真淘宝实测）——
+        // 白卡像一张纸插在黑框槽里，探出部分 + 左上角卡其三角 = 折纸效果。
+        // v1.9.126 的「白卡整体收在黑框内 + 内部三角」被用户否了（没有折纸感），
+        // 关键不是三角大小而是【探出+三角填补凹槽】的结构
         Positioned(
-          top: 12,
+          top: 0, // 黑框 margin-top 6 → 白卡探出黑框上缘 6pt
           right: 12,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
               _memberWhiteCard(),
+              // 折角三角：填补白卡顶缘与黑框顶缘之间的凹槽，
+              // 直角在右下，竖直边贴白卡左缘（高度=探出量 6pt）
               const Positioned(
                 left: -8,
                 top: 0,
@@ -1874,15 +1878,16 @@ class _WalletItem {
   _WalletItem(this.label, this.value, this.color);
 }
 
-/// v1.9.126 折纸三角瓣：白卡左上角外侧的折角（对齐真实淘宝 88VIP 黑框）
-/// 实测几何：直角在右下，竖直直角边贴白卡左缘，卡其色 #877554
+/// v1.9.127 折纸三角瓣：白卡探出黑框上缘后，填补白卡顶缘与黑框顶缘凹槽的折角
+/// 实测几何（16:01 真淘宝）：直角在右下，竖直直角边贴白卡左缘（高=探出量 6pt），
+/// 水平直角边落在黑框顶缘上（宽 8pt），卡其色 #9E8D62（截图像素采样）
 class _FoldCorner extends StatelessWidget {
   const _FoldCorner();
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      size: const Size(8, 10),
+      size: const Size(8, 6),
       painter: _FoldCornerPainter(),
     );
   }
@@ -1891,11 +1896,11 @@ class _FoldCorner extends StatelessWidget {
 class _FoldCornerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF877554);
+    final paint = Paint()..color = const Color(0xFF9E8D62);
     final path = Path()
-      ..moveTo(size.width, 0) // 上右（贴白卡左缘顶端）
-      ..lineTo(size.width, size.height) // 下右（直角）
-      ..lineTo(0, size.height) // 下左
+      ..moveTo(size.width, 0) // 上右（白卡左上角顶点）
+      ..lineTo(size.width, size.height) // 下右（直角，黑框顶缘与白卡左缘交点）
+      ..lineTo(0, size.height) // 下左（黑框顶缘上）
       ..close();
     canvas.drawPath(path, paint);
   }
