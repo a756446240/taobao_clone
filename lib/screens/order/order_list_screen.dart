@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
@@ -40,6 +42,11 @@ class _OrderListScreenState extends State<OrderListScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchCtrl = TextEditingController();
   String _query = '';
+
+  /// v1.9.122：搜索样式开关——false=经典内联搜索框（默认，原功能保留）；
+  /// true=真实淘宝同款订单搜索页（双击「筛选」按钮来回切换，偏好持久化）
+  bool _useNewSearch = false;
+  static const _kSearchStyleKey = 'order_search_style_new';
 
   /// 顶部频道：全部订单 / 购物 / 闪购(外卖) / 飞猪(旅行)（撑满整宽，指示条滑动切换）
   static const _channels = ['全部订单', '购物', '闪购', '飞猪'];
@@ -116,6 +123,26 @@ class _OrderListScreenState extends State<OrderListScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<CartProvider>().sweepAutoConfirm();
     });
+    // v1.9.122：恢复搜索样式偏好（经典搜索框 / 真实淘宝同款搜索页）
+    SharedPreferences.getInstance().then((p) {
+      final v = p.getBool(_kSearchStyleKey) ?? false;
+      if (mounted && v != _useNewSearch) setState(() => _useNewSearch = v);
+    });
+  }
+
+  /// 双击「筛选」→ 经典搜索框 ↔ 真实淘宝同款搜索页 来回切换（单击仍是筛选弹层）
+  void _toggleSearchStyle() {
+    setState(() => _useNewSearch = !_useNewSearch);
+    SharedPreferences.getInstance()
+        .then((p) => p.setBool(_kSearchStyleKey, _useNewSearch));
+    _toast(_useNewSearch ? '已切换：淘宝同款订单搜索页' : '已切换：经典搜索框');
+  }
+
+  /// 新版搜索：点击搜索框 → 全屏订单搜索页（真实淘宝同款）
+  void _openOrderSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const OrderSearchScreen()),
+    );
   }
 
   int _initialSubIndex(String type) {
@@ -573,46 +600,55 @@ class _OrderListScreenState extends State<OrderListScreen>
                 color: Colors.black87, size: 22),
           ),
           const SizedBox(width: 8),
-          // 搜索框（可输入：按商品关键词/店铺名搜索）
+          // 搜索框（经典：可输入即时过滤；新版：点击进入淘宝同款搜索页。
+          // 双击「筛选」按钮在两种样式间切换，v1.9.122）
           Expanded(
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFf2f2f2),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: [
-                  const Icon(AppIcons.search,
-                      color: Color(0xFF999999), size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() => _query = v),
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.black87),
-                      decoration: const InputDecoration(
-                        hintText: '搜索订单',
-                        hintStyle: TextStyle(
-                            color: Color(0xFF999999), fontSize: 14),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
+            child: GestureDetector(
+              onTap: _useNewSearch ? _openOrderSearch : null,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFf2f2f2),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(AppIcons.search,
+                        color: Color(0xFF999999), size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _useNewSearch
+                          ? const Text('搜索订单',
+                              style: TextStyle(
+                                  color: Color(0xFF999999), fontSize: 14))
+                          : TextField(
+                              controller: _searchCtrl,
+                              onChanged: (v) => setState(() => _query = v),
+                              style: const TextStyle(
+                                  fontSize: 14, color: Colors.black87),
+                              decoration: const InputDecoration(
+                                hintText: '搜索订单',
+                                hintStyle: TextStyle(
+                                    color: Color(0xFF999999), fontSize: 14),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                    ),
+                    if (!_useNewSearch && _query.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _searchCtrl.clear();
+                          _query = '';
+                        }),
+                        child: const Icon(Icons.cancel,
+                            color: Color(0xFF999999), size: 16),
                       ),
-                    ),
-                  ),
-                  if (_query.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _searchCtrl.clear();
-                        _query = '';
-                      }),
-                      child: const Icon(Icons.cancel,
-                          color: Color(0xFF999999), size: 16),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -658,9 +694,11 @@ class _OrderListScreenState extends State<OrderListScreen>
             ),
           ),
           const SizedBox(width: 10),
-          // 筛选 → v1.9.114：订单筛选底部弹层（对齐真实淘宝，纯视觉）
+          // 筛选 → 单击：订单筛选底部弹层（v1.9.114）；
+          // 双击：经典搜索框 ↔ 淘宝同款搜索页 来回切换（v1.9.122）
           GestureDetector(
             onTap: _openFilterSheet,
+            onDoubleTap: _toggleSearchStyle,
             child: _topAction(AppIcons.filter, '筛选'),
           ),
           const SizedBox(width: 12),
@@ -3292,12 +3330,3 @@ class _ShortcutsSheet extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(items[i].$2,
                       style: const TextStyle(
-                          fontSize: 12, color: Colors.black87)),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
