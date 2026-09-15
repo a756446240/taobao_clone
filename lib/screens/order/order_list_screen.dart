@@ -3375,6 +3375,15 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
   void initState() {
     super.initState();
     _loadPrefs();
+    // v1.9.124：结果页再点搜索框 → 切回联想编辑界面并全选关键词
+    // （对齐真实淘宝：搜索一次后点搜索框会再次弹出搜索界面）
+    _focus.addListener(() {
+      if (_focus.hasFocus && _results) {
+        setState(() => _results = false);
+        _ctrl.selection = TextSelection(
+            baseOffset: 0, extentOffset: _ctrl.text.length);
+      }
+    });
     // 进入页面自动弹键盘（对齐真实淘宝）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focus.requestFocus();
