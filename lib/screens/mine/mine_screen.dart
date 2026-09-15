@@ -714,11 +714,12 @@ class _MineScreenState extends State<MineScreen> {
   // ============ 权益行（v1.9.117：黑框内白字版，对齐真实淘宝） ============
   Widget _buildWalletRowInDark() {
     final items = [
-      _WalletItem('红包', '领红包', Colors.white),
-      _WalletItem('优惠券', '领优惠', Colors.white),
-      _WalletItem('淘金币抵', '¥1.30', const Color(0xFFFFD28A)),
-      _WalletItem('天猫积分', '5', const Color(0xFFFFD28A)),
-      _WalletItem('充值金', '¥0.00', Colors.white),
+      // v1.9.128：数值对齐 13:16 真淘宝截图（原 领红包/领优惠/¥1.30/5/¥0.00 被用户点「离谱」）
+      _WalletItem('红包', '¥1457', Colors.white),
+      _WalletItem('优惠券', '33张', Colors.white),
+      _WalletItem('淘金币抵', '¥7.91', const Color(0xFFFFD28A)),
+      _WalletItem('天猫积分', '2343', const Color(0xFFFFD28A)),
+      _WalletItem('充值金', '一键查额', Colors.white),
     ];
     return Row(
       children: [
