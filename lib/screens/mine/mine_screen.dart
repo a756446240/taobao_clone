@@ -509,83 +509,89 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   // ============ 整体黑框会员区（v1.9.117 对齐真实淘宝） ============
-  // 深棕黑框内含：上行（本月已省 + 右上白色立体卡）→ 权益行（白字）→ 农场横幅
+  // 深棕黑框内含：上行（本月已省）→ 权益行（白字）→ 农场横幅；
+  // v1.9.123：白色会员中心卡改为「立顶」样式——Stack 叠压黑框上缘 + 投影，
+  // 对齐真实淘宝（白卡底部探入黑框、顶部超出黑框）
   Widget _buildMemberFrame() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF2A1E0C),
-            Color(0xFF4C3714),
-            Color(0xFF7A5C24),
-          ],
-        ),
-        border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
-      ),
-      child: Column(
-        children: [
-          // 上行：本月已省（左）+ 右上白色立体卡
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          // 顶部外边距给立顶白卡留出让位空间
+          margin: const EdgeInsets.fromLTRB(12, 32, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 28, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF2A1E0C),
+                Color(0xFF4C3714),
+                Color(0xFF7A5C24),
+              ],
+            ),
+            border: Border.all(color: const Color(0xFFC9A25E), width: 0.6),
+          ),
+          child: Column(
             children: [
-              Expanded(
+              // 上行：本月已省（右侧留白给立顶白卡）
+              Padding(
+                padding: const EdgeInsets.only(right: 182),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const BenefitsScreen()),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text.rich(
-                          TextSpan(children: [
-                            TextSpan(
-                              text: '本月已省',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(
-                              text: '1296',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(
-                              text: '元',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ]),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(Icons.chevron_right,
-                            size: 14, color: Color(0xFFD9BE8A)),
-                      ],
-                    ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                            text: '本月已省',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: '1296',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: '元',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ]),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.chevron_right,
+                          size: 14, color: Color(0xFFD9BE8A)),
+                    ],
                   ),
                 ),
               ),
-              _memberWhiteCard(),
+              const SizedBox(height: 14),
+              _buildWalletRowInDark(),
+              const SizedBox(height: 12),
+              _buildFarmBanner(),
             ],
           ),
-          const SizedBox(height: 14),
-          _buildWalletRowInDark(),
-          const SizedBox(height: 12),
-          _buildFarmBanner(),
-        ],
-      ),
+        ),
+        // 立顶白卡：底部叠压进黑框上缘，靠右对齐
+        Positioned(
+          top: 0,
+          right: 20,
+          child: _memberWhiteCard(),
+        ),
+      ],
     );
   }
 
@@ -600,10 +606,11 @@ class _MineScreenState extends State<MineScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
+          // v1.9.123 立顶卡：投影加深，浮在黑框上缘更有立体感
           BoxShadow(
-            color: Colors.black.withOpacity(0.22),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
