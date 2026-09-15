@@ -187,8 +187,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     fontWeight: FontWeight.w900,
                     color: Colors.black87)),
           ),
-          // 编辑入口：双击打开编辑菜单
+          // v1.9.127：单击 ⋯ 弹出操作菜单（编辑订单/克隆订单）；
+          // 保留双击直开编辑菜单的老手势
           GestureDetector(
+            onTap: () => _showMoreActions(),
             onDoubleTap: () => _showEditMenu(),
             child: const Icon(Icons.more_horiz,
                 color: Colors.black87, size: 24),
@@ -2838,6 +2840,62 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============ 右上角编辑菜单 ============
+  /// v1.9.127：右上角 ⋯ 单击 → 操作菜单（编辑订单/克隆订单）
+  void _showMoreActions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, size: 22),
+              title: const Text('编辑订单', style: TextStyle(fontSize: 14)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _showEditMenu();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_outlined, size: 22),
+              title: const Text('克隆订单', style: TextStyle(fontSize: 14)),
+              subtitle: const Text('复制本单并生成新订单号，可再修改单号/时间等',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _cloneOrder();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// v1.9.127：克隆本单（整店卡片深拷贝+新订单号），跳到克隆单详情页继续编辑
+  void _cloneOrder() {
+    final provider = context.read<CartProvider>();
+    final cloned = provider.cloneShop(_shop);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已克隆订单（已生成新订单号），点信息行可改单号/时间'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            OrderDetailScreen(shop: cloned, item: cloned.items.first),
+      ),
+    );
+  }
+
   void _showEditMenu() {
     final provider = context.read<CartProvider>();
     showModalBottomSheet(
