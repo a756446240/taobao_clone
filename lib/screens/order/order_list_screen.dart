@@ -3467,8 +3467,18 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
     await p.setString(_kSeenKey, jsonEncode(_seen));
   }
 
-  void _submit([String? kw]) {
-    final k = (kw ?? _ctrl.text).trim();
+  Future<void> _submit([String? kw]) async {
+    var k = (kw ?? _ctrl.text).trim();
+    if (k.isEmpty && kw == null) {
+      // v1.9.123 修复「第一次能搜、后续点搜索没反应」：
+      // 搜狗等第三方输入法的组字挂在键盘候选栏、尚未提交进输入框，
+      // 此时 _ctrl.text 为空导致静默 return——先断开输入连接让 IME
+      // 把组字提交上屏，再取一次文本
+      _focus.unfocus();
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+      if (!mounted) return;
+      k = _ctrl.text.trim();
+    }
     if (k.isEmpty) return;
     if (kw != null) _ctrl.text = kw;
     final groups = _matchGroups(k);
