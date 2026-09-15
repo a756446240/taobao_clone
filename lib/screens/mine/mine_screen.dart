@@ -510,16 +510,14 @@ class _MineScreenState extends State<MineScreen> {
 
   // ============ 整体黑框会员区（v1.9.117 对齐真实淘宝） ============
   // 深棕黑框内含：上行（本月已省）→ 权益行（白字）→ 农场横幅；
-  // v1.9.123：白色会员中心卡改为「立顶」样式——Stack 叠压黑框上缘 + 投影，
-  // 对齐真实淘宝（白卡底部探入黑框、顶部超出黑框）
+  // v1.9.125：白卡收进黑框内部右上（v1.9.123 的「立顶」探出黑框上缘
+  // 被用户驳回——真实淘宝白卡完全在黑框内，垂直对齐本月已省行，带投影）
   Widget _buildMemberFrame() {
     return Stack(
-      clipBehavior: Clip.none,
       children: [
         Container(
-          // 顶部外边距给立顶白卡留出让位空间
-          margin: const EdgeInsets.fromLTRB(12, 32, 12, 0),
-          padding: const EdgeInsets.fromLTRB(12, 28, 12, 10),
+          margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: const LinearGradient(
@@ -578,17 +576,18 @@ class _MineScreenState extends State<MineScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              // 与白卡底边错开：白卡 top12+高56=68，权益行从 16+26+26=68 起
+              const SizedBox(height: 26),
               _buildWalletRowInDark(),
               const SizedBox(height: 12),
               _buildFarmBanner(),
             ],
           ),
         ),
-        // 立顶白卡：底部叠压进黑框上缘，靠右对齐
+        // 白卡：黑框内部右上（不探出黑框），垂直对齐「本月已省」行
         Positioned(
-          top: 0,
-          right: 20,
+          top: 12,
+          right: 12,
           child: _memberWhiteCard(),
         ),
       ],
