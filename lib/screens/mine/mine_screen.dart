@@ -714,11 +714,10 @@ class _MineScreenState extends State<MineScreen> {
   // ============ 权益行（v1.9.117：黑框内白字版，对齐真实淘宝） ============
   Widget _buildWalletRowInDark() {
     // v1.9.128：数值对齐 13:16 真淘宝截图（原 领红包/领优惠/¥1.30/5/¥0.00 被用户点「离谱」）
-    // v1.9.129：①4 项之间的竖杆全部删除（真淘宝无分隔线，用户截图红框点名）
-    // ②末尾「充值金」改「借钱 ?/一键查额」卡片区，布局/配色按 22:24 真淘宝
-    // 截图像素采样：借钱+一键查额在左，竖杆分隔，「全部权益」竖排+›在右，
-    // 右下米色「去使用」按钮（按钮底 #F7E5CB / 按钮字 #625135 / 借钱与竖排
-    // 字 #B9AC9B / 一键查额 #E3DBCA）
+    // v1.9.129：4 项竖杆删除 + 借钱卡片（竖杆+全部权益竖排+去使用按钮）
+    // v1.9.130：用户反馈「借钱栏和左边项目对齐，去使用删除后框架缩小去空白」
+    // ——借钱改为第 5 个等宽栏（标签 12px/值 15px bold，与其他栏同规格同基线），
+    // 去使用按钮删除，行高回到全部权益竖排高度（≈62pt），黑框不再留白
     final items = [
       _WalletItem('红包', '¥1457', Colors.white),
       _WalletItem('优惠券', '33张', Colors.white),
@@ -750,78 +749,58 @@ class _MineScreenState extends State<MineScreen> {
                 ),
               ),
             )),
-        // 借钱卡片区（宽约屏宽 1/4，对齐真淘宝 116/470 比例）
-        GestureDetector(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-                builder: (_) => BenefitsScreen(initialIndex: 4)),
-          ),
-          child: SizedBox(
-            width: 100,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+        // 借钱：第 5 个等宽栏，与左边 4 栏同规格同基线（采样色 #B9AC9B/#E3DBCA）
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => BenefitsScreen(initialIndex: 4)),
+            ),
+            child: const Column(
               children: [
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('借钱',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFFB9AC9B))),
-                              SizedBox(width: 2),
-                              Icon(Icons.help_outline,
-                                  size: 11, color: Color(0xFFB9AC9B)),
-                            ],
-                          ),
-                          SizedBox(height: 5),
-                          Text('一键查额',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFE3DBCA))),
-                        ],
-                      ),
-                    ),
-                    // 借钱与全部权益之间的竖杆（真淘宝采样色≈白 25% 透明）
-                    Container(
-                        width: 1,
-                        height: 44,
-                        color: const Color(0x40FFFFFF)),
-                    const SizedBox(width: 6),
-                    // 全部权益竖排 + ›
-                    const Text('全\n部\n权\n益',
-                        textAlign: TextAlign.center,
+                    Text('借钱',
                         style: TextStyle(
-                            fontSize: 12,
-                            height: 1.3,
-                            color: Color(0xFFB9AC9B))),
-                    const Icon(Icons.chevron_right,
-                        size: 12, color: Color(0xFFB9AC9B)),
+                            fontSize: 12, color: Color(0xFFB9AC9B))),
+                    SizedBox(width: 2),
+                    Icon(Icons.help_outline,
+                        size: 11, color: Color(0xFFB9AC9B)),
                   ],
                 ),
-                const SizedBox(height: 6),
-                // 去使用按钮（米底棕字，右对齐贴黑框右缘）
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF7E5CB),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: const Text('去使用',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF625135))),
-                ),
+                SizedBox(height: 4),
+                Text('一键查额',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFE3DBCA))),
               ],
             ),
+          ),
+        ),
+        // 借钱与全部权益之间的竖杆 + 全部权益竖排 + ›
+        GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const BenefitsScreen()),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                  width: 1,
+                  height: 50,
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  color: const Color(0x40FFFFFF)),
+              const Text('全\n部\n权\n益',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12,
+                      height: 1.3,
+                      color: Color(0xFFB9AC9B))),
+              const Icon(Icons.chevron_right,
+                  size: 12, color: Color(0xFFB9AC9B)),
+            ],
           ),
         ),
       ],
