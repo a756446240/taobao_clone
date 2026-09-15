@@ -585,10 +585,21 @@ class _MineScreenState extends State<MineScreen> {
           ),
         ),
         // 白卡：黑框内部右上（不探出黑框），垂直对齐「本月已省」行
+        // v1.9.126：白卡左上角外侧加折纸三角瓣，对齐真实淘宝 88VIP 黑框折角
         Positioned(
           top: 12,
           right: 12,
-          child: _memberWhiteCard(),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _memberWhiteCard(),
+              const Positioned(
+                left: -8,
+                top: 0,
+                child: _FoldCorner(),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1861,4 +1872,34 @@ class _WalletItem {
   final String value;
   final Color color;
   _WalletItem(this.label, this.value, this.color);
+}
+
+/// v1.9.126 折纸三角瓣：白卡左上角外侧的折角（对齐真实淘宝 88VIP 黑框）
+/// 实测几何：直角在右下，竖直直角边贴白卡左缘，卡其色 #877554
+class _FoldCorner extends StatelessWidget {
+  const _FoldCorner();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(8, 10),
+      painter: _FoldCornerPainter(),
+    );
+  }
+}
+
+class _FoldCornerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF877554);
+    final path = Path()
+      ..moveTo(size.width, 0) // 上右（贴白卡左缘顶端）
+      ..lineTo(size.width, size.height) // 下右（直角）
+      ..lineTo(0, size.height) // 下左
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
