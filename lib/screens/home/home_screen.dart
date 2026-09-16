@@ -726,10 +726,9 @@ class _HomeScreenState extends State<HomeScreen>
       color: Colors.white,
       child: TabBar(
         controller: _tabController,
-        isScrollable: true,
-        // v1.9.132：tab 贴左排列（对齐真淘宝「猜你喜欢」贴屏幕左缘）——
-        // 默认居中分布导致首个 tab 缩进 ~80pt，用户截图点名
-        tabAlignment: TabAlignment.start,
+        // v1.9.133：等宽均分填满整行（用户：左对齐后右侧空，要按间隔
+        // 均匀分布填充到最右）；不可滚动时 TabBar 默认 TabAlignment.fill
+        // v1.9.132 的 isScrollable+start 只解决了贴左、没填满
         labelColor: AppColors.primary,
         unselectedLabelColor: Colors.black87,
         indicatorColor: AppColors.primary,
