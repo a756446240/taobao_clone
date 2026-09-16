@@ -554,7 +554,8 @@ class _MineScreenState extends State<MineScreen> {
                                 fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
-                            text: '1296',
+                            // v1.9.131：对齐 15:50 真淘宝参考图 本月已省140元
+                            text: '140',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -719,10 +720,11 @@ class _MineScreenState extends State<MineScreen> {
     // ——借钱改为第 5 个等宽栏（标签 12px/值 15px bold，与其他栏同规格同基线），
     // 去使用按钮删除，行高回到全部权益竖排高度（≈62pt），黑框不再留白
     final items = [
-      _WalletItem('红包', '¥1457', Colors.white),
-      _WalletItem('优惠券', '33张', Colors.white),
+      // v1.9.131：数值对齐 15:50 真淘宝新参考图（¥1464/29张/¥7.91/2348）
+      _WalletItem('红包', '¥1464', Colors.white),
+      _WalletItem('优惠券', '29张', Colors.white),
       _WalletItem('淘金币抵', '¥7.91', const Color(0xFFFFD28A)),
-      _WalletItem('天猫积分', '2344', const Color(0xFFFFD28A)),
+      _WalletItem('天猫积分', '2348', const Color(0xFFFFD28A)),
     ];
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -780,6 +782,10 @@ class _MineScreenState extends State<MineScreen> {
           ),
         ),
         // 借钱与全部权益之间的竖杆 + 全部权益竖排 + ›
+        // v1.9.131：竖排收紧到与左侧「标签+数值」两行同高（≈40pt，
+        // 10px/height1.0 紧凑排），益底对齐数值行底（用户点名，对齐 15:50
+        // 真淘宝参考图）；行高从 62pt 降下来后，下方横幅随 Column 自然
+        // 上移补齐，黑框底部多余空白消除、整体框缩小
         GestureDetector(
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const BenefitsScreen()),
@@ -789,14 +795,14 @@ class _MineScreenState extends State<MineScreen> {
             children: [
               Container(
                   width: 1,
-                  height: 50,
+                  height: 38,
                   margin: const EdgeInsets.symmetric(horizontal: 5),
                   color: const Color(0x40FFFFFF)),
               const Text('全\n部\n权\n益',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 12,
-                      height: 1.3,
+                      fontSize: 10,
+                      height: 1.0,
                       color: Color(0xFFB9AC9B))),
               const Icon(Icons.chevron_right,
                   size: 12, color: Color(0xFFB9AC9B)),
