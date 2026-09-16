@@ -495,6 +495,12 @@ class MaterialPoolProvider extends ChangeNotifier {
       return (19.9, 99);
     }
     if (has(['眼镜', '隐形眼镜', '美瞳', '滴眼液', '人工泪液'])) return (49, 269);
+    // v1.9.133：挂脖/随身/便携净化类（KB AIR MASK 等）真实售价 ~¥200-600，
+    // 不能落入「净化器」399-2999 大家电档（用户截图 ¥2746 被点「对不上」）
+    if (has(['挂脖', '随身', '便携', '穿戴']) &&
+        has(['净化', '负离子', 'air mask', 'airmask'])) {
+      return (199, 599);
+    }
     if (has(['净化器'])) return (399, 2999);
     if (has(['挂脖'])) return (29, 159);
     if (has(['保温杯', '焖烧杯', '水杯'])) return (59, 269);
