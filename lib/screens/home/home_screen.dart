@@ -583,7 +583,12 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(height: 6),
-          Center(child: AppImage(url: card.imageUrl, height: 56)),
+          // v1.9.132：图片从居中改为贴左——四卡的标题/价格本来都是左对齐，
+          // 只有图片居中，第一张卡（淘宝直播，图窄）图片浮在中间偏右，
+          // 用户点名「第一个框没有最左排列」；全部贴左后四卡视觉一致
+          Align(
+              alignment: Alignment.centerLeft,
+              child: AppImage(url: card.imageUrl, height: 56)),
           const SizedBox(height: 6),
           Text(
             card.priceText,
@@ -722,6 +727,9 @@ class _HomeScreenState extends State<HomeScreen>
       child: TabBar(
         controller: _tabController,
         isScrollable: true,
+        // v1.9.132：tab 贴左排列（对齐真淘宝「猜你喜欢」贴屏幕左缘）——
+        // 默认居中分布导致首个 tab 缩进 ~80pt，用户截图点名
+        tabAlignment: TabAlignment.start,
         labelColor: AppColors.primary,
         unselectedLabelColor: Colors.black87,
         indicatorColor: AppColors.primary,
