@@ -243,7 +243,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(stage.$2, color: const Color(0xFFFF5000), size: 20),
+                // v1.9.135：物流行图标换贴图卡车（矢量重绘拉高清，对齐真实淘宝）
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Image.asset(
+                      'assets/images/icons/logistics_truck.png',
+                      width: 20,
+                      height: 20),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text.rich(
@@ -253,11 +260,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFFFF5000),
-                              fontWeight: FontWeight.w600)),
+                              fontWeight: FontWeight.w700)),
                       TextSpan(
                         text: _bannerLogisticsText,
                         style: const TextStyle(
-                            fontSize: 14, color: Color(0xFF333333)),
+                            fontSize: 14,
+                            color: Color(0xFF101010),
+                            fontWeight: FontWeight.w600),
                       ),
                     ]),
                     // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
@@ -2444,7 +2453,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _primaryBtn('再买一单',
                     color: const Color(0xFFff5000), onTap: () => _reAddToCart(_item)),
               ] else if (isSignedPending) ...[
-                _outlineBtn('延长收货', onTap: () => _demoToast('已延长收货时间')),
+                // v1.9.135：左一按钮三状态随机分配（按订单号哈希稳定随机）——
+                // 催物流 / 延长收货 / 催促配送，字体样式与框架底色完全一致（_outlineBtn 灰底）
+                () {
+                  const firstBtnPool = ['催物流', '延长收货', '催促配送'];
+                  final firstBtn = firstBtnPool[
+                      _orderNo.isEmpty ? 1 : _orderNo.hashCode.abs() % 3];
+                  return _outlineBtn(firstBtn, onTap: () {
+                    switch (firstBtn) {
+                      case '催物流':
+                        _demoToast('已催促物流加急配送');
+                        break;
+                      case '催促配送':
+                        _demoToast('已催促配送员尽快送达');
+                        break;
+                      default:
+                        _demoToast('已延长收货时间');
+                    }
+                  });
+                }(),
                 const SizedBox(width: 8),
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
@@ -2591,6 +2618,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
   Widget _bottomAction(String asset, String label, {VoidCallback? onTap}) {
+    // v1.9.135：图标 22→26、字号 10→11.5（用户要求「更多」拉大，客服位同规格保持一致）
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2599,11 +2627,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(asset, width: 22, height: 22),
+            Image.asset(asset, width: 26, height: 26),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
-                    color: Color(0xFF666666), fontSize: 10)),
+                    color: Color(0xFF666666), fontSize: 11.5)),
           ],
         ),
       ),
