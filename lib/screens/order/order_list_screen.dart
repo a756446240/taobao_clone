@@ -4,6 +4,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'express_library_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -792,7 +794,15 @@ class _OrderListScreenState extends State<OrderListScreen>
                       for (final e in items)
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: () => Navigator.of(dlgCtx).pop(),
+                          // v1.9.136：「我的快递」不再是纯视觉，点击进快递库
+                          onTap: () {
+                            Navigator.of(dlgCtx).pop();
+                            if (e.$2 == '我的快递') {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ExpressLibraryScreen()));
+                            }
+                          },
                           child: SizedBox(
                             width: 68,
                             child: Column(
