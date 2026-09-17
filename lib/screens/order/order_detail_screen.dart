@@ -243,15 +243,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // v1.9.138：阶段图标全部真实淘宝抠图拉高清——已签收=包裹箱，其余=卡车
+                // v1.9.139：阶段图标矢量重绘（实心橙，解决"太虚"），
+                // 尺寸 21→15 对齐真实淘宝（图标≈文字高度，按真实比例小尺寸绘制）
                 Padding(
-                  padding: const EdgeInsets.only(top: 1),
+                  padding: const EdgeInsets.only(top: 2),
                   child: Image.asset(
                       stage.$1.contains('签收')
                           ? 'assets/images/icons/logistics_signed.png'
                           : 'assets/images/icons/logistics_truck.png',
-                      width: 21,
-                      height: 21),
+                      width: 15,
+                      height: 15),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2430,8 +2431,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ? 'assets/images/icons/order_gengduo.png'
                       : 'assets/images/icons/order_tousu.png',
                   secondIsMore ? '更多' : '投诉',
-                  // v1.9.138：只有「更多」加大，客服/投诉保持原样
-                  big: secondIsMore,
+                  // v1.9.139：「更多」恢复与客服同大（22px/10号，对齐真实淘宝）
                   onTap: secondIsMore ? _showMoreSheet : _gotoComplaint),
               const Spacer(),
               if (_isPendingShip) ...[
@@ -2625,7 +2625,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
   Widget _bottomAction(String asset, String label,
       {VoidCallback? onTap, bool big = false}) {
-    // v1.9.138：只有「更多」用加大版（big:true），客服/投诉保持原始 22px/10px
+    // v1.9.139：所有图标位统一 22px/10px（更多不再加大，big 参数保留备用）
     final double iconSize = big ? 36 : 22;
     final double fontSize = big ? 14 : 10;
     return GestureDetector(
