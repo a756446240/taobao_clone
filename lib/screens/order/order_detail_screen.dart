@@ -243,30 +243,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // v1.9.137：卡车贴图加粗描边 + 渲染 20→24（136 笔画太细发虚）
+                // v1.9.138：阶段图标全部真实淘宝抠图拉高清——已签收=包裹箱，其余=卡车
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Image.asset(
-                      'assets/images/icons/logistics_truck.png',
-                      width: 24,
-                      height: 24),
+                      stage.$1.contains('签收')
+                          ? 'assets/images/icons/logistics_signed.png'
+                          : 'assets/images/icons/logistics_truck.png',
+                      width: 21,
+                      height: 21),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text.rich(
                     TextSpan(children: [
+                      // v1.9.138：对齐真实淘宝——阶段词橙色 w600，
+                      // 后面内容是常规体深灰不是粗体（137 加粗加错了）
                       TextSpan(
                           text: '${stage.$1}  ',
                           style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFFFF5000),
-                              fontWeight: FontWeight.w800)),
+                              fontWeight: FontWeight.w600)),
                       TextSpan(
                         text: _bannerLogisticsText,
                         style: const TextStyle(
                             fontSize: 14,
-                            color: Color(0xFF101010),
-                            fontWeight: FontWeight.w700),
+                            color: Color(0xFF333333),
+                            fontWeight: FontWeight.w400),
                       ),
                     ]),
                     // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
@@ -2426,6 +2430,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ? 'assets/images/icons/order_gengduo.png'
                       : 'assets/images/icons/order_tousu.png',
                   secondIsMore ? '更多' : '投诉',
+                  // v1.9.138：只有「更多」加大，客服/投诉保持原样
+                  big: secondIsMore,
                   onTap: secondIsMore ? _showMoreSheet : _gotoComplaint),
               const Spacer(),
               if (_isPendingShip) ...[
@@ -2617,8 +2623,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
-  Widget _bottomAction(String asset, String label, {VoidCallback? onTap}) {
-    // v1.9.137：图标再放大 30→36、字号 12.5→14（用户两次反馈感知不明显，拉大步进）
+  Widget _bottomAction(String asset, String label,
+      {VoidCallback? onTap, bool big = false}) {
+    // v1.9.138：只有「更多」用加大版（big:true），客服/投诉保持原始 22px/10px
+    final double iconSize = big ? 36 : 22;
+    final double fontSize = big ? 14 : 10;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2627,11 +2636,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(asset, width: 36, height: 36),
+            Image.asset(asset, width: iconSize, height: iconSize),
             const SizedBox(height: 2),
             Text(label,
-                style: const TextStyle(
-                    color: Color(0xFF666666), fontSize: 14)),
+                style: TextStyle(
+                    color: const Color(0xFF666666), fontSize: fontSize)),
           ],
         ),
       ),
