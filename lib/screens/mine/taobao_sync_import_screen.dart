@@ -343,12 +343,19 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
     final cover = selected.isNotEmpty ? '，其中覆盖 ${selected.length} 条' : '';
     if (result.added > 0) {
-      _toast('已导入 ${result.added} 条$cover（跳过 ${result.skipped} 条$tail）');
+      // v1.9.140：新增订单里有物流数据的也报一下，快递库立即可见
+      final lg = result.logiFilled > 0 ? '，含物流 ${result.logiFilled} 条' : '';
+      _toast('已导入 ${result.added} 条$cover$lg（跳过 ${result.skipped} 条$tail）');
+      if (mounted) Navigator.of(context).pop();
+    } else if (result.logiFilled > 0) {
+      // v1.9.140：纯物流 JSON 导入——订单早已存在时 added=0，
+      // 必须明确告诉用户快递已补进快递库，否则会以为没导进去
+      _toast('快递已补进 ${result.logiFilled} 条已有订单，可到「快递库」查看');
       if (mounted) Navigator.of(context).pop();
     } else if (_forceTags) {
       _toast('绿色标签已按抓包强制覆盖（无新订单，${result.skipped} 条已存在）');
     } else {
-      _toast('没有新订单，${result.skipped} 条已存在$tail');
+      _toast('没有新订单，${result.skipped} 条已存在$tail（这些订单本就有物流或抓包无物流）');
     }
   }
 
