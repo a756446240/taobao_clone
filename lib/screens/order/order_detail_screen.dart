@@ -243,16 +243,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // v1.9.140：阶段图标改为从 1179px 原生淘宝截图提取（形状/颜色
-                // 与真实淘宝一致），尺寸按真实比例：卡车 18x16，签收箱 16x16
+                // v1.9.141：图标 alpha 增强为实心纯橙 #FF5000（解决发虚），
+                // 尺寸加大：卡车 18x16→24x21，签收箱 16x16→21x21
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Image.asset(
                       stage.$1.contains('签收')
                           ? 'assets/images/icons/logistics_signed.png'
                           : 'assets/images/icons/logistics_truck.png',
-                      width: stage.$1.contains('签收') ? 16 : 18,
-                      height: 16),
+                      width: stage.$1.contains('签收') ? 21 : 24,
+                      height: 21),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
