@@ -2618,7 +2618,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
   Widget _bottomAction(String asset, String label, {VoidCallback? onTap}) {
-    // v1.9.135：图标 22→26、字号 10→11.5（用户要求「更多」拉大，客服位同规格保持一致）
+    // v1.9.136：图标再放大 26→30、字号 11.5→12.5（用户反馈 135 的放大感知不明显）
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2627,11 +2627,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(asset, width: 26, height: 26),
+            Image.asset(asset, width: 30, height: 30),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
-                    color: Color(0xFF666666), fontSize: 11.5)),
+                    color: Color(0xFF666666), fontSize: 12.5)),
           ],
         ),
       ),
