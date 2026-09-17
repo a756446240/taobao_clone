@@ -243,13 +243,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // v1.9.135：物流行图标换贴图卡车（矢量重绘拉高清，对齐真实淘宝）
+                // v1.9.137：卡车贴图加粗描边 + 渲染 20→24（136 笔画太细发虚）
                 Padding(
                   padding: const EdgeInsets.only(top: 1),
                   child: Image.asset(
                       'assets/images/icons/logistics_truck.png',
-                      width: 20,
-                      height: 20),
+                      width: 24,
+                      height: 24),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -260,13 +260,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFFFF5000),
-                              fontWeight: FontWeight.w700)),
+                              fontWeight: FontWeight.w800)),
                       TextSpan(
                         text: _bannerLogisticsText,
                         style: const TextStyle(
                             fontSize: 14,
                             color: Color(0xFF101010),
-                            fontWeight: FontWeight.w600),
+                            fontWeight: FontWeight.w700),
                       ),
                     ]),
                     // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
@@ -2618,7 +2618,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 底栏图标位（v1.9.85：用高清贴图，对齐真实淘宝截图）
   Widget _bottomAction(String asset, String label, {VoidCallback? onTap}) {
-    // v1.9.136：图标再放大 26→30、字号 11.5→12.5（用户反馈 135 的放大感知不明显）
+    // v1.9.137：图标再放大 30→36、字号 12.5→14（用户两次反馈感知不明显，拉大步进）
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2627,11 +2627,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(asset, width: 30, height: 30),
+            Image.asset(asset, width: 36, height: 36),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(
-                    color: Color(0xFF666666), fontSize: 12.5)),
+                    color: Color(0xFF666666), fontSize: 14)),
           ],
         ),
       ),
