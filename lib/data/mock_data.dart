@@ -85,25 +85,25 @@ class MockData {
         title: '淘宝直播',
         titleColor: 0xFF1a1a1a,
         imageUrl: 'assets/images/remote/r0040.jpg',
-        priceText: '直播价¥32',
+        priceText: '直播价¥1299',
         priceColor: 0xFFff2d55),
     HomeLiveCard(
         title: '直播有好价',
         titleColor: 0xFFff2d55,
         imageUrl: 'assets/images/remote/r0042.jpg',
-        priceText: '直播价¥4',
+        priceText: '直播价¥6299',
         priceColor: 0xFFff2d55),
     HomeLiveCard(
         title: '百亿补贴',
         titleColor: 0xFF1a1a1a,
         imageUrl: 'assets/images/remote/r0044.jpg',
-        priceText: '补贴价¥47',
+        priceText: '补贴价¥2099',
         priceColor: 0xFFff2d55),
     HomeLiveCard(
         title: '国家补贴',
         titleColor: 0xFF16a34a,
         imageUrl: 'assets/images/remote/r0047.jpg',
-        priceText: '补贴价¥9.43',
+        priceText: '补贴价¥1899',
         priceColor: 0xFFff2d55),
   ];
 
