@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 /// 快递联网查询共享工具（v1.9.100 起，物流页/退款页共用）
-/// - 公司识别：快递100 autonumber（免 key，全公司覆盖）
-/// - 实时轨迹：apizero 双通道优先（匿名 30 次/天），快递100 严格判失败兜底
+/// v1.9.136 修复：快递100 autonumber 已失效（对真实单号也返「不是有效的
+/// 快递单号」），公司识别改本地单号规则优先；apizero 显式 com 调免费通道
+/// （避免 auto 识别被判升级），顺丰/中通自动带手机号后 4 位
 class ExpressOnline {
   ExpressOnline._();
 
@@ -24,6 +25,22 @@ class ExpressOnline {
     'cainiao': '菜鸟速递',
   };
 
+  /// 快递100 comCode → apizero com
+  static const _apizeroCom = {
+    'shunfeng': 'sf',
+    'yuantong': 'yto',
+    'zhongtong': 'zto',
+    'shentong': 'sto',
+    'huitongkuaidi': 'best',
+    'jtexpress': 'jt',
+    'jd': 'jd',
+    'yunda': 'yunda',
+    'ems': 'ems',
+  };
+
+  /// apizero 免费通道（/api/express）支持的公司
+  static const _freeComs = {'sf', 'yto', 'zto', 'sto', 'best', 'jt'};
+
   /// 模拟手机浏览器请求头（快递100 对无 UA/Referer 的请求会拦截返回非 JSON）
   static void applyBrowserHeaders(HttpClientRequest req, String referer) {
     req.headers.set(HttpHeaders.userAgentHeader,
@@ -37,9 +54,45 @@ class ExpressOnline {
   static String logoForComCode(String comCode) =>
       'https://cdn.kuaidi100.com/images/all/56/$comCode.png';
 
-  /// 联网识别快递公司（快递100 autonumber，全公司覆盖，实测可用）
+  /// 本地单号规则识别公司（v1.9.136：autonumber 已失效，本地规则零联网覆盖主流公司）
+  /// 返回 (快递100 comCode, 中文名)，识别不了返回 ('','')
+  static (String, String) detectLocal(String waybill) {
+    final w = waybill.trim().toUpperCase();
+    if (w.isEmpty) return ('', '');
+    if (RegExp(r'^SF\d{9,15}$').hasMatch(w)) return ('shunfeng', '顺丰速运');
+    if (RegExp(r'^YT\d{9,15}$').hasMatch(w)) return ('yuantong', '圆通速递');
+    if (RegExp(r'^JT\d{9,15}$').hasMatch(w)) return ('jtexpress', '极兔速递');
+    if (RegExp(r'^JD[A-Z]{0,3}\d{9,15}$').hasMatch(w)) return ('jd', '京东物流');
+    if (RegExp(r'^YD\d{9,15}$').hasMatch(w)) return ('yunda', '韵达快递');
+    // 申通：15 位数字，77 开头（实测 773442217376054）
+    if (RegExp(r'^77\d{13}$').hasMatch(w)) return ('shentong', '申通快递');
+    // 中通：14 位数字，73/75/78/79 开头（实测 79033349096068）
+    if (RegExp(r'^(73|75|78|79)\d{12}$').hasMatch(w)) {
+      return ('zhongtong', '中通快递');
+    }
+    if (RegExp(r'^\d{13}$').hasMatch(w)) {
+      if (RegExp(r'^(43|46)').hasMatch(w)) return ('yunda', '韵达快递');
+      if (RegExp(r'^(10|11|50|56)').hasMatch(w)) return ('ems', 'EMS');
+      if (RegExp(r'^(95|96|97|98|99)').hasMatch(w)) {
+        return ('youzhengguonei', '邮政快递包裹');
+      }
+    }
+    // 圆通旧单号：12 位数字 88 开头
+    if (RegExp(r'^88\d{10}$').hasMatch(w)) return ('yuantong', '圆通速递');
+    return ('', '');
+  }
+
+  /// 从掩码手机号里抠后 4 位（顺丰/中通联网查询必传），抠不到返回 ''
+  static String extractPhone4(String text) {
+    final m = RegExp(r'(\d{4})\D*$').firstMatch(text);
+    return m?.group(1) ?? '';
+  }
+
+  /// 联网识别快递公司：本地规则优先（v1.9.136），识别不了再试 autonumber
   /// 返回 (comCode, 中文公司名)，失败返回 ('','')
   static Future<(String, String)> detectCompany(String waybill) async {
+    final local = detectLocal(waybill);
+    if (local.$1.isNotEmpty) return local;
     try {
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 8);
@@ -61,16 +114,19 @@ class ExpressOnline {
   }
 
   /// apizero 免费物流接口（2026 实测匿名可用，30 次/天）：
-  /// /api/express 覆盖 申通/圆通/顺丰/中通/百世/极兔；
-  /// /api/express-pro 覆盖 京东/韵达/EMS 及其余公司
+  /// /api/express 覆盖 申通/圆通/顺丰/中通/百世/极兔（显式 com 才不走 auto，
+  /// 顺丰/中通还必须带 phone=手机号后 4 位）；
+  /// /api/express-pro 覆盖 京东/韵达/EMS 及其余公司（匿名额度极少）
   static Future<Map<String, dynamic>?> _fetchApizero(String waybill,
-      {bool pro = false}) async {
+      {bool pro = false, String com = '', String phone4 = ''}) async {
     final path = pro ? '/api/express-pro' : '/api/express';
     try {
+      var url = 'https://v1.apizero.cn$path?number=$waybill';
+      if (com.isNotEmpty) url += '&com=$com';
+      if (phone4.isNotEmpty) url += '&phone=$phone4';
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 8);
-      final req = await client.getUrl(
-          Uri.parse('https://v1.apizero.cn$path?number=$waybill'));
+      final req = await client.getUrl(Uri.parse(url));
       applyBrowserHeaders(req, 'https://apizero.cn/');
       final resp = await req.close().timeout(const Duration(seconds: 8));
       final body = await resp.transform(utf8.decoder).join();
@@ -125,14 +181,36 @@ class ExpressOnline {
     return '运输中 预计明天送达';
   }
 
-  /// 联网查询实时物流轨迹：apizero 双通道优先，快递100 严格判失败兜底
+  /// 联网查询实时物流轨迹（v1.9.136：已知公司走显式 com 通道，避免 auto 被判
+  /// 升级；顺丰/中通自动带手机号后 4 位）：apizero 优先，快递100 严格判失败兜底
   /// 返回 [{time, tag, text}] 最新在前；失败返回 null
   static Future<List<Map<String, String>>?> fetchTraces(
-      String comCode, String waybill) async {
-    // 1) apizero（匿名免费，自动识别公司）
-    var r = await _fetchApizero(waybill);
-    if (r != null && r['upgrade'] == true) {
-      r = await _fetchApizero(waybill, pro: true);
+      String comCode, String waybill,
+      {String phone4 = ''}) async {
+    Map<String, dynamic>? r;
+    final apCom = _apizeroCom[comCode] ?? '';
+    if (apCom.isNotEmpty) {
+      if (_freeComs.contains(apCom)) {
+        // 顺丰/中通免费通道必须带手机号后 4 位，没带直接走 pro
+        final needPhone = apCom == 'sf' || apCom == 'zto';
+        if (!needPhone || phone4.isNotEmpty) {
+          r = await _fetchApizero(waybill, com: apCom, phone4: phone4);
+          if (r != null && r['upgrade'] == true) r = null;
+        }
+        r ??= await _fetchApizero(waybill,
+            pro: true, com: apCom, phone4: phone4);
+      } else {
+        // 京东/韵达/EMS 等只有 pro 通道
+        r = await _fetchApizero(waybill,
+            pro: true, com: apCom, phone4: phone4);
+      }
+    }
+    if (r == null || r['traces'] is! List) {
+      // 公司未知或显式通道失败：旧自动识别链路兜底
+      r = await _fetchApizero(waybill);
+      if (r != null && r['upgrade'] == true) {
+        r = await _fetchApizero(waybill, pro: true);
+      }
     }
     if (r != null && r['traces'] is List) {
       return [
