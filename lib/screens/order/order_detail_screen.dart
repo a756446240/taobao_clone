@@ -211,6 +211,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       '已到达代收点',
       '物流异常 · 请联系快递员',
     ];
+    // v1.9.134：待发货/待付款不显示物流横幅行（真实淘宝待发货详情页地址卡上方无此行）
+    final category = CartProvider.statusCategory(
+        _item.statusTitle.isEmpty ? _shop.orderSubStatus : _item.statusTitle);
+    final showLogisticsRow = category != '待发货' && category != '待付款';
     // 物流阶段图标/标签
     final stage = _logisticsStage();
     return Container(
@@ -222,6 +226,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         children: [
           // v1.9.111：倒计时已移至 AppBar 下方置顶（黑色细体），此处不再显示
           // 物流状态行（单击 → 物流详情页，对齐真实淘宝；双击换选项）
+          // v1.9.134：待发货/待付款隐藏此行
+          if (showLogisticsRow)
           GestureDetector(
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -265,7 +271,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           // 地址区（单击展开/收起完整信息，双击手动输入：第一行收件人，其余地址）
-          const SizedBox(height: 14),
+          if (showLogisticsRow) const SizedBox(height: 14),
           GestureDetector(
             onTap: () =>
                 setState(() => _addressExpanded = !_addressExpanded),
@@ -2414,16 +2420,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   onTap: secondIsMore ? _showMoreSheet : _gotoComplaint),
               const Spacer(),
               if (_isPendingShip) ...[
+                // v1.9.134：对齐真实淘宝——催发货=白底灰框黑字，修改地址=橙底白字（常驻）
                 if (pendingShipFull) ...[
                   _outlineBtn('申请开票', onTap: () => _demoToast('申请开票')),
                   const SizedBox(width: 8),
-                  _outlineBtn('催发货', onTap: _urgeShip),
-                  const SizedBox(width: 8),
-                  _primaryBtn('修改地址',
-                      color: const Color(0xFFff5000), onTap: _editAddress),
-                ] else
-                  _primaryBtn('催发货',
-                      color: const Color(0xFFff5000), onTap: _urgeShip),
+                ],
+                _frameBtn('催发货', onTap: _urgeShip),
+                const SizedBox(width: 8),
+                _primaryBtn('修改地址',
+                    color: const Color(0xFFff5000), onTap: _editAddress),
               ] else if (isTradeSuccess) ...[
                 _outlineBtn('追加评价', onTap: () {
                   Navigator.of(context).push(
@@ -2644,9 +2649,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // 底部主按钮：橙底白字圆角矩形（对齐真实淘宝切图）
-  Widget _primaryBtn(String text, {required Color color, VoidCallback? onTap}) {
+  // 底部灰框按钮：白底+灰框+黑字（v1.9.134 催发货，对齐真实淘宝）
+  Widget _frameBtn(String text, {VoidCallback? onTap}) {
     return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        constraints: const BoxConstraints(minWidth: 80, minHeight: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFDDDDDD)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: Text(text,
+              style: const TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500)),
+        ),
+      ),
+    );
+  }
+
+  // 底部主按钮：橙底白字圆角矩形（对齐真实淘宝切图）
+  Widget _primaryBtn(String text, {required Color color, VoidCallback? onTap}) {    return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
