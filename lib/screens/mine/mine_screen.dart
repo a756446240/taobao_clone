@@ -20,7 +20,7 @@ import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import '../home/channel_screen.dart';
 import '../message/chat_screen.dart';
-import '../order/logistics_screen.dart';
+import '../order/express_library_screen.dart';
 import '../order/order_list_screen.dart';
 import 'ai_order_audit_screen.dart';
 import 'ai_order_import_screen.dart';
@@ -1040,10 +1040,10 @@ class _MineScreenState extends State<MineScreen> {
     );
   }
 
-  /// 单击"快递" → 物流详情
+  /// 单击"快递" → 快递库（v1.9.136：所有抓包/联网快递汇总列表）
   void _openLogistics() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LogisticsScreen()),
+      MaterialPageRoute(builder: (_) => const ExpressLibraryScreen()),
     );
   }
 
@@ -1064,7 +1064,7 @@ class _MineScreenState extends State<MineScreen> {
   /// 单击"设置" → 设置页（双击仍是编辑资料）
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.44')),
+      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.136')),
     );
   }
 
