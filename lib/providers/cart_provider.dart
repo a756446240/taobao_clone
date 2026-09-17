@@ -148,8 +148,10 @@ class CartProvider extends ChangeNotifier {
   /// 淘宝同步导入：按订单号去重，只追加本地不存在的新订单。
   /// 已在本地的订单（含用户编辑过的内容）绝不覆盖；
   /// 用户删除过的订单（黑名单）永久跳过、不会复活。
-  /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数)。
-  ({int added, int skipped, int blocked}) importSyncedShops(
+  /// 返回 (新增订单条数, 重复跳过条数, 已删除拦截条数, 补物流条数)。
+  /// v1.9.140：logiFilled = 本次给多少条已有订单补上了单号/时间线——
+  /// 导入纯物流 JSON 时 added=0，靠这个数告诉用户"快递确实进库了"
+  ({int added, int skipped, int blocked, int logiFilled}) importSyncedShops(
       List<ShoppingCartShop> incoming,
       {bool forceRefresh = false,
       Set<String>? forceOrderNos,
@@ -167,6 +169,7 @@ class CartProvider extends ChangeNotifier {
     var added = 0;
     var skipped = 0;
     var blocked = 0;
+    var logiFilled = 0;
     var opsBackfilled = false;
     for (final shop in incoming) {
       // v1.9.75：已有订单只补缺省的抓包按钮序列（orderOps 是新版字段，
@@ -209,6 +212,9 @@ class CartProvider extends ChangeNotifier {
         for (final old in _shops) {
           for (final oldItem in old.items) {
             if (oldItem.orderNo != it.orderNo) continue;
+            // v1.9.140：补物流前快照，补成功计一次（一条订单只计一次）
+            final hadLogi = oldItem.logisticsTraces.isNotEmpty ||
+                oldItem.waybillNo.isNotEmpty;
             if (oldItem.logisticsTraces.isEmpty &&
                 it.logisticsTraces.isNotEmpty) {
               oldItem.logisticsTraces = it.logisticsTraces;
@@ -222,6 +228,11 @@ class CartProvider extends ChangeNotifier {
             if (oldItem.waybillNo.isEmpty && it.waybillNo.isNotEmpty) {
               oldItem.waybillNo = it.waybillNo;
               opsBackfilled = true;
+            }
+            if (!hadLogi &&
+                (oldItem.logisticsTraces.isNotEmpty ||
+                    oldItem.waybillNo.isNotEmpty)) {
+              logiFilled++;
             }
             if (oldItem.logistics.isEmpty && it.logistics.isNotEmpty) {
               oldItem.logistics = it.logistics;
@@ -351,7 +362,8 @@ class CartProvider extends ChangeNotifier {
       _persist();
       notifyListeners();
     }
-    return (added: added, skipped: skipped, blocked: blocked);
+    return (added: added, skipped: skipped, blocked: blocked,
+        logiFilled: logiFilled);
   }
 
   /// AI 截图解析导入：把识别出的订单追加为新店铺卡片（自动持久化，无需重新构建）
