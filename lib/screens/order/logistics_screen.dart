@@ -453,10 +453,11 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
   static Future<(String, String)> _detectCompany(String waybill) =>
       ExpressOnline.detectCompany(waybill);
 
-  /// 联网查询实时物流轨迹：apizero 双通道优先，快递100 严格判失败兜底
+  /// 联网查询实时物流轨迹（v1.9.136：显式 com + 手机号后 4 位，修 autonumber 失效）
   Future<List<Map<String, String>>?> _fetchTracesOnline(
           String comCode, String waybill) =>
-      ExpressOnline.fetchTraces(comCode, waybill);
+      ExpressOnline.fetchTraces(comCode, waybill,
+          phone4: ExpressOnline.extractPhone4(_phoneMasked));
 
   /// 双击公司/单号行：修改快递单号（可选联网识别公司并拉取实时物流）
   void _editWaybill() {
