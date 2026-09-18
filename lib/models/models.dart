@@ -205,6 +205,9 @@ class OrderItem {
   String shopDiscountLabel; // 店铺优惠右侧标签（超级立减/官方立减等，v1.9.97）
   bool showStyleBtn; // 是否显示「更换款式」按钮（v1.9.98，⋯菜单可关）
   bool showPlatformCoupon; // 是否显示平台优惠券
+  double payDiscount; // 支付优惠金额（v1.9.142）
+  String payDiscountLabel; // 支付优惠右侧标签（支付立减/银行卡立减等）
+  bool showPayDiscount; // 是否显示支付优惠行（默认 false 不显示）
   double coDiscount; // 共减金额
   double shippingFee; // 运费金额（默认 0）
   bool showShippingFee; // 是否显示运费行（默认 false）
@@ -321,6 +324,9 @@ class OrderItem {
     this.shopDiscountLabel = '超级立减',
     this.showStyleBtn = false,
     this.showPlatformCoupon = true,
+    this.payDiscount = 0,
+    this.payDiscountLabel = '',
+    this.showPayDiscount = false,
     this.coDiscount = 0,
     this.shippingFee = 0,
     this.showShippingFee = false,
