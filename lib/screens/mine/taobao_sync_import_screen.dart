@@ -31,6 +31,9 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
   // v1.9.107：强制覆盖店铺头像——修正旧抓包/兜底链抓到的错版头像
   // （红底 logo 等），以本次抓包 newShopImg 为准
   bool _forceAvatar = false;
+  // v1.9.145：强制覆盖物流信息（默认开）——同一订单再次抓包拿到更新的
+  // 物流后，导入即以抓包为准覆盖旧单号/公司/轨迹，全部更新进快递库
+  bool _forceLogistics = true;
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -254,6 +257,41 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                     style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
                   ),
                 ),
+              // v1.9.145：强制覆盖物流信息（默认开）——同一订单再次抓包拿到
+              // 更新的物流后，导入即覆盖旧物流，全部更新进快递库
+              const SizedBox(height: 6),
+              InkWell(
+                onTap: () =>
+                    setState2(() => _forceLogistics = !_forceLogistics),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: _forceLogistics,
+                        onChanged: (v) =>
+                            setState2(() => _forceLogistics = v ?? false),
+                        activeColor: const Color(0xFFFF5000),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text('强制覆盖物流信息（以本次抓包为准）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+              if (_forceLogistics)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '⚠️ 匹配订单的快递单号/公司/物流轨迹将全部以本次抓包覆盖更新，'
+                    '双击改过的物流信息也会冲掉。',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
+                  ),
+                ),
               if (dup > 0) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -330,7 +368,8 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     final result = provider.importSyncedShops(shops,
         forceOrderNos: selected,
         forceTags: _forceTags,
-        forceAvatar: _forceAvatar);
+        forceAvatar: _forceAvatar,
+        forceLogistics: _forceLogistics);
     // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
     // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
     // 覆盖层清除后详情页/退款页立即显示抓包头像
@@ -349,8 +388,11 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
       if (mounted) Navigator.of(context).pop();
     } else if (result.logiFilled > 0) {
       // v1.9.140：纯物流 JSON 导入——订单早已存在时 added=0，
-      // 必须明确告诉用户快递已补进快递库，否则会以为没导进去
-      _toast('快递已补进 ${result.logiFilled} 条已有订单，可到「快递库」查看');
+      // 必须明确告诉用户快递已补进快递库，否则会以为没导进去；
+      // v1.9.145：强制覆盖模式下文案改"更新"
+      _toast(_forceLogistics
+          ? '快递已按抓包更新 ${result.logiFilled} 条已有订单，可到「快递库」查看'
+          : '快递已补进 ${result.logiFilled} 条已有订单，可到「快递库」查看');
       if (mounted) Navigator.of(context).pop();
     } else if (_forceTags) {
       _toast('绿色标签已按抓包强制覆盖（无新订单，${result.skipped} 条已存在）');
