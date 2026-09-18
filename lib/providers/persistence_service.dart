@@ -11,6 +11,19 @@ import '../utils/doc_paths.dart';
 class PersistenceService {
   PersistenceService._();
 
+  /// v1.9.143：物流轨迹归一化——抓包脚本对无物流的订单会写 '[]'，
+  /// 字符串非空会导致覆盖弹窗/快递库混入"无单号空条目"，统一归 ''。
+  static String _normTraces(dynamic raw) {
+    final s = (raw ?? '').toString().trim();
+    if (s.isEmpty) return '';
+    try {
+      if ((jsonDecode(s) as List).isEmpty) return '';
+    } catch (_) {
+      return '';
+    }
+    return s;
+  }
+
   static const _kShops = 'persisted_shops_v1';
   static const _kProfile = 'persisted_profile_v1';
   static const _kDeletedTitle = 'persisted_deleted_titles_v1';
@@ -294,7 +307,7 @@ class PersistenceService {
       waybillBorrowed: j['waybillBorrowed'] ?? false,
       shipLogo: j['shipLogo'] ?? '',
       shipPhone: j['shipPhone'] ?? '',
-      logisticsTraces: j['logisticsTraces'] ?? '',
+      logisticsTraces: _normTraces(j['logisticsTraces']),
       refundSteps: j['refundSteps'] ?? '',
       pickupCode: j['pickupCode'] ?? '',
       pickupGuarantee: j['pickupGuarantee'] ?? '',
