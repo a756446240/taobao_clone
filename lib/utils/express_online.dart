@@ -181,12 +181,57 @@ class ExpressOnline {
     return '运输中 预计明天送达';
   }
 
-  /// 联网查询实时物流轨迹（v1.9.136：已知公司走显式 com 通道，避免 auto 被判
-  /// 升级；顺丰/中通自动带手机号后 4 位）：apizero 优先，快递100 严格判失败兜底
+  /// 快递100 m 站免费查询（无配额限制；圆通等多数公司无需手机号直接出轨迹，
+  /// 顺丰/中通/申通要手机号后 4 位校验，查不到会返「查无结果」判失败）
+  static Future<List<Map<String, String>>?> _fetchKuaidi100(
+      String comCode, String waybill) async {
+    final urls = [
+      'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill',
+      'https://www.kuaidi100.com/query?type=$comCode&postid=$waybill&temp=${DateTime.now().millisecondsSinceEpoch / 1000}',
+    ];
+    for (final url in urls) {
+      try {
+        final client = HttpClient()
+          ..connectionTimeout = const Duration(seconds: 8);
+        final req = await client.getUrl(Uri.parse(url));
+        applyBrowserHeaders(req, 'https://m.kuaidi100.com/');
+        final resp = await req.close().timeout(const Duration(seconds: 8));
+        final body = await resp.transform(utf8.decoder).join();
+        client.close();
+        final j = jsonDecode(body);
+        if (j is! Map || j['status']?.toString() != '200') continue;
+        final data = j['data'];
+        if (data is! List || data.isEmpty) continue;
+        // 「查无结果」是假轨迹，判失败（v1.9.88 修复：此前会被当成成功）
+        if ((data.first['context'] ?? '').toString().contains('查无结果')) {
+          continue;
+        }
+        return [
+          for (final e in data)
+            {
+              'time': (e['time'] ?? '').toString(),
+              'tag': '',
+              'text': (e['context'] ?? '').toString(),
+            }
+        ];
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /// 联网查询实时物流轨迹（v1.9.143：通道顺序调整为快递100 m 站优先——
+  /// 免费无配额，圆通等可直接出轨迹（实测真实单号 13 条）；
+  /// apizero 匿名 30 次/天容易 429，留给顺丰/中通/申通这些要手机号的兜底）
   /// 返回 [{time, tag, text}] 最新在前；失败返回 null
   static Future<List<Map<String, String>>?> fetchTraces(
       String comCode, String waybill,
       {String phone4 = ''}) async {
+    // 1) 快递100 m 站优先（免费无配额）
+    if (comCode.isNotEmpty) {
+      final kd = await _fetchKuaidi100(comCode, waybill);
+      if (kd != null) return kd;
+    }
+    // 2) apizero（显式 com 免费通道 → pro → 自动识别兜底）
     Map<String, dynamic>? r;
     final apCom = _apizeroCom[comCode] ?? '';
     if (apCom.isNotEmpty) {
@@ -218,39 +263,6 @@ class ExpressOnline {
           Map<String, String>.from((e as Map)
               .map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')))
       ];
-    }
-    // 2) 快递100 兜底（免费通道常返「查无结果」，必须严格判失败）
-    if (comCode.isEmpty) return null;
-    final urls = [
-      'https://m.kuaidi100.com/query?type=$comCode&postid=$waybill',
-      'https://www.kuaidi100.com/query?type=$comCode&postid=$waybill&temp=${DateTime.now().millisecondsSinceEpoch / 1000}',
-    ];
-    for (final url in urls) {
-      try {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 8);
-        final req = await client.getUrl(Uri.parse(url));
-        applyBrowserHeaders(req, 'https://m.kuaidi100.com/');
-        final resp = await req.close().timeout(const Duration(seconds: 8));
-        final body = await resp.transform(utf8.decoder).join();
-        client.close();
-        final j = jsonDecode(body);
-        if (j is! Map || j['status']?.toString() != '200') continue;
-        final data = j['data'];
-        if (data is! List || data.isEmpty) continue;
-        // 「查无结果」是假轨迹，判失败（v1.9.88 修复：此前会被当成成功）
-        if ((data.first['context'] ?? '').toString().contains('查无结果')) {
-          continue;
-        }
-        return [
-          for (final e in data)
-            {
-              'time': (e['time'] ?? '').toString(),
-              'tag': '',
-              'text': (e['context'] ?? '').toString(),
-            }
-        ];
-      } catch (_) {}
     }
     return null;
   }
