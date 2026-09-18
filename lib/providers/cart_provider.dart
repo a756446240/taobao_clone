@@ -161,7 +161,11 @@ class CartProvider extends ChangeNotifier {
       bool forceTags = false,
       // v1.9.107：强制覆盖店铺头像——导入页开关打开时，同名店铺所有订单的
       // shopAvatar 无条件以本次抓包为准（修正旧抓包错版头像，如红底 logo）
-      bool forceAvatar = false}) {
+      bool forceAvatar = false,
+      // v1.9.145：强制覆盖物流信息——导入页开关打开时（默认开），匹配订单的
+      // 单号/公司/轨迹/物流摘要/发货时间/logo/电话 无条件以本次抓包为准
+      // （同一订单再次抓包拿到更新的物流后，导入即刷新，全部更新进快递库）
+      bool forceLogistics = false}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -206,7 +210,9 @@ class CartProvider extends ChangeNotifier {
         }
       }
       // v1.9.76：抓包真实物流（全量时间线/公司/单号）同步到已有订单——
-      // 只补空值，用户双击改过的物流文字绝不覆盖
+      // 默认只补空值，用户双击改过的物流文字不覆盖；
+      // v1.9.145：forceLogistics 打开时抓包非空字段无条件以抓包为准——
+      // 同一订单再次抓包拿到更新物流后导入即刷新，全部更新进快递库
       for (final it in shop.items) {
         if (it.orderNo.isEmpty) continue;
         for (final old in _shops) {
@@ -215,40 +221,66 @@ class CartProvider extends ChangeNotifier {
             // v1.9.140：补物流前快照，补成功计一次（一条订单只计一次）
             final hadLogi = oldItem.logisticsTraces.isNotEmpty ||
                 oldItem.waybillNo.isNotEmpty;
-            if (oldItem.logisticsTraces.isEmpty &&
-                it.logisticsTraces.isNotEmpty) {
+            var logiTouched = false;
+            if (it.logisticsTraces.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.logisticsTraces != it.logisticsTraces
+                    : oldItem.logisticsTraces.isEmpty)) {
               oldItem.logisticsTraces = it.logisticsTraces;
               opsBackfilled = true;
+              logiTouched = true;
             }
-            if (oldItem.shipCompany.isEmpty &&
-                it.shipCompany.isNotEmpty) {
+            if (it.shipCompany.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.shipCompany != it.shipCompany
+                    : oldItem.shipCompany.isEmpty)) {
               oldItem.shipCompany = it.shipCompany;
               opsBackfilled = true;
+              logiTouched = true;
             }
-            if (oldItem.waybillNo.isEmpty && it.waybillNo.isNotEmpty) {
+            if (it.waybillNo.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.waybillNo != it.waybillNo
+                    : oldItem.waybillNo.isEmpty)) {
               oldItem.waybillNo = it.waybillNo;
+              // 抓包来的单号就是该订单的真实单号，清掉借用标记（v1.9.145），
+              // 之后进物流页也会自动联网刷新
+              oldItem.waybillBorrowed = false;
               opsBackfilled = true;
+              logiTouched = true;
             }
-            if (!hadLogi &&
-                (oldItem.logisticsTraces.isNotEmpty ||
-                    oldItem.waybillNo.isNotEmpty)) {
+            if (logiTouched && (!hadLogi || forceLogistics)) {
               logiFilled++;
             }
-            if (oldItem.logistics.isEmpty && it.logistics.isNotEmpty) {
+            if (it.logistics.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.logistics != it.logistics
+                    : oldItem.logistics.isEmpty)) {
               oldItem.logistics = it.logistics;
               opsBackfilled = true;
             }
-            // 发货时间：抓包真实值只补空（待发货本就为空，不反向清）
-            if (oldItem.shipTime.isEmpty && it.shipTime.isNotEmpty) {
+            // 发货时间：抓包真实值默认只补空（待发货本就为空，不反向清）；
+            // forceLogistics 时以抓包为准
+            if (it.shipTime.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.shipTime != it.shipTime
+                    : oldItem.shipTime.isEmpty)) {
               oldItem.shipTime = it.shipTime;
               opsBackfilled = true;
             }
-            // 快递官方 logo/客服电话（v1.9.79）：抓包真实值只补空
-            if (oldItem.shipLogo.isEmpty && it.shipLogo.isNotEmpty) {
+            // 快递官方 logo/客服电话（v1.9.79）：抓包真实值默认只补空；
+            // forceLogistics 时以抓包为准
+            if (it.shipLogo.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.shipLogo != it.shipLogo
+                    : oldItem.shipLogo.isEmpty)) {
               oldItem.shipLogo = it.shipLogo;
               opsBackfilled = true;
             }
-            if (oldItem.shipPhone.isEmpty && it.shipPhone.isNotEmpty) {
+            if (it.shipPhone.isNotEmpty &&
+                (forceLogistics
+                    ? oldItem.shipPhone != it.shipPhone
+                    : oldItem.shipPhone.isEmpty)) {
               oldItem.shipPhone = it.shipPhone;
               opsBackfilled = true;
             }
