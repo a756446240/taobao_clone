@@ -786,6 +786,10 @@ class CartProvider extends ChangeNotifier {
     String? shopDiscountLabel,
     bool? showStyleBtn,
     bool? showPlatformCoupon,
+    double? payDiscount,
+    String? payDiscountLabel,
+    bool? showPayDiscount,
+    String? orderNo,
     double? coDiscount,
     double? shippingFee,
     bool? showShippingFee,
@@ -884,6 +888,10 @@ class CartProvider extends ChangeNotifier {
     if (shopDiscountLabel != null) item.shopDiscountLabel = shopDiscountLabel;
     if (showStyleBtn != null) item.showStyleBtn = showStyleBtn;
     if (showPlatformCoupon != null) item.showPlatformCoupon = showPlatformCoupon;
+    if (payDiscount != null) item.payDiscount = payDiscount;
+    if (payDiscountLabel != null) item.payDiscountLabel = payDiscountLabel;
+    if (showPayDiscount != null) item.showPayDiscount = showPayDiscount;
+    if (orderNo != null && orderNo.isNotEmpty) item.orderNo = orderNo;
     if (coDiscount != null) item.coDiscount = coDiscount;
     if (shippingFee != null) item.shippingFee = shippingFee;
     if (showShippingFee != null) item.showShippingFee = showShippingFee;
