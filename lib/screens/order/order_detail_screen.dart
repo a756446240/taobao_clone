@@ -47,6 +47,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   // 商品标题展开状态（v1.9.99：>16字默认折叠1行，点∨展开；key=商品标题）
   final Set<String> _expandedTitles = {};
   bool _platformCouponExpanded = false; // 平台优惠明细展开（v1.9.93）
+  bool _payDiscountExpanded = false; // 支付优惠明细展开（v1.9.142）
 
   @override
   void initState() {
@@ -1321,16 +1322,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // 有明细时该组总额 = 子项之和（抓包导入的订单 shopDiscount/platformCoupon 为 0）
     final shopSubs = _discountSubs('shop');
     final platformSubs = _discountSubs('platform');
+    final paySubs = _discountSubs('pay');
     final shopTotal =
         shopSubs.isNotEmpty ? _subsSum(shopSubs) : _item.shopDiscount;
     final platformTotal = platformSubs.isNotEmpty
         ? _subsSum(platformSubs)
         : _item.platformCoupon;
-    // 共减 = 店铺优惠 + 平台优惠（优先用持久化的共减字段）
+    final payTotal =
+        paySubs.isNotEmpty ? _subsSum(paySubs) : _item.payDiscount;
+    // 共减 = 店铺优惠 + 平台优惠 + 支付优惠（优先用持久化的共减字段）
     final co = _item.coDiscount > 0
         ? _item.coDiscount
         : (_item.showShopDiscount ? shopTotal : 0) +
-            (_item.showPlatformCoupon ? platformTotal : 0);
+            (_item.showPlatformCoupon ? platformTotal : 0) +
+            (_item.showPayDiscount ? payTotal : 0);
     return [
       _priceRow('商品总价', '共$totalQty件',
           '¥${productTotal.toStringAsFixed(2)}'),
@@ -1347,7 +1352,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (_item.showShopDiscount)
         _discountGroupRow(
           group: 'shop',
-          icon: Icons.storefront,
+          icon: 'assets/images/icons/discount_shop.png',
           label: '店铺优惠',
           sub: _item.shopDiscountLabel,
           total: shopTotal,
@@ -1360,7 +1365,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (_item.showPlatformCoupon)
         _discountGroupRow(
           group: 'platform',
-          icon: Icons.confirmation_number,
+          icon: 'assets/images/icons/discount_platform.png',
           label: '平台优惠',
           sub: _item.platformCouponLabel,
           total: platformTotal,
@@ -1369,6 +1374,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           onToggle: () => setState(
               () => _platformCouponExpanded = !_platformCouponExpanded),
           onEditLabel: () => _pickDiscountLabel('platform'),
+        ),
+      // v1.9.142：支付优惠（默认不显示，编辑菜单可开），编辑逻辑同店铺/平台优惠
+      if (_item.showPayDiscount)
+        _discountGroupRow(
+          group: 'pay',
+          icon: 'assets/images/icons/discount_pay.png',
+          label: '支付优惠',
+          sub: _item.payDiscountLabel,
+          total: payTotal,
+          subs: paySubs,
+          expanded: _payDiscountExpanded,
+          onToggle: () => setState(
+              () => _payDiscountExpanded = !_payDiscountExpanded),
+          onEditLabel: () => _pickDiscountLabel('pay'),
         ),
       Row(
         children: [
@@ -1493,6 +1512,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  /// v1.9.142：优惠分组行图标改高清贴图（店铺/平台/支付三枚区分，
+  /// 512px 矢量重绘，小尺寸不虛），尺寸对齐原 16px 红块
+  Widget _discountAssetIcon(String asset) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 5),
+      child: Image.asset(asset, width: 16, height: 16),
+    );
+  }
+
   Widget _priceRow(String label, String sub, String value,
       {Color? valueColor, IconData? icon}) {
     return Padding(
@@ -1545,11 +1573,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 无抓包明细时的确定性自动拆分（对齐真实淘宝常见子项名）
   List<Map<String, dynamic>> _autoDiscountSubs(String group) {
-    final total =
-        group == 'shop' ? _item.shopDiscount : _item.platformCoupon;
+    final total = group == 'shop'
+        ? _item.shopDiscount
+        : group == 'platform'
+            ? _item.platformCoupon
+            : _item.payDiscount;
     if (total <= 0) return const [];
     final rnd = Random('${_item.orderNo}_$group'.hashCode);
     double r2(double v) => double.parse(v.toStringAsFixed(2));
+    // 支付组：单个子项（支付立减），对齐真实淘宝
+    if (group == 'pay') {
+      return [
+        {'group': group, 'name': '支付立减', 'sub': '', 'amount': r2(total)}
+      ];
+    }
     if (group == 'shop') {
       if (total >= 40) {
         final a = r2(total * (0.35 + rnd.nextDouble() * 0.1));
@@ -1617,10 +1654,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     ];
   }
 
-  /// 优惠分组行（店铺优惠/平台优惠）：单击展开/收起子项，双击编辑明细
+  /// 优惠分组行（店铺优惠/平台优惠/支付优惠）：单击展开/收起子项，双击编辑明细
   Widget _discountGroupRow({
     required String group,
-    required IconData icon,
+    required String icon,
     required String label,
     required String sub,
     required double total,
@@ -1639,7 +1676,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onDoubleTap: () => _editDiscountDetails(group, label),
             child: Row(
               children: [
-                _discountIcon(icon),
+                _discountAssetIcon(icon),
                 Text(label, style: AppTextStyles.small),
                 // v1.9.110：店铺优惠标签（超级立减/官方立减）改黑色细体无框；
                 // v1.9.113：平台优惠标签（满60元可减/淘金币已抵X）改浅橘打底
@@ -1648,7 +1685,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onDoubleTap: onEditLabel,
-                    child: group == 'platform'
+                    child: group != 'shop'
                         ? Container(
                             margin: const EdgeInsets.only(left: 6),
                             padding: const EdgeInsets.symmetric(
@@ -1761,17 +1798,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 优惠标签选择（v1.9.97）：双击店铺优惠/平台优惠右侧橙色标签弹出，
+  /// 优惠标签选择（v1.9.97）：双击店铺优惠/平台优惠/支付优惠右侧橙色标签弹出，
   /// 从常用标签里选，也可自定义或隐藏
   void _pickDiscountLabel(String group) {
     final isShop = group == 'shop';
+    final isPay = group == 'pay';
     final presets = isShop
         ? const ['超级立减', '官方立减', '单品直降', '店铺满减', '会员专享价', '店铺券']
-        : const ['满60元可减', '淘金币已抵', '88VIP专享', '跨店满减', '消费券', '红包已抵'];
+        : isPay
+            ? const ['支付立减', '银行卡立减', '支付宝立减', '微信立减金', '云闪付立减']
+            : const ['满60元可减', '淘金币已抵', '88VIP专享', '跨店满减', '消费券', '红包已抵'];
+    final groupName = isShop ? '店铺优惠' : isPay ? '支付优惠' : '平台优惠';
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text(isShop ? '选择店铺优惠标签' : '选择平台优惠标签',
+        title: Text('选择$groupName标签',
             style: const TextStyle(fontSize: 15)),
         children: [
           ...presets.map((p) => SimpleDialogOption(
@@ -1779,7 +1820,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   context.read<CartProvider>().updateOrderItem(
                         _item,
                         shopDiscountLabel: isShop ? p : null,
-                        platformCouponLabel: isShop ? null : p,
+                        platformCouponLabel:
+                            (!isShop && !isPay) ? p : null,
+                        payDiscountLabel: isPay ? p : null,
                       );
                   Navigator.pop(ctx);
                 },
@@ -1798,7 +1841,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 context.read<CartProvider>().updateOrderItem(
                       _item,
                       shopDiscountLabel: isShop ? v : null,
-                      platformCouponLabel: isShop ? null : v,
+                      platformCouponLabel:
+                          (!isShop && !isPay) ? v : null,
+                      payDiscountLabel: isPay ? v : null,
                     );
               });
             },
@@ -1812,7 +1857,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               context.read<CartProvider>().updateOrderItem(
                     _item,
                     shopDiscountLabel: isShop ? '' : null,
-                    platformCouponLabel: isShop ? null : '',
+                    platformCouponLabel:
+                        (!isShop && !isPay) ? '' : null,
+                    payDiscountLabel: isPay ? '' : null,
                   );
               Navigator.pop(ctx);
             },
@@ -1825,6 +1872,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// 修改订单编号（v1.9.142）：同单号的所有商品行一起改，
+  /// 避免多商品合并订单因单号不一致被拆散
+  void _editOrderNo(CartProvider provider) {
+    _editText('修改订单编号', _orderNo, (v) {
+      final newNo = v.trim();
+      final oldNo = _item.orderNo;
+      if (newNo.isEmpty || newNo == oldNo) return;
+      for (final shop in provider.shops) {
+        for (final it in shop.items) {
+          if (it.orderNo == oldNo) {
+            provider.updateOrderItem(it, orderNo: newNo);
+          }
+        }
+      }
+    });
   }
 
   Future<void> _editDiscountDetails(String group, String label) async {
@@ -1977,6 +2041,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           discountDetails: jsonEncode(merged),
           shopDiscount: group == 'shop' ? sum : null,
           platformCoupon: group == 'platform' ? sum : null,
+          payDiscount: group == 'pay' ? sum : null,
         );
   }
 
@@ -3140,6 +3205,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           }
                         });
                       }),
+                      // v1.9.142：订单编号可改——同单号的所有商品行联动改，
+                      // 避免多商品合并订单分组被打散
+                      _editTile(Icons.tag, '修改订单编号', () {
+                        _editOrderNo(provider);
+                      }),
                       const Divider(height: 1),
                       _editTile(Icons.monetization_on, '修改商品总价', () {
                         _editNumber('修改商品总价', _item.productTotal, (v) {
@@ -3204,6 +3274,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _editTile(Icons.local_offer, '修改平台优惠', () {
                         _editNumber('修改平台优惠', _item.platformCoupon, (v) {
                           provider.updateOrderItem(_item, platformCoupon: v);
+                        });
+                      }),
+                      // v1.9.142：支付优惠（默认不显示，开关打开后出现）
+                      _switchTile(Icons.visibility_off, '隐藏支付优惠',
+                          value: !_item.showPayDiscount, onChanged: (v) {
+                        provider.updateOrderItem(
+                            _item, showPayDiscount: !v);
+                        setSheetState(() {});
+                      }),
+                      _editTile(Icons.payment, '修改支付优惠', () {
+                        _editNumber('修改支付优惠', _item.payDiscount, (v) {
+                          provider.updateOrderItem(_item, payDiscount: v);
                         });
                       }),
                       _editTile(Icons.exposure_minus_1, '修改共减', () {
