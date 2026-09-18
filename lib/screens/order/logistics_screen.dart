@@ -115,7 +115,19 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
   /// - 拉到已签收 → 订单自动跳「待确认收货」
   Future<void> _autoRefreshOnline({bool force = false}) async {
     final it = item;
-    if (it == null || _refreshingOnline) return;
+    if (it == null) return;
+    if (_refreshingOnline) {
+      // v1.9.144：手动长按撞上正在进行的上一次刷新时给明确反馈，
+      // 不再静默丢弃（此前直接 return，用户感知"长按联网更新没反应"）
+      if (force && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('正在联网刷新中，请稍候…'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
     // 只跟踪真实/手动覆盖的单号；空单号（派生假号）不联网
     final waybill = it.waybillNo.trim();
     if (waybill.isEmpty) {
@@ -129,6 +141,11 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       }
       return;
     }
+    // v1.9.144：进页面的【自动】刷新跳过借用单号——借用单号多为顺丰/中通/申通
+    // （免费接口要手机号后4位必失败），每次进物流页都跑一长串超时请求（最坏
+    // 半分钟以上），期间把手动长按刷新也堵死（"长按没反应"的根因）；
+    // 手动长按（force=true）仍然允许借用单号联网刷新（v1.9.143 保留）
+    if (!force && it.waybillBorrowed) return;
     // v1.9.143：借用/覆盖的单号也允许联网刷新——拉回来的就是该单号
     // 真实物流，正是借用/覆盖的目的（此前跳过被用户反馈"联网更新不行"）；
     // 刷新成功后同步给所有共享该单号的订单，多处展示保持一致不"串单"
@@ -147,7 +164,10 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     _refreshingOnline = true;
     try {
       final detected = await _detectCompany(waybill);
-      final list = await _fetchTracesOnline(detected.$1, waybill);
+      // v1.9.144：全通道总耗时 20s 封顶（此前各通道串行超时叠加最坏
+      // 近 1 分钟，期间长按刷新被堵死）
+      final list = await _fetchTracesOnline(detected.$1, waybill)
+          .timeout(const Duration(seconds: 20), onTimeout: () => null);
       if (!mounted) return;
       if (list == null || list.isEmpty) {
         // v1.9.101：拉取失败给明确反馈，不再静默无反应
@@ -908,9 +928,11 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                 child: GestureDetector(
                   onDoubleTap: _editWaybill,
                   onLongPress: () {
+                    // v1.9.144：刷新中的提示持续显示直到结果被替换（此前 1 秒
+                    // 就消失，之后十几秒无任何反馈，用户感知"没反应"）
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                       content: Text('正在联网刷新最新物流…'),
-                      duration: Duration(seconds: 1),
+                      duration: Duration(seconds: 15),
                     ));
                     _autoRefreshOnline(force: true);
                   },
