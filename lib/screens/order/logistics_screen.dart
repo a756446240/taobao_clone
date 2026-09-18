@@ -62,21 +62,41 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     });
   }
 
-  /// 无单号的假订单：从抓包运单池按订单号哈希稳定分配一个真实单号，
+  /// 无单号的假订单：从抓包运单池分配一个真实单号，
   /// 连带快递公司/官方头像/客服电话，之后即可联网实时跟踪
   void _assignCapturedWaybill() {
     final it = item;
     if (it == null || it.waybillNo.isNotEmpty) return;
     final provider = context.read<CartProvider>();
-    final pool = <OrderItem>[
+    final all = <OrderItem>[
       for (final s in provider.shops)
         for (final e in s.items)
-          if (!identical(e, it) && e.waybillNo.isNotEmpty) e,
+          if (!identical(e, it)) e,
     ];
+    final pool = all.where((e) => e.waybillNo.isNotEmpty).toList();
     if (pool.isEmpty) return;
+    // v1.9.143：按"最少被借用"优先分配（同次数按订单号哈希打散）——
+    // 此前纯哈希取模，池子小时一堆假订单全分到同一个单号
+    // （用户反馈"全是这个顺丰单号"），现在各家快递均匀摊开
+    final borrowCount = <String, int>{};
+    for (final e in all) {
+      if (e.waybillBorrowed && e.waybillNo.isNotEmpty) {
+        borrowCount[e.waybillNo] = (borrowCount[e.waybillNo] ?? 0) + 1;
+      }
+    }
     final seed = it.orderNo.isEmpty ? it.title.hashCode : it.orderNo.hashCode;
-    final donor = pool[seed.abs() % pool.length];
-    // v1.9.101：标记为借用单号——联网刷新跳过借用单号，避免串入别的订单物流
+    OrderItem donor = pool.first;
+    var bestScore = 1 << 62;
+    for (final d in pool) {
+      final c = borrowCount[d.waybillNo] ?? 0;
+      final score = c * 1000000 + ((seed + d.waybillNo.hashCode) & 0xFFFFF);
+      if (score < bestScore) {
+        bestScore = score;
+        donor = d;
+      }
+    }
+    // v1.9.101：标记为借用单号——v1.9.143 起借用单号也可联网刷新
+    // （刷新拉的就是该单号真实物流，正是借用目的），标记仅用于统计分配
     it.waybillBorrowed = true;
     provider.updateOrderItem(
       it,
@@ -109,41 +129,14 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       }
       return;
     }
-    // v1.9.101：借用单号（运单池分配）不联网拉轨迹——
-    // 拉回来的必是别的订单的物流信息（用户反馈"串单"根因）
-    if (it.waybillBorrowed) {
-      if (force && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('该订单未关联真实快递单号，双击公司行填写真实单号后可联网刷新'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-      return;
-    }
-    // v1.9.113：运行时共享单号守卫——同一运单号被多个订单使用且归属
-    // 未标记清楚时（老数据/覆盖流程残留），一律不联网拉轨迹，
-    // 否则拉回来的必是另一个订单的物流（用户反馈"刷新串单"）
-    {
-      final provider = context.read<CartProvider>();
-      final sharers = <OrderItem>[
-        for (final s in provider.shops)
-          for (final e in s.items)
-            if (!identical(e, it) && e.waybillNo.trim() == waybill) e,
-      ];
-      final ambiguous =
-          sharers.any((e) => !e.waybillBorrowed);
-      if (ambiguous) {
-        if (force && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('该单号同时关联多个订单，已跳过联网刷新避免串单'),
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ));
-        }
-        return;
-      }
-    }
+    // v1.9.143：借用/覆盖的单号也允许联网刷新——拉回来的就是该单号
+    // 真实物流，正是借用/覆盖的目的（此前跳过被用户反馈"联网更新不行"）；
+    // 刷新成功后同步给所有共享该单号的订单，多处展示保持一致不"串单"
+    final sharers = <OrderItem>[
+      for (final s in context.read<CartProvider>().shops)
+        for (final e in s.items)
+          if (!identical(e, it) && e.waybillNo.trim() == waybill) e,
+    ];
     if (!force) {
       final real = _realTraces;
       if (real != null) {
@@ -171,9 +164,10 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       // v1.9.110：摘要写「派送中 预计今天送达」式短文案（对齐真实淘宝），
       // 不再把首条原始轨迹长文塞进订单列表
       final summary = ExpressOnline.summarize(list);
+      final tracesJson = jsonEncode(list);
       provider.updateOrderItem(
         it,
-        logisticsTraces: jsonEncode(list),
+        logisticsTraces: tracesJson,
         logistics: summary.isNotEmpty ? summary : it.logistics,
         // 公司/头像只在缺省时补，用户手动改过的绝不覆盖
         shipCompany:
@@ -182,6 +176,15 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
             ? _logoForComCode(detected.$1)
             : null,
       );
+      // v1.9.143：同一单号的其他订单（借用/覆盖来的）同步同一份真实轨迹，
+      // 处处一致（只同步轨迹与摘要，不动它们的订单状态）
+      for (final e in sharers) {
+        provider.updateOrderItem(
+          e,
+          logisticsTraces: tracesJson,
+          logistics: summary.isNotEmpty ? summary : e.logistics,
+        );
+      }
       // 已签收 → 自动转「待确认收货」
       final firstTag = (list.first['tag'] ?? '').toString();
       if (firstTag.contains('签收') &&
@@ -312,7 +315,12 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     if (it == null) return 'SF3102886642157';
     if (it.waybillNo.isNotEmpty) return it.waybillNo;
     final digits = it.orderNo.replaceAll(RegExp(r'\D'), '');
-    return 'SF${digits.padLeft(13, '0').substring(0, 13)}';
+    // v1.9.143：取订单号【后】13 位派生——同批抓包订单号前 13 位几乎相同，
+    // 取前 13 位会把一堆订单派生成同一个 SF 单号（用户反馈"全是这个顺丰单号"）
+    if (digits.length >= 13) {
+      return 'SF${digits.substring(digits.length - 13)}';
+    }
+    return 'SF${digits.padLeft(13, '0')}';
   }
 
   /// 本地生成时间线（无抓包数据时的兜底，与订单状态一致）
@@ -580,11 +588,21 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     if (it == null) return;
     final provider = context.read<CartProvider>();
     // 收集所有带抓包真实物流时间线的订单（排除当前单）
+    // v1.9.143：必须同时有单号+轨迹——无单号的条目覆盖过去也没法联网跟踪，
+    // 且弹窗里只显示"快递"两个字没法选（用户反馈"抓包的快递不显示单号"）
     final candidates = <OrderItem>[];
     for (final shop in provider.shops) {
       for (final e in shop.items) {
         if (identical(e, it)) continue;
-        if (e.logisticsTraces.isNotEmpty) candidates.add(e);
+        if (e.waybillNo.isEmpty) continue;
+        final raw = e.logisticsTraces.trim();
+        if (raw.isEmpty) continue;
+        try {
+          if ((jsonDecode(raw) as List).isEmpty) continue;
+        } catch (_) {
+          continue;
+        }
+        candidates.add(e);
       }
     }
     if (candidates.isEmpty) {
