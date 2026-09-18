@@ -1064,7 +1064,7 @@ class _MineScreenState extends State<MineScreen> {
   /// 单击"设置" → 设置页（双击仍是编辑资料）
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.142')),
+      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.143')),
     );
   }
 
