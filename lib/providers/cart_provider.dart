@@ -1188,10 +1188,43 @@ class CartProvider extends ChangeNotifier {
       it.orderNo =
           '5127${List.generate(15, (_) => rng.nextInt(10)).join()}';
     }
+    // v1.9.146：克隆时自动采用同店其他订单里最新抓包的头像
+    //（克隆体是 JSON 深拷贝，会原样带走源单头像；若同店有更新的
+    // 真实抓包头像，以最新者为准，避免克隆出过期/错版头像）
+    final latestAvatar = _latestCapturedAvatar(shop.shopName);
+    if (latestAvatar.isNotEmpty) {
+      cloned.shopAvatar = latestAvatar;
+    }
     _shops.insert(0, cloned);
     _persist();
     notifyListeners();
     return cloned;
+  }
+
+  /// v1.9.146：在同名店铺的所有订单里找"最新抓包"的真实店铺头像。
+  /// 只认非淘宝通用默认图的头像；按订单最早创建时间排序，最新者优先。
+  /// 没有任何真实抓包头像时返回空串（调用方保留原头像）。
+  String _latestCapturedAvatar(String shopName) {
+    String best = '';
+    DateTime? bestTime;
+    for (final s in _shops) {
+      if (s.shopName != shopName) continue;
+      final av = s.shopAvatar;
+      if (av.isEmpty || _isGenericAvatar(av)) continue;
+      DateTime? t;
+      for (final it in s.items) {
+        final itTime = _parseCreateTime(it.createTime);
+        if (itTime != null && (t == null || itTime.isBefore(t))) {
+          t = itTime;
+        }
+      }
+      final newer = t != null && (bestTime == null || t.isAfter(bestTime));
+      if (best.isEmpty || newer) {
+        best = av;
+        if (t != null) bestTime = t;
+      }
+    }
+    return best;
   }
 
   /// 删除整单（订单管理页左滑删除）
