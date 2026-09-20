@@ -136,6 +136,12 @@ class OrderItem {
   String imageUrl;
   String title;
   String configuration;
+
+  /// v1.9.146：订单级店铺头像——真实淘宝按订单存下单时的店铺头像快照，
+  /// 同一家店不同订单的头像可以不一样（店铺改过头像后老订单仍是旧头像）。
+  /// 非空时详情页/退款页优先显示它，空=回退店铺组级 shopAvatar。
+  String shopAvatar;
+
   final int stock;
   double price;
   double? originalPrice; // 划线价（平台加补前）
@@ -284,6 +290,7 @@ class OrderItem {
     required this.imageUrl,
     required this.title,
     required this.configuration,
+    this.shopAvatar = '',
     required this.stock,
     required this.price,
     this.originalPrice,
