@@ -781,14 +781,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return GestureDetector(onDoubleTap: _pickShopLineStyle, child: child);
   }
 
-  /// 商家头像显示：优先相册替换图（以店铺名为 key 持久化）
+  /// 商家头像显示（v1.9.146 订单级头像）：
+  /// 优先级 订单级手动覆盖 > 订单级抓包头像 > 店铺级手动覆盖 >
+  /// 店铺级抓包头像 > 淘宝默认店标。真实淘宝按订单存下单时的店铺头像
+  /// 快照，同店不同订单头像可以不一样，店铺组级头像兜底旧数据。
   Widget _shopAvatar() {
+    // 本订单手动换的头像（双击头像选相册，按订单号存）
+    final orderOverride = context
+        .watch<ProductImageProvider>()
+        .imageFor('shop_avatar:order:$_orderNo');
+    if (orderOverride != null) {
+      return AppImage(url: orderOverride, width: 30, height: 30);
+    }
+    // 本订单抓包/预置的订单级头像
+    if (_item.shopAvatar.isNotEmpty) {
+      return AppImage(url: _item.shopAvatar, width: 30, height: 30);
+    }
+    // 店铺级手动覆盖（旧版按店铺名存，全店订单共享）
     final override =
         context.watch<ProductImageProvider>().imageFor('shop_avatar:${_shop.shopName}');
     if (override != null) {
       return AppImage(url: override, width: 30, height: 30);
     }
-    // v1.9.78：抓包真实店铺头像优先
+    // v1.9.78：抓包真实店铺头像（店铺组级）
     if (_shop.shopAvatar.isNotEmpty) {
       return AppImage(url: _shop.shopAvatar, width: 30, height: 30);
     }
@@ -813,9 +828,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await File(picked.path).copy('${saveDir.path}/$fileName');
       if (!mounted) return;
       // v1.9.102：存相对 Documents 路径——自签重装容器变化后头像不丢
+      // v1.9.146：改按订单号存——同店不同订单头像可以不一样（真实淘宝
+      // 按订单存店铺头像快照），双击只影响当前这一个订单
       await context
           .read<ProductImageProvider>()
-          .setOverride('shop_avatar:${_shop.shopName}',
+          .setOverride('shop_avatar:order:$_orderNo',
               'shop_avatars/$fileName');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
