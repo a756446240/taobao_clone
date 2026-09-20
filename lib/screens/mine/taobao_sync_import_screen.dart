@@ -373,10 +373,17 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
     // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
     // 覆盖层清除后详情页/退款页立即显示抓包头像
+    // v1.9.146：同时清掉订单级头像覆盖（shop_avatar:order:单号），
+    // 否则订单级优先级高于抓包回填，强制覆盖不生效
     final imgProvider = context.read<ProductImageProvider>();
     for (final s in shops) {
       if (s.shopAvatar.isNotEmpty) {
         imgProvider.removeOverride('shop_avatar:${s.shopName}');
+        for (final it in s.items) {
+          if (it.orderNo.isNotEmpty) {
+            imgProvider.removeOverride('shop_avatar:order:${it.orderNo}');
+          }
+        }
       }
     }
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
