@@ -130,6 +130,7 @@ class PersistenceService {
   static Map<String, dynamic> _itemToJson(OrderItem item) {
     return {
       'imageUrl': item.imageUrl,
+      'shopAvatar': item.shopAvatar,
       'title': item.title,
       'configuration': item.configuration,
       'stock': item.stock,
@@ -222,6 +223,7 @@ class PersistenceService {
     return OrderItem(
       // v1.9.102：本地图片路径统一转相对 Documents 存储（自签重装不丢图）
       imageUrl: DocPaths.relativize(j['imageUrl'] ?? ''),
+      shopAvatar: DocPaths.relativize(j['shopAvatar'] ?? ''),
       title: j['title'] ?? '',
       configuration: j['configuration'] ?? '',
       stock: j['stock'] ?? 0,
