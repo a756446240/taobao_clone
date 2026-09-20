@@ -949,6 +949,34 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
+  /// 店铺头像图（v1.9.146 订单级优先，与订单详情页 _shopAvatar 同规则）：
+  /// 订单级手动覆盖 > 订单级抓包头像 > 店铺级手动覆盖 > 店铺级抓包 > 默认店标
+  Widget _buildShopAvatarImage() {
+    final orderOverride = context
+        .read<ProductImageProvider>()
+        .imageFor('shop_avatar:order:${_item.orderNo}');
+    if (orderOverride != null) {
+      return AppImage(url: orderOverride, width: 22, height: 22,
+          fit: BoxFit.cover);
+    }
+    if (_item.shopAvatar.isNotEmpty) {
+      return AppImage(url: _item.shopAvatar, width: 22, height: 22,
+          fit: BoxFit.cover);
+    }
+    final override = context
+        .read<ProductImageProvider>()
+        .imageFor('shop_avatar:${_shop.shopName}');
+    if (override != null) {
+      return AppImage(url: override, width: 22, height: 22, fit: BoxFit.cover);
+    }
+    if (_shop.shopAvatar.isNotEmpty) {
+      return AppImage(url: _shop.shopAvatar, width: 22, height: 22,
+          fit: BoxFit.cover);
+    }
+    return Image.asset('assets/images/shop_default.png',
+        width: 22, height: 22, fit: BoxFit.cover);
+  }
+
   // ============ 店铺行 ============
   Widget _buildShopRow() {
     return Container(
@@ -958,15 +986,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          // 店铺头像：优先抓包真实头像（shopAvatar），空则淘宝通用默认店标
+          // 店铺头像（v1.9.146 订单级优先）：订单级覆盖/抓包头像 >
+          // 店铺级覆盖/抓包头像（shopAvatar），空则淘宝通用默认店标
           // （v1.9.109：橙色小店图标，与订单详情页一致，不再用红圆"淘"）
           ClipRRect(
             borderRadius: BorderRadius.circular(11),
-            child: _shop.shopAvatar.isNotEmpty
-                ? AppImage(url: _shop.shopAvatar, width: 22, height: 22,
-                    fit: BoxFit.cover)
-                : Image.asset('assets/images/shop_default.png',
-                    width: 22, height: 22, fit: BoxFit.cover),
+            child: _buildShopAvatarImage(),
           ),
           const SizedBox(width: 6),
           Expanded(
