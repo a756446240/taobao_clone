@@ -1073,15 +1073,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   fontWeight: FontWeight.w600,
                                   color: Colors.black)),
                         ),
-                        const SizedBox(width: 6),
-                        // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
-                        const Text('价格明细',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: Color(0xFF999999))),
-                        const Icon(Icons.chevron_right,
-                            size: 12, color: Color(0xFF999999)),
+                        // v1.9.146：店铺/平台/支付优惠全部隐藏时，
+                        // 价格明细入口一并隐藏（没有可展开的优惠就没意义了）
+                        if (_item.showShopDiscount ||
+                            _item.showPlatformCoupon ||
+                            _item.showPayDiscount) ...[
+                          const SizedBox(width: 6),
+                          // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
+                          const Text('价格明细',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFF999999))),
+                          const Icon(Icons.chevron_right,
+                              size: 12, color: Color(0xFF999999)),
+                        ],
                         const Spacer(),
                       ],
                     ),
