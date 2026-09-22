@@ -74,15 +74,24 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     final provider = context.read<CartProvider>();
     // v1.9.116：备份文件里带已删除订单黑名单时一并恢复（合并去重），
     // 防掉签重装后旧备份恢复完、之前删掉的订单又被抓包导入复活
+    // v1.9.149：同时识别纯物流 JSON（抓快递物流脚本输出的 logisticsOnly
+    // 标记）——只补已有订单物流 + 物流单进独立物流库，不新增订单卡片
+    var logisticsOnly = false;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
+        logisticsOnly = decoded['logisticsOnly'] == true;
         final nos = decoded['deletedTradeNos'];
         if (nos is List && nos.isNotEmpty) {
           provider.restoreDeletedTradeNos(nos.map((e) => e.toString()));
         }
       }
     } catch (_) {}
+    // v1.9.149：JSON 里带运单号的物流单条数（确认弹窗展示用）
+    final waybillCount = shops
+        .expand((s) => s.items)
+        .where((it) => it.waybillNo.trim().isNotEmpty)
+        .length;
     final existingNos = <String>{
       for (final s in provider.shops)
         for (final it in s.items) it.orderNo,
@@ -184,10 +193,16 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '来源：$sourceDesc\n'
-                '解析到 ${shops.length} 家店铺 / $total 条订单\n\n'
-                '✅ 新增导入：${total - dup} 条\n'
-                '⏭ 已存在：$dup 条（默认跳过，只补空字段）',
+                logisticsOnly
+                    ? '来源：$sourceDesc（纯物流）\n'
+                        '解析到 $waybillCount 条物流单\n\n'
+                        '📦 全部物流单进「物流」页（订单存不存在都算）\n'
+                        '⏭ 已有订单只补物流，不新增订单卡片'
+                    : '来源：$sourceDesc\n'
+                        '解析到 ${shops.length} 家店铺 / $total 条订单\n\n'
+                        '✅ 新增导入：${total - dup} 条\n'
+                        '⏭ 已存在：$dup 条（默认跳过，只补空字段）\n'
+                        '📦 $waybillCount 条物流单同时进「物流」页',
                 style: const TextStyle(fontSize: 13, height: 1.6),
               ),
               // v1.9.103：强制覆盖绿色标签开关（配合 taobao_tags_*.json 使用）
@@ -292,7 +307,7 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                     style: TextStyle(fontSize: 12, color: Color(0xFFFF5000)),
                   ),
                 ),
-              if (dup > 0) ...[
+              if (dup > 0 && !logisticsOnly) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () async {
@@ -369,7 +384,9 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
         forceOrderNos: selected,
         forceTags: _forceTags,
         forceAvatar: _forceAvatar,
-        forceLogistics: _forceLogistics);
+        forceLogistics: _forceLogistics,
+        // v1.9.149：纯物流 JSON 不新增订单卡片
+        addOrders: !logisticsOnly);
     // v1.9.102：抓包真实店铺头像「强制覆盖」——清掉同名店铺的手动换头像
     // 覆盖层（用户反馈之前手动换的头像不理想，以抓包真实头像为准）；
     // 覆盖层清除后详情页/退款页立即显示抓包头像
@@ -388,18 +405,28 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
     }
     final tail = result.blocked > 0 ? '，拦截已删除 ${result.blocked} 条' : '';
     final cover = selected.isNotEmpty ? '，其中覆盖 ${selected.length} 条' : '';
-    if (result.added > 0) {
+    // v1.9.149：物流单入库条数提示（订单存不存在都算）
+    final ex = result.expressUpserted > 0
+        ? '，${result.expressUpserted} 条物流单进「物流」页'
+        : '';
+    if (logisticsOnly) {
+      // v1.9.149：纯物流 JSON——告诉用户物流单进了物流页、订单卡片没动
+      _toast('物流单已导入：${result.expressUpserted} 条进「物流」页'
+          '${result.logiFilled > 0 ? '，${result.logiFilled} 条已有订单物流同步更新' : ''}'
+          '（未新增订单卡片）');
+      if (mounted) Navigator.of(context).pop();
+    } else if (result.added > 0) {
       // v1.9.140：新增订单里有物流数据的也报一下，快递库立即可见
       final lg = result.logiFilled > 0 ? '，含物流 ${result.logiFilled} 条' : '';
-      _toast('已导入 ${result.added} 条$cover$lg（跳过 ${result.skipped} 条$tail）');
+      _toast('已导入 ${result.added} 条$cover$lg$ex（跳过 ${result.skipped} 条$tail）');
       if (mounted) Navigator.of(context).pop();
-    } else if (result.logiFilled > 0) {
+    } else if (result.logiFilled > 0 || result.expressUpserted > 0) {
       // v1.9.140：纯物流 JSON 导入——订单早已存在时 added=0，
       // 必须明确告诉用户快递已补进快递库，否则会以为没导进去；
       // v1.9.145：强制覆盖模式下文案改"更新"
       _toast(_forceLogistics
-          ? '快递已按抓包更新 ${result.logiFilled} 条已有订单，可到「快递库」查看'
-          : '快递已补进 ${result.logiFilled} 条已有订单，可到「快递库」查看');
+          ? '快递已按抓包更新 ${result.logiFilled} 条已有订单$ex，可到「物流」页查看'
+          : '快递已补进 ${result.logiFilled} 条已有订单$ex，可到「物流」页查看');
       if (mounted) Navigator.of(context).pop();
     } else if (_forceTags) {
       _toast('绿色标签已按抓包强制覆盖（无新订单，${result.skipped} 条已存在）');
@@ -566,7 +593,10 @@ class _TaobaoSyncImportScreenState extends State<TaobaoSyncImportScreen> {
                   '2. 把生成的 JSON 文件用微信发到手机\n'
                   '3. 回到这里点「选择文件导入」\n\n'
                   '默认只新增订单：已有订单（包括你改过的）原样保留。'
-                  '想用抓包数据覆盖某几单，导入时点「按单选择覆盖」勾选即可，覆盖前会再确认一次。',
+                  '想用抓包数据覆盖某几单，导入时点「按单选择覆盖」勾选即可，覆盖前会再确认一次。\n\n'
+                  '抓到的物流单（带运单号）全部单独进「我的-快递」物流页：'
+                  '订单没导入也照收；「抓快递物流」脚本生成的纯物流 JSON '
+                  '只进物流页和补已有订单物流，不新增订单卡片。',
                   style:
                       TextStyle(fontSize: 12, color: Color(0xFF0D47A1), height: 1.6),
                 ),
