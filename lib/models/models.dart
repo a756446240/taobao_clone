@@ -1,6 +1,8 @@
 /// 数据模型层（全新架构：不可变模型 + 手写 fromJson）
 library;
 
+import 'dart:convert';
+
 // ============================= 首页 =============================
 
 /// 金刚区入口项
@@ -509,4 +511,198 @@ class PostModel {
     this.postTime = '',
     this.isLike = false,
   });
+}
+
+// ============================= 独立物流单（v1.9.149） =============================
+
+/// 独立物流单库（v1.9.149）：抓包 JSON 导入时，所有带运单号的物流记录
+/// 不论对应订单是否在本地订单列表，都进这个库单独列出（「物流」页）。
+/// 与订单解耦：订单卡片可以一条不加，物流单必进库——
+/// 解决"抓快递物流只覆盖已填入订单，没导入的订单物流直接丢"的问题。
+/// 同一运单号只存一条（按 waybillNo 去重，新抓包轨迹非空即整体刷新）。
+class ExpressRecord {
+  String waybillNo; // 运单号（去重主键）
+  String shipCompany; // 快递公司名，如"顺丰速运"
+  String shipLogo; // 快递公司官方 logo URL
+  String shipPhone; // 快递官方客服电话
+  String logistics; // 最新状态摘要（「派送中 预计今天送达」式短文案）
+  String tracesJson; // 全量时间线 JSON：[{"time","tag","text"}] 最新在前
+  String orderNo; // 来源淘宝订单号（可能为空）
+  String shopName; // 店铺名
+  String title; // 商品标题
+  String imageUrl; // 商品图 URL/本地路径
+  String configuration; // 商品规格
+  double price; // 实付单价
+  int quantity; // 数量
+  String statusTitle; // 抓包订单状态（已发货/交易成功/…），物流页大状态兜底用
+  String createTime; // 订单创建时间
+  String updatedAt; // 本条记录写入/更新时间（ISO8601，排序兜底）
+
+  ExpressRecord({
+    required this.waybillNo,
+    this.shipCompany = '',
+    this.shipLogo = '',
+    this.shipPhone = '',
+    this.logistics = '',
+    this.tracesJson = '',
+    this.orderNo = '',
+    this.shopName = '',
+    this.title = '',
+    this.imageUrl = '',
+    this.configuration = '',
+    this.price = 0,
+    this.quantity = 1,
+    this.statusTitle = '',
+    this.createTime = '',
+    String? updatedAt,
+  }) : updatedAt = updatedAt ?? DateTime.now().toIso8601String();
+
+  /// 从抓包订单商品行提取物流单（一个订单多个商品行共享订单级运单号，
+  /// 上游按 waybillNo 去重后只留一条）
+  factory ExpressRecord.fromOrderItem(OrderItem it,
+      {required String shopName}) {
+    return ExpressRecord(
+      waybillNo: it.waybillNo.trim(),
+      shipCompany: it.shipCompany,
+      shipLogo: it.shipLogo,
+      shipPhone: it.shipPhone,
+      logistics: it.logistics,
+      tracesJson: it.logisticsTraces,
+      orderNo: it.orderNo,
+      shopName: shopName,
+      title: it.title,
+      imageUrl: it.imageUrl,
+      configuration: it.configuration,
+      price: it.price,
+      quantity: it.quantity,
+      statusTitle: it.statusTitle,
+      createTime: it.createTime,
+    );
+  }
+
+  /// 转成合成 OrderItem 供物流详情页直接复用（不进订单列表、不落订单存储；
+  /// 详情页在 express 模式下的所有改动走 CartProvider.updateExpressRecord）
+  OrderItem toOrderItem() {
+    return OrderItem(
+      imageUrl: imageUrl,
+      title: title,
+      configuration: configuration,
+      stock: 99,
+      price: price,
+      quantity: quantity,
+      statusTitle: statusTitle,
+      logistics: logistics,
+      createTime: createTime,
+      payTime: createTime,
+      shipTime: shipTimeFromTraces ?? createTime,
+      orderNo: orderNo,
+      productTotal: price * quantity,
+      shipCompany: shipCompany,
+      waybillNo: waybillNo,
+      shipLogo: shipLogo,
+      shipPhone: shipPhone,
+      logisticsTraces: tracesJson,
+    );
+  }
+
+  /// 从时间线首条（最新）推发货时间——物流页倒计时兜底用
+  String? get shipTimeFromTraces {
+    final t = latestTraceTime;
+    return t == null ? null : _fmt(t);
+  }
+
+  factory ExpressRecord.fromJson(Map<String, dynamic> j) {
+    return ExpressRecord(
+      waybillNo: j['waybillNo'] ?? '',
+      shipCompany: j['shipCompany'] ?? '',
+      shipLogo: j['shipLogo'] ?? '',
+      shipPhone: j['shipPhone'] ?? '',
+      logistics: j['logistics'] ?? '',
+      tracesJson: j['tracesJson'] ?? '',
+      orderNo: j['orderNo'] ?? '',
+      shopName: j['shopName'] ?? '',
+      title: j['title'] ?? '',
+      imageUrl: j['imageUrl'] ?? '',
+      configuration: j['configuration'] ?? '',
+      price: (j['price'] as num?)?.toDouble() ?? 0,
+      quantity: j['quantity'] ?? 1,
+      statusTitle: j['statusTitle'] ?? '',
+      createTime: j['createTime'] ?? '',
+      updatedAt: j['updatedAt'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'waybillNo': waybillNo,
+        'shipCompany': shipCompany,
+        'shipLogo': shipLogo,
+        'shipPhone': shipPhone,
+        'logistics': logistics,
+        'tracesJson': tracesJson,
+        'orderNo': orderNo,
+        'shopName': shopName,
+        'title': title,
+        'imageUrl': imageUrl,
+        'configuration': configuration,
+        'price': price,
+        'quantity': quantity,
+        'statusTitle': statusTitle,
+        'createTime': createTime,
+        'updatedAt': updatedAt,
+      };
+
+  ExpressRecord copyWith({
+    String? shipCompany,
+    String? shipLogo,
+    String? shipPhone,
+    String? logistics,
+    String? tracesJson,
+    String? orderNo,
+    String? shopName,
+    String? title,
+    String? imageUrl,
+    String? configuration,
+    double? price,
+    int? quantity,
+    String? statusTitle,
+  }) {
+    return ExpressRecord(
+      waybillNo: waybillNo,
+      shipCompany: shipCompany ?? this.shipCompany,
+      shipLogo: shipLogo ?? this.shipLogo,
+      shipPhone: shipPhone ?? this.shipPhone,
+      logistics: logistics ?? this.logistics,
+      tracesJson: tracesJson ?? this.tracesJson,
+      orderNo: orderNo ?? this.orderNo,
+      shopName: shopName ?? this.shopName,
+      title: title ?? this.title,
+      imageUrl: imageUrl ?? this.imageUrl,
+      configuration: configuration ?? this.configuration,
+      price: price ?? this.price,
+      quantity: quantity ?? this.quantity,
+      statusTitle: statusTitle ?? this.statusTitle,
+      createTime: createTime,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+  }
+
+  /// 最新轨迹时间（列表排序主依据）：解析 tracesJson 首条 time；空回退 null
+  DateTime? get latestTraceTime {
+    if (tracesJson.isEmpty) return null;
+    try {
+      final list = (jsonDecode(tracesJson) as List?) ?? const [];
+      for (final e in list) {
+        if (e is! Map) continue;
+        final s = (e['time'] ?? '').toString();
+        final t = DateTime.tryParse(s.replaceAll(' ', 'T'));
+        if (t != null) return t;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// 时间线里时间格式与抓包一致："MM-dd HH:mm"
+  static String _fmt(DateTime t) =>
+      '${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 }
