@@ -31,6 +31,31 @@ class PersistenceService {
   static const _kPresetVersion = 'imported_preset_version_v1';
   static const _kDeletedTradeNos = 'persisted_deleted_trade_nos_v1';
 
+  /// v1.9.149：独立物流单库（与订单解耦，抓包物流单必进库）
+  static const _kExpress = 'standalone_express_v1';
+
+  static Future<List<ExpressRecord>> loadExpressRecords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kExpress);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .map((e) =>
+              ExpressRecord.fromJson(e as Map<String, dynamic>))
+          .where((r) => r.waybillNo.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> saveExpressRecords(List<ExpressRecord> records) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _kExpress, jsonEncode(records.map((e) => e.toJson()).toList()));
+  }
+
   static Future<List<ShoppingCartShop>?> loadShops() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kShops);
