@@ -34,14 +34,34 @@ class LogisticsScreen extends StatefulWidget {
   final OrderItem? item;
   final String shopName;
 
-  const LogisticsScreen({super.key, this.item, this.shopName = ''});
+  /// v1.9.149：从独立物流单库（「物流」页）进入时带上物流单——
+  /// 页面用物流单合成 OrderItem 展示；联网刷新/改单号后回写物流单库，
+  /// 不碰订单列表（合成订单不在店铺里，严禁触发订单状态流转）
+  final ExpressRecord? express;
+
+  const LogisticsScreen(
+      {super.key, this.item, this.shopName = '', this.express});
 
   @override
   State<LogisticsScreen> createState() => _LogisticsScreenState();
 }
 
 class _LogisticsScreenState extends State<LogisticsScreen> {
-  OrderItem? get item => widget.item;
+  /// v1.9.149：物流单模式时缓存合成的 OrderItem（状态改动落在同一个对象上）
+  OrderItem? _syntheticItem;
+
+  OrderItem? get item {
+    final w = widget.item;
+    if (w != null) return w;
+    if (widget.express != null) {
+      _syntheticItem ??= widget.express!.toOrderItem();
+      return _syntheticItem;
+    }
+    return null;
+  }
+
+  /// v1.9.149：本次改动是否要回写独立物流单库（而非订单存储）
+  bool get _isExpressMode => widget.express != null;
 
   // ===== 固定收货信息（对齐用户真实默认地址：淄博 中房大厦） =====
   static const _receiver = '黑山灰';
@@ -57,7 +77,8 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 假订单先分配抓包真实单号，再联网刷新（v1.9.88）
-      _assignCapturedWaybill();
+      // v1.9.149：物流单模式自带真实单号，跳过分配
+      if (!_isExpressMode) _assignCapturedWaybill();
       _autoRefreshOnline();
     });
   }
@@ -198,20 +219,34 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
       );
       // v1.9.143：同一单号的其他订单（借用/覆盖来的）同步同一份真实轨迹，
       // 处处一致（只同步轨迹与摘要，不动它们的订单状态）
-      for (final e in sharers) {
-        provider.updateOrderItem(
-          e,
-          logisticsTraces: tracesJson,
-          logistics: summary.isNotEmpty ? summary : e.logistics,
-        );
-      }
-      // 已签收 → 自动转「待确认收货」
+      // v1.9.149：物流单模式——最新轨迹回写独立物流单库；本地订单列表里
+      // 若恰好有同一单号的订单也同步一份（轨迹+摘要），但绝不触发订单状态流转
       final firstTag = (list.first['tag'] ?? '').toString();
-      if (firstTag.contains('签收') &&
-          CartProvider.statusCategory(it.statusTitle) == '待收货') {
-        final shop = provider.shops.firstWhere((s) => s.items.contains(it),
-            orElse: () => provider.shops.first);
-        provider.updateOrderStatus(shop, it, '待确认收货');
+      if (_isExpressMode) {
+        provider.updateExpressRecord(ExpressRecord.fromOrderItem(it,
+            shopName: widget.express!.shopName));
+        for (final e in sharers) {
+          provider.updateOrderItem(
+            e,
+            logisticsTraces: tracesJson,
+            logistics: summary.isNotEmpty ? summary : e.logistics,
+          );
+        }
+      } else {
+        for (final e in sharers) {
+          provider.updateOrderItem(
+            e,
+            logisticsTraces: tracesJson,
+            logistics: summary.isNotEmpty ? summary : e.logistics,
+          );
+        }
+        // 已签收 → 自动转「待确认收货」
+        if (firstTag.contains('签收') &&
+            CartProvider.statusCategory(it.statusTitle) == '待收货') {
+          final shop = provider.shops.firstWhere((s) => s.items.contains(it),
+              orElse: () => provider.shops.first);
+          provider.updateOrderStatus(shop, it, '待确认收货');
+        }
       }
       if (!mounted) return;
       setState(() {});
@@ -564,9 +599,19 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
                             ? ExpressOnline.summarize(list!)
                             : it.logistics,
                       );
-                      // 3) 实时轨迹已签收 → 订单自动跳「待确认收货」（v1.9.88）
+                      // v1.9.149：物流单模式——改单号=换去重主键，
+                      // 删旧物流单、把更新后的整条写回物流单库；
+                      // 合成订单不在订单列表，绝不触发订单状态流转
+                      if (_isExpressMode) {
+                        provider.deleteExpressRecord(widget.express!.waybillNo);
+                        provider.updateExpressRecord(ExpressRecord.fromOrderItem(
+                            it,
+                            shopName: widget.express!.shopName));
+                      }
+                      // 3) 实时轨迹已签收 → 订单自动跳「待确认收货」（v1.9.88；
+                      //    v1.9.149 物流单模式跳过，无订单可转）
                       var signed = false;
-                      if (gotReal) {
+                      if (gotReal && !_isExpressMode) {
                         final firstTag =
                             (jsonDecode(traces).first['tag'] ?? '').toString();
                         if (firstTag.contains('签收') &&
@@ -806,8 +851,9 @@ class _LogisticsScreenState extends State<LogisticsScreen> {
         _headerAction(Icons.chat_bubble_outline, '客服'),
         const SizedBox(width: 12),
         // 双击「包裹」：选择抓包订单的真实物流覆盖当前页（v1.9.80）
+        // v1.9.149：物流单模式没有订单载体，隐藏该操作
         _headerAction(Icons.inventory_2_outlined, '包裹',
-            onDoubleTap: _showCapturedLogisticsPicker),
+            onDoubleTap: _isExpressMode ? null : _showCapturedLogisticsPicker),
         const SizedBox(width: 12),
         _headerAction(Icons.more_horiz, ''),
       ],
