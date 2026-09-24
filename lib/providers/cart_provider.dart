@@ -68,9 +68,7 @@ class CartProvider extends ChangeNotifier {
       final category = statusCategory(s);
       if (s.contains('待付款') || s.contains('等待付款')) {
         counts['待付款'] = counts['待付款']! + 1;
-      } else if (category == '退款/售后' ||
-          s.contains('退款') ||
-          s.contains('售后')) {
+      } else if (category == '退款/售后' || s.contains('退款') || s.contains('售后')) {
         // v1.9.101：角标只统计「进行中」的退款/售后（对齐真实淘宝），已完结不计数
         final refundDone = s.contains('成功') ||
             s.contains('结束') ||
@@ -81,9 +79,7 @@ class CartProvider extends ChangeNotifier {
         }
       } else if (s.contains('评价')) {
         counts['待评价'] = counts['待评价']! + 1;
-      } else if (category == '待发货' ||
-          s.contains('待发货') ||
-          s.contains('等待发货')) {
+      } else if (category == '待发货' || s.contains('待发货') || s.contains('等待发货')) {
         counts['待发货'] = counts['待发货']! + 1;
       } else if (category == '待收货' ||
           s.contains('已发货') ||
@@ -298,24 +294,23 @@ class CartProvider extends ChangeNotifier {
   /// 物流单全部进独立物流库，绝不新增订单卡片；
   /// expressUpserted = 本次并入独立物流库的物流单条数（订单存不存在都算）
   ({int added, int skipped, int blocked, int logiFilled, int expressUpserted})
-      importSyncedShops(
-      List<ShoppingCartShop> incoming,
-      {bool forceRefresh = false,
-      Set<String>? forceOrderNos,
-      // v1.9.103：强制覆盖绿色标签——导入页开关打开时，所有匹配订单的
-      // detailTags 无条件以抓包为准（含手动改过的；抓包为空=该商品无标签，
-      // 置 tagsForced 防 displayTags 自动补默认标签）
-      bool forceTags = false,
-      // v1.9.107：强制覆盖店铺头像——导入页开关打开时，同名店铺所有订单的
-      // shopAvatar 无条件以本次抓包为准（修正旧抓包错版头像，如红底 logo）
-      bool forceAvatar = false,
-      // v1.9.145：强制覆盖物流信息——导入页开关打开时（默认开），匹配订单的
-      // 单号/公司/轨迹/物流摘要/发货时间/logo/电话 无条件以本次抓包为准
-      // （同一订单再次抓包拿到更新的物流后，导入即刷新，全部更新进快递库）
-      bool forceLogistics = false,
-      // v1.9.149：false = 纯物流导入（抓包脚本 taobao_logistics_*.json）——
-      // 不新增订单卡片，只补已有订单物流 + 物流单进独立物流库
-      bool addOrders = true}) {
+      importSyncedShops(List<ShoppingCartShop> incoming,
+          {bool forceRefresh = false,
+          Set<String>? forceOrderNos,
+          // v1.9.103：强制覆盖绿色标签——导入页开关打开时，所有匹配订单的
+          // detailTags 无条件以抓包为准（含手动改过的；抓包为空=该商品无标签，
+          // 置 tagsForced 防 displayTags 自动补默认标签）
+          bool forceTags = false,
+          // v1.9.107：强制覆盖店铺头像——导入页开关打开时，同名店铺所有订单的
+          // shopAvatar 无条件以本次抓包为准（修正旧抓包错版头像，如红底 logo）
+          bool forceAvatar = false,
+          // v1.9.145：强制覆盖物流信息——导入页开关打开时（默认开），匹配订单的
+          // 单号/公司/轨迹/物流摘要/发货时间/logo/电话 无条件以本次抓包为准
+          // （同一订单再次抓包拿到更新的物流后，导入即刷新，全部更新进快递库）
+          bool forceLogistics = false,
+          // v1.9.149：false = 纯物流导入（抓包脚本 taobao_logistics_*.json）——
+          // 不新增订单卡片，只补已有订单物流 + 物流单进独立物流库
+          bool addOrders = true}) {
     final existingNos = <String>{
       for (final shop in _shops)
         for (final item in shop.items) item.orderNo,
@@ -553,9 +548,7 @@ class CartProvider extends ChangeNotifier {
         // v1.9.85：非待发货/待付款订单缺发货时间时，按创建时间当天随机补齐
         final cat = statusCategory(
             it.statusTitle.isEmpty ? shop.orderSubStatus : it.statusTitle);
-        if (cat != '待发货' &&
-            cat != '待付款' &&
-            it.shipTime.trim().isEmpty) {
+        if (cat != '待发货' && cat != '待付款' && it.shipTime.trim().isEmpty) {
           it.shipTime = _autoShipTimeSameDay(it);
         }
       }
@@ -569,8 +562,13 @@ class CartProvider extends ChangeNotifier {
       _persist();
       notifyListeners();
     }
-    return (added: added, skipped: skipped, blocked: blocked,
-        logiFilled: logiFilled, expressUpserted: expressUpserted);
+    return (
+      added: added,
+      skipped: skipped,
+      blocked: blocked,
+      logiFilled: logiFilled,
+      expressUpserted: expressUpserted
+    );
   }
 
   /// AI 截图解析导入：把识别出的订单追加为新店铺卡片（自动持久化，无需重新构建）
@@ -657,8 +655,7 @@ class CartProvider extends ChangeNotifier {
     // 尝试塞进已有同名店铺，否则新建店铺
     ShoppingCartShop? target;
     for (final s in _shops) {
-      if (s.shopName == shopName &&
-          s.orderSubStatus == status) {
+      if (s.shopName == shopName && s.orderSubStatus == status) {
         target = s;
         break;
       }
@@ -722,8 +719,7 @@ class CartProvider extends ChangeNotifier {
   Future<void> _mergeNewPresetOrders() async {
     final preset = await PresetOrders.loadWithVersion();
     if (preset == null) return;
-    final imported =
-        await PersistenceService.loadImportedPresetVersion();
+    final imported = await PersistenceService.loadImportedPresetVersion();
     if (preset.version <= imported) return;
     final existingNos = <String>{
       for (final shop in _shops)
@@ -732,7 +728,8 @@ class CartProvider extends ChangeNotifier {
     var added = 0;
     for (final shop in preset.shops) {
       final newItems = shop.items
-          .where((it) => it.orderNo.isEmpty || !existingNos.contains(it.orderNo))
+          .where(
+              (it) => it.orderNo.isEmpty || !existingNos.contains(it.orderNo))
           .toList();
       if (newItems.isEmpty) continue;
       shop.items
@@ -755,10 +752,10 @@ class CartProvider extends ChangeNotifier {
   List<ShoppingCartShop> get shops {
     // 按每单最早创建时间降序（最新创建的订单排在最上面）
     final sorted = [..._shops]..sort((a, b) {
-      final ta = _earliestCreateTime(a);
-      final tb = _earliestCreateTime(b);
-      return tb.compareTo(ta);
-    });
+        final ta = _earliestCreateTime(a);
+        final tb = _earliestCreateTime(b);
+        return tb.compareTo(ta);
+      });
     return sorted;
   }
 
@@ -801,8 +798,11 @@ class CartProvider extends ChangeNotifier {
       if (m != null) {
         final now = DateTime.now();
         return DateTime(
-            now.year, int.parse(m.group(1)!), int.parse(m.group(2)!),
-            int.parse(m.group(3)!), int.parse(m.group(4)!));
+            now.year,
+            int.parse(m.group(1)!),
+            int.parse(m.group(2)!),
+            int.parse(m.group(3)!),
+            int.parse(m.group(4)!));
       }
     } catch (_) {}
     return null;
@@ -967,6 +967,7 @@ class CartProvider extends ChangeNotifier {
     double? originalPrice,
     String? statusTitle,
     String? countDown,
+    String? countDownDeadline,
     String? logistics,
     String? createTime,
     String? payTime,
@@ -1048,6 +1049,7 @@ class CartProvider extends ChangeNotifier {
     if (originalPrice != null) item.originalPrice = originalPrice;
     if (statusTitle != null) item.statusTitle = statusTitle;
     if (countDown != null) item.countDown = countDown;
+    if (countDownDeadline != null) item.countDownDeadline = countDownDeadline;
     if (logistics != null) item.logistics = logistics;
     if (createTime != null) {
       item.createTime = createTime;
@@ -1072,8 +1074,10 @@ class CartProvider extends ChangeNotifier {
     if (onTimeText2 != null) item.onTimeText2 = onTimeText2;
     if (imageUrl != null) item.imageUrl = imageUrl;
     if (deliveryPromise != null) item.deliveryPromise = deliveryPromise;
-    if (deliveryPromiseSub != null) item.deliveryPromiseSub = deliveryPromiseSub;
-    if (showDeliveryPromise != null) item.showDeliveryPromise = showDeliveryPromise;
+    if (deliveryPromiseSub != null)
+      item.deliveryPromiseSub = deliveryPromiseSub;
+    if (showDeliveryPromise != null)
+      item.showDeliveryPromise = showDeliveryPromise;
     if (shipPromise != null) item.shipPromise = shipPromise;
     if (paymentMethod != null) {
       item.paymentMethod = paymentMethod;
@@ -1095,10 +1099,12 @@ class CartProvider extends ChangeNotifier {
     if (shopDiscount != null) item.shopDiscount = shopDiscount;
     if (showShopDiscount != null) item.showShopDiscount = showShopDiscount;
     if (platformCoupon != null) item.platformCoupon = platformCoupon;
-    if (platformCouponLabel != null) item.platformCouponLabel = platformCouponLabel;
+    if (platformCouponLabel != null)
+      item.platformCouponLabel = platformCouponLabel;
     if (shopDiscountLabel != null) item.shopDiscountLabel = shopDiscountLabel;
     if (showStyleBtn != null) item.showStyleBtn = showStyleBtn;
-    if (showPlatformCoupon != null) item.showPlatformCoupon = showPlatformCoupon;
+    if (showPlatformCoupon != null)
+      item.showPlatformCoupon = showPlatformCoupon;
     if (payDiscount != null) item.payDiscount = payDiscount;
     if (payDiscountLabel != null) item.payDiscountLabel = payDiscountLabel;
     if (showPayDiscount != null) item.showPayDiscount = showPayDiscount;
@@ -1111,8 +1117,10 @@ class CartProvider extends ChangeNotifier {
     if (detailTags != null) item.detailTags = detailTags;
     if (tmallPoints != null) item.tmallPoints = tmallPoints;
     if (showTmallPoints != null) item.showTmallPoints = showTmallPoints;
-    if (showPlatformPriceRow != null) item.showPlatformPriceRow = showPlatformPriceRow;
-    if (showCouponPriceRow != null) item.showCouponPriceRow = showCouponPriceRow;
+    if (showPlatformPriceRow != null)
+      item.showPlatformPriceRow = showPlatformPriceRow;
+    if (showCouponPriceRow != null)
+      item.showCouponPriceRow = showCouponPriceRow;
     if (showTaxInfoLine != null) item.showTaxInfoLine = showTaxInfoLine;
     if (refundStatus != null) item.refundStatus = refundStatus;
     if (refundTitle != null) item.refundTitle = refundTitle;
@@ -1250,6 +1258,28 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 设置订单倒计时并启动自动倒数（v1.9.151）：
+  /// 解析「还剩X天Y小时[Z分钟]自动确认」→ 计算截止时间存 countDownDeadline，
+  /// 详情页据 deadline 每秒实时倒数、归零自动跳「交易成功」。
+  void setCountdown(OrderItem item, String text) {
+    item.countDown = text;
+    final m = RegExp(r'还剩(\d+)天(?:(\d+)小时)?(?:(\d+)分钟)?').firstMatch(text);
+    final days = m != null ? (int.tryParse(m.group(1)!) ?? 0) : 0;
+    final hours =
+        m != null && m.group(2) != null ? (int.tryParse(m.group(2)!) ?? 0) : 0;
+    final minutes =
+        m != null && m.group(3) != null ? (int.tryParse(m.group(3)!) ?? 0) : 0;
+    if (days == 0 && hours == 0 && minutes == 0) {
+      item.countDownDeadline = '';
+    } else {
+      item.countDownDeadline = DateTime.now()
+          .add(Duration(days: days, hours: hours, minutes: minutes))
+          .toIso8601String();
+    }
+    _persist();
+    notifyListeners();
+  }
+
   /// 自动确认收货（对齐真实淘宝 10 天倒计时结束）：
   /// 「待收货」分类订单付款（无付款时间用创建时间）满 10 天 → 自动跳「交易成功」。
   /// 在订单列表页打开时扫描一次（v1.9.88）。
@@ -1294,11 +1324,11 @@ class CartProvider extends ChangeNotifier {
   }
 
   /// 生成在途物流文案（按订单号哈希确定性，对齐真实淘宝列表物流条格式）
-  String _autoTransitText(OrderItem item) {    const origins = ['长沙', '杭州', '广州', '金华', '武汉', '上海', '郑州', '义乌'];
+  String _autoTransitText(OrderItem item) {
+    const origins = ['长沙', '杭州', '广州', '金华', '武汉', '上海', '郑州', '义乌'];
     const dests = ['济南', '淄博', '青岛', '潍坊', '烟台', '临沂'];
-    final seed = (item.orderNo.isEmpty ? item.title : item.orderNo)
-        .hashCode
-        .abs();
+    final seed =
+        (item.orderNo.isEmpty ? item.title : item.orderNo).hashCode.abs();
     final o = origins[seed % origins.length];
     final d = dests[(seed ~/ 7) % dests.length];
     return '您的快件离开【$o转运中心】，已发往【$d】';
@@ -1313,9 +1343,8 @@ class CartProvider extends ChangeNotifier {
           if (!identical(e, item) && e.waybillNo.isNotEmpty) e,
     ];
     if (pool.isEmpty) return;
-    final seed = (item.orderNo.isEmpty ? item.title : item.orderNo)
-        .hashCode
-        .abs();
+    final seed =
+        (item.orderNo.isEmpty ? item.title : item.orderNo).hashCode.abs();
     final donor = pool[seed % pool.length];
     item.waybillNo = donor.waybillNo;
     // v1.9.101：标记为借用单号——联网刷新跳过借用单号，
@@ -1364,8 +1393,7 @@ class CartProvider extends ChangeNotifier {
     );
     final rng = Random();
     for (final it in cloned.items) {
-      it.orderNo =
-          '5127${List.generate(15, (_) => rng.nextInt(10)).join()}';
+      it.orderNo = '5127${List.generate(15, (_) => rng.nextInt(10)).join()}';
     }
     // v1.9.147：克隆订单头像跟源订单走——真实淘宝按订单存下单时的
     // 店铺头像快照，同店不同订单头像可以不一样（截图证实），克隆体
@@ -1421,17 +1449,16 @@ class CartProvider extends ChangeNotifier {
   /// 交易号固定 28 位（付款时间前8位+20位随机）
   void _migrateTradeNos() {
     var changed = false;
-    bool needOrderNo(String no) => !((no.startsWith('512') && no.length == 19) ||
-        RegExp(r'^\d{15,20}$').hasMatch(no)); // 512生成单号与真实淘宝单号（15-20位）都保留
+    bool needOrderNo(String no) =>
+        !((no.startsWith('512') && no.length == 19) ||
+            RegExp(r'^\d{15,20}$').hasMatch(no)); // 512生成单号与真实淘宝单号（15-20位）都保留
     bool needTradeNo(String no) => no.length != 28;
     for (final shop in _shops) {
       for (final item in shop.items) {
         // 老版本订单编号与交易号同值（5127 开头 19 位），迁移时把它保留为订单编号
         if (needOrderNo(item.orderNo)) {
           final legacy = item.alipayTradeNo;
-          item.orderNo = (!needOrderNo(legacy))
-              ? legacy
-              : _composeOrderNo();
+          item.orderNo = (!needOrderNo(legacy)) ? legacy : _composeOrderNo();
           changed = true;
         }
         if (needTradeNo(item.alipayTradeNo)) {
@@ -1576,8 +1603,7 @@ class CartProvider extends ChangeNotifier {
   /// 拼接订单编号：5127 开头 + 15 位随机数字 = 19 位
   String _composeOrderNo() {
     final rand = Random();
-    final tail =
-        List.generate(15, (_) => rand.nextInt(10).toString()).join();
+    final tail = List.generate(15, (_) => rand.nextInt(10).toString()).join();
     return '5127$tail';
   }
 
@@ -1585,8 +1611,7 @@ class CartProvider extends ChangeNotifier {
   String _composeTradeNo(String prefix8) {
     final rand = Random();
     final p = prefix8.length == 8 ? prefix8 : _timePrefix('');
-    final tail =
-        List.generate(20, (_) => rand.nextInt(10).toString()).join();
+    final tail = List.generate(20, (_) => rand.nextInt(10).toString()).join();
     return '$p$tail';
   }
 
@@ -1594,8 +1619,7 @@ class CartProvider extends ChangeNotifier {
   /// （对齐真实微信支付 transaction_id 格式：420000 开头 28 位纯数字）
   String _composeWechatTradeNo() {
     final rand = Random();
-    final tail =
-        List.generate(22, (_) => rand.nextInt(10).toString()).join();
+    final tail = List.generate(22, (_) => rand.nextInt(10).toString()).join();
     return '420000$tail';
   }
 
