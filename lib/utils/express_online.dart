@@ -219,19 +219,74 @@ class ExpressOnline {
     return null;
   }
 
-  /// 联网查询实时物流轨迹（v1.9.143：通道顺序调整为快递100 m 站优先——
-  /// 免费无配额，圆通等可直接出轨迹（实测真实单号 13 条）；
-  /// apizero 匿名 30 次/天容易 429，留给顺丰/中通/申通这些要手机号的兜底）
+  /// uapis.cn 免费快递接口（2026-09-24 实测可用）：
+  /// 免 key、自动识别公司、返回完整真实轨迹；顺丰必须带 phone 手机尾号。
+  /// 返回 [{time, tag, text}] 最新在前；失败返回 null
+  static Future<List<Map<String, String>>?> _fetchUapis(String waybill,
+      {String phone4 = ''}) async {
+    try {
+      var url =
+          'https://uapis.cn/api/v1/misc/tracking/query?tracking_number=$waybill';
+      if (phone4.isNotEmpty) url += '&phone=$phone4';
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
+      final req = await client.getUrl(Uri.parse(url));
+      applyBrowserHeaders(req, 'https://uapis.cn/');
+      final resp = await req.close().timeout(const Duration(seconds: 10));
+      final body = await resp.transform(utf8.decoder).join();
+      client.close();
+      final j = jsonDecode(body);
+      if (j is! Map) return null;
+      final tracks = j['tracks'];
+      if (tracks is! List || tracks.isEmpty) return null;
+      final status = (j['status'] ?? '').toString();
+      final statusCode = (j['status_code'] ?? '').toString();
+      return [
+        for (var i = 0; i < tracks.length; i++)
+          {
+            'time': (tracks[i]['time'] ?? '').toString(),
+            'tag': i == 0 ? _tagFromUapis(status, statusCode) : '',
+            'text': (tracks[i]['context'] ?? '').toString(),
+          }
+      ];
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// uapis.cn 状态 → 首条 tag（驱动 summarize / 物流页阶段展示）
+  static String _tagFromUapis(String status, String statusCode) {
+    if (statusCode == 'delivered' ||
+        status.contains('完成') ||
+        status.contains('签收')) {
+      return '已签收';
+    }
+    if (statusCode == 'out_for_delivery' ||
+        status.contains('派送') ||
+        status.contains('派件')) {
+      return '派送中';
+    }
+    if (statusCode == 'picked_up' || status.contains('揽收')) {
+      return '已揽收';
+    }
+    return '运输中';
+  }
+
+  /// 联网查询实时物流轨迹（v1.9.151：uapis.cn 优先——免 key、自动识别公司、
+  /// 返回真实轨迹；快递100 m 站/autonumber 已失效，apizero 匿名额度限流仅作兜底）
   /// 返回 [{time, tag, text}] 最新在前；失败返回 null
   static Future<List<Map<String, String>>?> fetchTraces(
       String comCode, String waybill,
       {String phone4 = ''}) async {
-    // 1) 快递100 m 站优先（免费无配额）
+    // 1) uapis.cn 优先（自动识别公司，无需本地 comCode）
+    final u = await _fetchUapis(waybill, phone4: phone4);
+    if (u != null) return u;
+    // 2) 快递100 m 站兜底（免费无配额）
     if (comCode.isNotEmpty) {
       final kd = await _fetchKuaidi100(comCode, waybill);
       if (kd != null) return kd;
     }
-    // 2) apizero（显式 com 免费通道 → pro → 自动识别兜底）
+    // 3) apizero（显式 com 免费通道 → pro → 自动识别兜底）
     Map<String, dynamic>? r;
     final apCom = _apizeroCom[comCode] ?? '';
     if (apCom.isNotEmpty) {
@@ -242,12 +297,11 @@ class ExpressOnline {
           r = await _fetchApizero(waybill, com: apCom, phone4: phone4);
           if (r != null && r['upgrade'] == true) r = null;
         }
-        r ??= await _fetchApizero(waybill,
-            pro: true, com: apCom, phone4: phone4);
+        r ??=
+            await _fetchApizero(waybill, pro: true, com: apCom, phone4: phone4);
       } else {
         // 京东/韵达/EMS 等只有 pro 通道
-        r = await _fetchApizero(waybill,
-            pro: true, com: apCom, phone4: phone4);
+        r = await _fetchApizero(waybill, pro: true, com: apCom, phone4: phone4);
       }
     }
     if (r == null || r['traces'] is! List) {
