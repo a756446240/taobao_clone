@@ -156,6 +156,7 @@ class OrderItem {
   // ===== 订单编辑字段（3.4 待发货/待收货可修改）=====
   String statusTitle; // 状态标题，如"运输中""已发货"
   String countDown; // 倒计时文字，如"还剩2天自动确认"
+  String countDownDeadline; // 倒计时截止时间戳（ISO，空=不自动倒数；v1.9.151 起支持设置后自动倒数并归零跳交易成功）
   String logistics; // 物流状态，如"已揽件·预计后天送达"
   String createTime; // 创建时间
   String payTime; // 付款时间
@@ -174,8 +175,7 @@ class OrderItem {
   List<String> get displayTags {
     final raw = <String>[
       ...detailTags,
-      if (detailTags.isEmpty && returnText.trim().isNotEmpty)
-        returnText.trim(),
+      if (detailTags.isEmpty && returnText.trim().isNotEmpty) returnText.trim(),
     ];
     final result = <String>[];
     for (final t in raw) {
@@ -200,7 +200,8 @@ class OrderItem {
   String deliveryPromise; // 待发货承诺文案，如"承诺48小时内发货"（显示在地址下方）
   String deliveryPromiseSub; // 承诺行灰色副标题，如"本月平均4天内发货"（空=隐藏）
   bool showDeliveryPromise; // 是否显示"承诺发货"行
-  String shipPromise; // 待发货灰框时间文案，如"今天13:46前发货"/"预计明天到达"/"预售，9月17日13:39前发货"（空=按标题确定性生成）
+  String
+      shipPromise; // 待发货灰框时间文案，如"今天13:46前发货"/"预计明天到达"/"预售，9月17日13:39前发货"（空=按标题确定性生成）
   String paymentMethod; // 支付方式
   String orderNo; // 订单编号（订单信息行）：5127 开头 19 位
   String alipayTradeNo; // 支付宝交易号：付款时间前8位 + 20位随机 = 28 位
@@ -231,7 +232,8 @@ class OrderItem {
   int giftCount; // 赠品件数
   String giftImage; // 赠品缩略图（URL 或本地路径，空=灰色占位）
   String giftTitle; // 赠品名称（展开/提示用）
-  List<String> giftImages; // 赠品缩略图列表（v1.9.102：抓包 gifts 数组全部图片，展示多张缩略图；空时回退 giftImage 单图）
+  List<String>
+      giftImages; // 赠品缩略图列表（v1.9.102：抓包 gifts 数组全部图片，展示多张缩略图；空时回退 giftImage 单图）
 
   // ===== 优惠明细（v1.9.93 起，抓包 detailv2/手动编辑） =====
   // JSON 数组：[{"group":"shop|platform","name":"官方立减","sub":"立减优惠","amount":57.0}]
@@ -278,7 +280,8 @@ class OrderItem {
   bool waybillBorrowed; // 单号是否从运单池借用（v1.9.101）：借用的单号不联网拉轨迹，避免把别的订单物流填进来
   String shipLogo; // 快递公司官方 logo URL（v1.9.79 起抓包 popupBodyCompony.icon，空=首字色块）
   String shipPhone; // 快递官方客服电话（v1.9.79 起，空=按公司名映射常见客服号）
-  String logisticsTraces; // 抓包真实全量物流时间线（v1.9.76 起）：JSON 数组 [{"time","tag","text"}] 最新在前，空=本地生成
+  String
+      logisticsTraces; // 抓包真实全量物流时间线（v1.9.76 起）：JSON 数组 [{"time","tag","text"}] 最新在前，空=本地生成
 
   // ===== 退款详情·寄回商品卡（3.7 可编辑区域） =====
   String refundSteps; // 步骤条文字（逗号分隔 3 段，空=默认"申请退款,商家处理,退款结束"）
@@ -303,6 +306,7 @@ class OrderItem {
     this.isSelected = true,
     this.statusTitle = '',
     this.countDown = '',
+    this.countDownDeadline = '',
     this.logistics = '',
     this.createTime = '',
     this.payTime = '',
@@ -407,7 +411,8 @@ class ShoppingCartShop {
   String orderTotalTip; // 店铺合计提示，如"共1件商品 合计："
   double actualTotal; // 订单实付总额（抓包导入时写入；>0 时列表合计/详情实付款优先用它，因为单价×数量会有分位舍入差）
   int orderBtnStyle; // 交易成功订单底部按钮样式：0评价+加购+再买一单/1闲鱼转卖+评价+加购/2加购+查看物流+评价（-1=按店名随机）
-  String orderOps; // 抓包真实按钮序列（v1.9.75 起）："再买一单*|加入购物车|评价|查看物流"，*=高亮；非空时卡片按钮照搬它，为空回退 orderBtnStyle 随机
+  String
+      orderOps; // 抓包真实按钮序列（v1.9.75 起）："再买一单*|加入购物车|评价|查看物流"，*=高亮；非空时卡片按钮照搬它，为空回退 orderBtnStyle 随机
   String shopAvatar; // 抓包真实店铺头像 URL（v1.9.78 起，空=默认红圆图标）
   int shopLineStyle; // 店名下方信息行样式：0星级+粉丝/1 88VIP好评率+平均退款/2 88VIP好评率+客服满意度/3好评率+平均退款/4 90天新增好评+平均退款/5 90天新增好评（-1=按店名随机）
 
