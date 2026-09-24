@@ -41,8 +41,7 @@ class PersistenceService {
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list
-          .map((e) =>
-              ExpressRecord.fromJson(e as Map<String, dynamic>))
+          .map((e) => ExpressRecord.fromJson(e as Map<String, dynamic>))
           .where((r) => r.waybillNo.isNotEmpty)
           .toList();
     } catch (_) {
@@ -168,6 +167,7 @@ class PersistenceService {
       'isSelected': item.isSelected,
       'statusTitle': item.statusTitle,
       'countDown': item.countDown,
+      'countDownDeadline': item.countDownDeadline,
       'logistics': item.logistics,
       'createTime': item.createTime,
       'payTime': item.payTime,
@@ -265,6 +265,7 @@ class PersistenceService {
       isSelected: j['isSelected'] ?? true,
       statusTitle: j['statusTitle'] ?? '',
       countDown: j['countDown'] ?? '',
+      countDownDeadline: j['countDownDeadline'] ?? '',
       logistics: j['logistics'] ?? '',
       createTime: j['createTime'] ?? '',
       payTime: j['payTime'] ?? '',
@@ -306,12 +307,14 @@ class PersistenceService {
       giftCount: j['giftCount'] ?? 0,
       giftImage: DocPaths.relativize(j['giftImage'] ?? ''),
       giftTitle: j['giftTitle'] ?? '',
-      giftImages:
-          (j['giftImages'] as List?)?.map((e) => DocPaths.relativize(e.toString())).toList() ??
-              const [],
+      giftImages: (j['giftImages'] as List?)
+              ?.map((e) => DocPaths.relativize(e.toString()))
+              .toList() ??
+          const [],
       discountDetails: j['discountDetails'] ?? '',
-      detailTags: (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
-          const ['极速退款', '7天无理由'],
+      detailTags:
+          (j['detailTags'] as List?)?.map((e) => e.toString()).toList() ??
+              const ['极速退款', '7天无理由'],
       tagsForced: j['tagsForced'] ?? false,
       tmallPoints: j['tmallPoints'] ?? 0,
       showTmallPoints: j['showTmallPoints'] ?? false,
@@ -378,8 +381,7 @@ class PersistenceService {
         <OrderItem>[];
     return ShoppingCartShop(
       shopName: j['shopName'] ?? '',
-      shopType:
-          (j['shopType'] == 1) ? ShopType.taoBao : ShopType.tianMao,
+      shopType: (j['shopType'] == 1) ? ShopType.taoBao : ShopType.tianMao,
       hasCoupons: j['hasCoupons'] ?? false,
       hasTmallEasyBuy: j['hasTmallEasyBuy'] ?? false,
       discounts: j['discounts'] ?? '',
