@@ -45,15 +45,14 @@ class DialogHelpers {
                     return ListTile(
                       title: Text(v,
                           style: TextStyle(
-                            color:
-                                selected ? const Color(0xFFff5000) : Colors.black87,
-                            fontWeight: selected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            color: selected
+                                ? const Color(0xFFff5000)
+                                : Colors.black87,
+                            fontWeight:
+                                selected ? FontWeight.bold : FontWeight.normal,
                           )),
                       trailing: selected
-                          ? const Icon(Icons.check,
-                              color: Color(0xFFff5000))
+                          ? const Icon(Icons.check, color: Color(0xFFff5000))
                           : null,
                       onTap: () => Navigator.of(ctx).pop(v),
                     );
@@ -99,8 +98,7 @@ class DialogHelpers {
                           Expanded(
                             child: Text(title,
                                 style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold)),
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(selected),
@@ -165,8 +163,11 @@ class DialogHelpers {
         final m = RegExp(r'(\d+)月(\d+)日\s*(\d+):(\d+)').firstMatch(initial);
         if (m != null) {
           final now = DateTime.now();
-          init = DateTime(now.year, int.parse(m.group(1)!),
-              int.parse(m.group(2)!), int.parse(m.group(3)!),
+          init = DateTime(
+              now.year,
+              int.parse(m.group(1)!),
+              int.parse(m.group(2)!),
+              int.parse(m.group(3)!),
               int.parse(m.group(4)!));
         } else {
           init = DateTime.now();
@@ -209,15 +210,11 @@ class DialogHelpers {
                             child: Text(title,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold)),
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                           TextButton(
                             onPressed: () {
-                              Navigator.of(
-                                  ctx)
-                                  .pop(
-                                      _formatDateTime(selected));
+                              Navigator.of(ctx).pop(_formatDateTime(selected));
                             },
                             child: const Text('确定',
                                 style: TextStyle(
@@ -244,38 +241,66 @@ class DialogHelpers {
                     Expanded(
                       child: Row(
                         children: [
-                          _pickerCol(_years(), selected.year, (v) =>
-                              onChange(DateTime(
-                                  v, selected.month, selected.day,
-                                  selected.hour, selected.minute,
+                          _pickerCol(
+                              _years(),
+                              selected.year,
+                              (v) => onChange(DateTime(
+                                  v,
+                                  selected.month,
+                                  selected.day,
+                                  selected.hour,
+                                  selected.minute,
                                   selected.second))),
                           _pickerCol(
-                              _months(), selected.month,
+                              _months(),
+                              selected.month,
                               (v) => onChange(DateTime(
-                                  selected.year, v, selected.day,
-                                  selected.hour, selected.minute,
+                                  selected.year,
+                                  v,
+                                  selected.day,
+                                  selected.hour,
+                                  selected.minute,
                                   selected.second))),
-                          _pickerCol(_days(selected.year, selected.month),
+                          _pickerCol(
+                              _days(selected.year, selected.month),
                               selected.day,
                               (v) => onChange(DateTime(
-                                  selected.year, selected.month, v,
-                                  selected.hour, selected.minute,
+                                  selected.year,
+                                  selected.month,
+                                  v,
+                                  selected.hour,
+                                  selected.minute,
                                   selected.second))),
-                          _pickerCol(_hours(), selected.hour,
+                          _pickerCol(
+                              _hours(),
+                              selected.hour,
                               (v) => onChange(DateTime(
-                                  selected.year, selected.month,
-                                  selected.day, v, selected.minute,
+                                  selected.year,
+                                  selected.month,
+                                  selected.day,
+                                  v,
+                                  selected.minute,
                                   selected.second))),
-                          _pickerCol(_minutes(), selected.minute,
+                          _pickerCol(
+                              _minutes(),
+                              selected.minute,
                               (v) => onChange(DateTime(
-                                  selected.year, selected.month,
-                                  selected.day, selected.hour, v,
+                                  selected.year,
+                                  selected.month,
+                                  selected.day,
+                                  selected.hour,
+                                  v,
                                   selected.second))),
-                          _pickerCol(_seconds(), selected.second,
+                          _pickerCol(
+                              _seconds(),
+                              selected.second,
                               (v) => onChange(DateTime(
-                                  selected.year, selected.month,
-                                  selected.day, selected.hour,
-                                  selected.minute, v))),
+                                  selected.year,
+                                  selected.month,
+                                  selected.day,
+                                  selected.hour,
+                                  selected.minute,
+                                  v))),
                         ],
                       ),
                     ),
@@ -289,13 +314,13 @@ class DialogHelpers {
     );
   }
 
-  static Widget _pickerCol(List<int> values, int current,
-      ValueChanged<int> onSelectedItemChanged) {
+  static Widget _pickerCol(
+      List<int> values, int current, ValueChanged<int> onSelectedItemChanged) {
     final idx = values.indexOf(current);
     return Expanded(
       child: CupertinoPicker(
-        scrollController: FixedExtentScrollController(
-            initialItem: idx >= 0 ? idx : 0),
+        scrollController:
+            FixedExtentScrollController(initialItem: idx >= 0 ? idx : 0),
         itemExtent: 36,
         onSelectedItemChanged: (i) => onSelectedItemChanged(values[i]),
         children: values
@@ -325,29 +350,35 @@ class DialogHelpers {
   static List<int> _minutes() => List.generate(60, (i) => i);
   static List<int> _seconds() => List.generate(60, (i) => i);
 
-  /// 滚动式倒计时选择器（仿 3.4 APK：天 + 小时 双滚轮）
-  /// initial 形如 "还剩3天21小时自动确认"，返回 "还剩X天Y小时自动确认"
+  /// 滚动式倒计时选择器（仿 3.4 APK：天 + 小时 + 分钟 三滚轮）
+  /// initial 形如 "还剩3天21小时自动确认"，返回 "还剩X天Y小时[Z分钟]自动确认"
+  /// （分钟为 0 时省略分钟段，保持与旧数据兼容）
   static Future<String?> showCountdownPicker(
     BuildContext context, {
     required String title,
     required String initial,
     String suffix = '自动确认',
   }) {
-    // 解析初始值中的 天/小时
+    // 解析初始值中的 天/小时/分钟
     var days = 3;
     var hours = 0;
-    final m = RegExp(r'还剩(\d+)天(?:(\d+)小时)?').firstMatch(initial);
+    var minutes = 0;
+    final m = RegExp(r'还剩(\d+)天(?:(\d+)小时)?(?:(\d+)分钟)?').firstMatch(initial);
     if (m != null) {
       days = int.tryParse(m.group(1)!) ?? 3;
       if (m.group(2) != null) hours = int.tryParse(m.group(2)!) ?? 0;
+      if (m.group(3) != null) minutes = int.tryParse(m.group(3)!) ?? 0;
     }
     days = days.clamp(1, 30);
     hours = hours.clamp(0, 23);
+    minutes = minutes.clamp(0, 59);
 
     int selDays = days;
     int selHours = hours;
+    int selMinutes = minutes;
     final daysCtrl = FixedExtentScrollController(initialItem: selDays - 1);
     final hoursCtrl = FixedExtentScrollController(initialItem: selHours);
+    final minutesCtrl = FixedExtentScrollController(initialItem: selMinutes);
 
     return showModalBottomSheet<String>(
       context: context,
@@ -379,8 +410,9 @@ class DialogHelpers {
                                   fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.of(ctx)
-                              .pop('还剩${selDays}天${selHours}小时$suffix'),
+                          onPressed: () => Navigator.of(ctx).pop(
+                              '还剩${selDays}天${selHours}小时'
+                              '${selMinutes > 0 ? '${selMinutes}分钟' : ''}$suffix'),
                           child: const Text('确定',
                               style: TextStyle(
                                   color: Color(0xFFff5000),
@@ -400,7 +432,8 @@ class DialogHelpers {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '还剩 $selDays 天 $selHours 小时后$suffix',
+                      '还剩 $selDays 天 $selHours 小时'
+                      '${selMinutes > 0 ? ' $selMinutes 分钟' : ''}后$suffix',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                           color: Color(0xFFff5000),
@@ -421,7 +454,7 @@ class DialogHelpers {
                           textBuilder: (i) => '${i + 1} 天',
                           onChanged: (i) => setSheet(() => selDays = i + 1),
                         ),
-                        const SizedBox(width: 24),
+                        const SizedBox(width: 12),
                         _countdownWheel(
                           ctrl: hoursCtrl,
                           label: '小时',
@@ -429,6 +462,15 @@ class DialogHelpers {
                           selected: selHours,
                           textBuilder: (i) => '$i 小时',
                           onChanged: (i) => setSheet(() => selHours = i),
+                        ),
+                        const SizedBox(width: 12),
+                        _countdownWheel(
+                          ctrl: minutesCtrl,
+                          label: '分钟',
+                          count: 60,
+                          selected: selMinutes,
+                          textBuilder: (i) => '$i 分钟',
+                          onChanged: (i) => setSheet(() => selMinutes = i),
                         ),
                       ],
                     ),
@@ -443,6 +485,7 @@ class DialogHelpers {
     ).then((v) {
       daysCtrl.dispose();
       hoursCtrl.dispose();
+      minutesCtrl.dispose();
       return v;
     });
   }
@@ -458,11 +501,12 @@ class DialogHelpers {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: Colors.black54)),
         const SizedBox(height: 4),
         SizedBox(
           height: 180,
-          width: 130,
+          width: 104,
           child: ListWheelScrollView.useDelegate(
             itemExtent: 44,
             physics: const FixedExtentScrollPhysics(),
@@ -479,8 +523,7 @@ class DialogHelpers {
                       color: active
                           ? const Color(0xFFff5000)
                           : const Color(0xFF999999),
-                      fontWeight:
-                          active ? FontWeight.w700 : FontWeight.w400,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w400,
                     ),
                   ),
                 );
@@ -516,8 +559,7 @@ class DialogHelpers {
             child: const Text('取消'),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
             child: const Text('确定'),
           ),
         ],
