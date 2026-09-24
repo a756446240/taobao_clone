@@ -223,19 +223,18 @@ class _OrderListScreenState extends State<OrderListScreen>
                           onRefresh: _onRefresh,
                           color: const Color(0xFFFF5000),
                           child: ListView.builder(
-                            padding:
-                                const EdgeInsets.only(top: 8, bottom: 24),
+                            padding: const EdgeInsets.only(top: 8, bottom: 24),
                             itemCount: filtered.length,
                             itemBuilder: (_, i) => _OrderCard(
-                                  shop: filtered[i].shop,
-                                  items: filtered[i].items,
-                                  actionText: _actionText,
-                                  rateTab: _currentTab == '待评价',
-                                  onEditItem: (item) =>
-                                      _showEditMenu(filtered[i].shop, item),
-                                  onDetail: (item) =>
-                                      _gotoDetail(filtered[i].shop, item),
-                                ),
+                              shop: filtered[i].shop,
+                              items: filtered[i].items,
+                              actionText: _actionText,
+                              rateTab: _currentTab == '待评价',
+                              onEditItem: (item) =>
+                                  _showEditMenu(filtered[i].shop, item),
+                              onDetail: (item) =>
+                                  _gotoDetail(filtered[i].shop, item),
+                            ),
                           ),
                         ),
             ),
@@ -301,17 +300,13 @@ class _OrderListScreenState extends State<OrderListScreen>
           o.kind == 0
               ? ShangouOrderCard(
                   order: o,
-                  onRemove: () =>
-                      setState(() => _removedChannelIds.add(o.id)),
-                  onPay: () => setState(
-                      () => _statusOverrides[o.id] = '配送中'),
+                  onRemove: () => setState(() => _removedChannelIds.add(o.id)),
+                  onPay: () => setState(() => _statusOverrides[o.id] = '配送中'),
                 )
               : FeizhuOrderCard(
                   order: o,
-                  onRemove: () =>
-                      setState(() => _removedChannelIds.add(o.id)),
-                  onPay: () => setState(
-                      () => _statusOverrides[o.id] = '待出行'),
+                  onRemove: () => setState(() => _removedChannelIds.add(o.id)),
+                  onPay: () => setState(() => _statusOverrides[o.id] = '待出行'),
                 ),
         if (recGoods != null) ...[
           const Padding(
@@ -394,8 +389,8 @@ class _OrderListScreenState extends State<OrderListScreen>
                       ),
                       child: Text(
                         _channelBadges[i]!,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 9),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 9),
                       ),
                     ),
                   ],
@@ -419,8 +414,7 @@ class _OrderListScreenState extends State<OrderListScreen>
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: ConstrainedBox(
               // tab 少时均分撑满整宽，tab 多时按内容宽度可左右滑动
-              constraints:
-                  BoxConstraints(minWidth: constraints.maxWidth - 20),
+              constraints: BoxConstraints(minWidth: constraints.maxWidth - 20),
               child: IntrinsicWidth(
                 child: Row(
                   children: [
@@ -430,8 +424,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                           onTap: () => setState(() => _subIndex = i),
                           behavior: HitTestBehavior.opaque,
                           child: Container(
-                            margin:
-                                const EdgeInsets.symmetric(horizontal: 3),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
@@ -488,17 +481,13 @@ class _OrderListScreenState extends State<OrderListScreen>
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
-                  color: selected
-                      ? const Color(0xFFFF5000)
-                      : Colors.black87,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? const Color(0xFFFF5000) : Colors.black87,
                 ),
               ),
               if (selected) ...[
                 const SizedBox(width: 2),
-                const Icon(Icons.close,
-                    size: 13, color: Color(0xFFFF5000)),
+                const Icon(Icons.close, size: 13, color: Color(0xFFFF5000)),
               ],
             ],
           ),
@@ -690,8 +679,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                 ),
                 const SizedBox(height: 2),
                 const Text('AI助手',
-                    style:
-                        TextStyle(color: Colors.black87, fontSize: 10)),
+                    style: TextStyle(color: Colors.black87, fontSize: 10)),
               ],
             ),
           ),
@@ -737,16 +725,14 @@ class _OrderListScreenState extends State<OrderListScreen>
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: const Text('67',
-                            style: TextStyle(
-                                color: Colors.white, fontSize: 8)),
+                            style: TextStyle(color: Colors.white, fontSize: 8)),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 const Text('',
-                    style:
-                        TextStyle(color: Colors.black87, fontSize: 10)),
+                    style: TextStyle(color: Colors.black87, fontSize: 10)),
               ],
             ),
           ),
@@ -785,8 +771,8 @@ class _OrderListScreenState extends State<OrderListScreen>
               child: Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -808,13 +794,11 @@ class _OrderListScreenState extends State<OrderListScreen>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(e.$1,
-                                    color: Colors.black87, size: 26),
+                                Icon(e.$1, color: Colors.black87, size: 26),
                                 const SizedBox(height: 6),
                                 Text(e.$2,
                                     style: const TextStyle(
-                                        color: Colors.black87,
-                                        fontSize: 12)),
+                                        color: Colors.black87, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -928,8 +912,7 @@ class _OrderListScreenState extends State<OrderListScreen>
                   style: AppTextStyles.middleSub),
               if (searching) ...[
                 const SizedBox(height: 8),
-                const Text('换个商品关键词或店铺名试试',
-                    style: AppTextStyles.min),
+                const Text('换个商品关键词或店铺名试试', style: AppTextStyles.min),
               ],
             ],
           ),
@@ -1064,9 +1047,8 @@ class _OrderCard extends StatelessWidget {
     return shop.orderOps
         .split('|')
         .where((s) => s.isNotEmpty)
-        .map((s) => s.endsWith('*')
-            ? (s.substring(0, s.length - 1), true)
-            : (s, false))
+        .map((s) =>
+            s.endsWith('*') ? (s.substring(0, s.length - 1), true) : (s, false))
         .toList();
   }
 
@@ -1083,7 +1065,8 @@ class _OrderCard extends StatelessWidget {
           // v1.9.87：高亮位改浅橙底橙字胶囊（真实淘宝高亮是浅橙，不是实心橙）
           _capturedOps[i].$2
               ? _capsuleBtn(_capturedOps[i].$1,
-                  highlight: true, onTap: () => _onOpTap(context, _capturedOps[i].$1))
+                  highlight: true,
+                  onTap: () => _onOpTap(context, _capturedOps[i].$1))
               : _outlineBtn(_capturedOps[i].$1,
                   onTap: () => _onOpTap(context, _capturedOps[i].$1)),
         ],
@@ -1112,16 +1095,16 @@ class _OrderCard extends StatelessWidget {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('删除订单？', style: TextStyle(fontSize: 16)),
-        content: const Text('删除后不可恢复，确定要删除这笔订单吗？',
-            style: TextStyle(fontSize: 13)),
+        content:
+            const Text('删除后不可恢复，确定要删除这笔订单吗？', style: TextStyle(fontSize: 13)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
               child: const Text('取消')),
           TextButton(
               onPressed: () => Navigator.pop(c, true),
-              child: const Text('删除',
-                  style: TextStyle(color: Color(0xFFFF5000)))),
+              child:
+                  const Text('删除', style: TextStyle(color: Color(0xFFFF5000)))),
         ],
       ),
     ).then((ok) {
@@ -1268,8 +1251,7 @@ class _OrderCard extends StatelessWidget {
                             ? '交易成功'
                             : shop.orderSubStatus,
                     style: AppTextStyles.small.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500)),
+                        color: AppColors.primary, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -1284,8 +1266,7 @@ class _OrderCard extends StatelessWidget {
           // 赠品行（v1.9.102：对齐真实淘宝列表卡——左"N件赠品"，
           // 右赠品缩略图+箭头，位于物流信息上方）
           if (!isRefund && items.any((e) => e.giftCount > 0))
-            _listGiftRow(
-                context, items.firstWhere((e) => e.giftCount > 0)),
+            _listGiftRow(context, items.firstWhere((e) => e.giftCount > 0)),
           // 日期+实付款行（v1.9.103：上移到商品区正下方，与商品图底部边缘对齐；
           // 运费计入实付款；标题右侧单价只算货品价值）
           if (!isRefund) _paidDateLine(total),
@@ -1309,15 +1290,12 @@ class _OrderCard extends StatelessWidget {
                       _moreBtn('更多',
                           onDoubleTap: () => onEditItem(items.first)),
                       const Spacer(),
-                      _capsuleBtn('加入购物车',
-                          onTap: () => _reAddToCart(context)),
+                      _capsuleBtn('加入购物车', onTap: () => _reAddToCart(context)),
                       const SizedBox(width: 8),
-                      _capsuleBtn('钱款去向',
-                          onTap: () => onDetail(items.first)),
+                      _capsuleBtn('钱款去向', onTap: () => onDetail(items.first)),
                       const SizedBox(width: 8),
                       _capsuleBtn('联系商家',
-                          highlight: true,
-                          onTap: () => _contactShop(context)),
+                          highlight: true, onTap: () => _contactShop(context)),
                     ],
                   )
                 : rateTab
@@ -1325,33 +1303,34 @@ class _OrderCard extends StatelessWidget {
                         ? _buildCapturedOpsButtons(context)
                         : _buildRateButtons(context))
                     : _isTradeSuccess
-                    // v1.9.87：交易成功卡片固定用截图款组合（追加评价+查看物流+
-                    // 再买一单浅橙高亮），不再走抓包按钮序列（用户反馈抓包款的
-                    // 实心橙再买一单+申请开票+删除订单与真实淘宝截图不符）
-                    ? _buildSuccessButtons(context)
-                    : Row(
-                    children: [
-                      // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
-                      _moreBtn('更多',
-                          onDoubleTap: () => onEditItem(items.first)),
-                      const Spacer(),
-                      // 已签收/交易成功的订单不再显示「催物流」（对齐真实淘宝）
-                      if (!_isSigned) ...[
-                        _outlineBtn('催物流',
-                            onTap: () => _urgeLogistics(context)),
-                        const SizedBox(width: 8),
-                      ],
-                      _outlineBtn('查看物流',
-                          onTap: () => _gotoLogistics(context, items.first)),
-                      const SizedBox(width: 8),
-                      // 「申请售后」对齐真实淘宝统一灰色线框，不用橙色实心
-                      actionText == '申请售后'
-                          ? _outlineBtn(actionText,
-                              onTap: () => _onPrimaryTap(context))
-                          : _primaryBtn(actionText,
-                              onTap: () => _onPrimaryTap(context)),
-                    ],
-                  ),
+                        // v1.9.87：交易成功卡片固定用截图款组合（追加评价+查看物流+
+                        // 再买一单浅橙高亮），不再走抓包按钮序列（用户反馈抓包款的
+                        // 实心橙再买一单+申请开票+删除订单与真实淘宝截图不符）
+                        ? _buildSuccessButtons(context)
+                        : Row(
+                            children: [
+                              // "更多"固定在最左侧（编辑入口，双击打开编辑菜单）
+                              _moreBtn('更多',
+                                  onDoubleTap: () => onEditItem(items.first)),
+                              const Spacer(),
+                              // 已签收/交易成功的订单不再显示「催物流」（对齐真实淘宝）
+                              if (!_isSigned) ...[
+                                _outlineBtn('催物流',
+                                    onTap: () => _urgeLogistics(context)),
+                                const SizedBox(width: 8),
+                              ],
+                              _outlineBtn('查看物流',
+                                  onTap: () =>
+                                      _gotoLogistics(context, items.first)),
+                              const SizedBox(width: 8),
+                              // 「申请售后」对齐真实淘宝统一灰色线框，不用橙色实心
+                              actionText == '申请售后'
+                                  ? _outlineBtn(actionText,
+                                      onTap: () => _onPrimaryTap(context))
+                                  : _primaryBtn(actionText,
+                                      onTap: () => _onPrimaryTap(context)),
+                            ],
+                          ),
           ),
         ],
       ),
@@ -1391,8 +1370,7 @@ class _OrderCard extends StatelessWidget {
         child: Row(
           children: [
             Text('${it.giftCount}件赠品',
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF333333))),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF333333))),
             const Spacer(),
             for (final t in thumbs.take(2))
               Padding(
@@ -1414,8 +1392,7 @@ class _OrderCard extends StatelessWidget {
                 child: const Icon(Icons.card_giftcard,
                     size: 12, color: Color(0xFFbbbbbb)),
               ),
-            const Icon(Icons.chevron_right,
-                color: Color(0xFFcccccc), size: 16),
+            const Icon(Icons.chevron_right, color: Color(0xFFcccccc), size: 16),
           ],
         ),
       ),
@@ -1476,8 +1453,7 @@ class _OrderCard extends StatelessWidget {
   void _gotoLogistics(BuildContext context, OrderItem item) {
     Navigator.of(context).push(
       MaterialPageRoute(
-          builder: (_) =>
-              LogisticsScreen(item: item, shopName: shop.shopName)),
+          builder: (_) => LogisticsScreen(item: item, shopName: shop.shopName)),
     );
   }
 
@@ -1537,17 +1513,14 @@ class _OrderCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: highlight
-              ? const Color(0xFFFFF1E8)
-              : const Color(0xFFF5F5F5),
+          color: highlight ? const Color(0xFFFFF1E8) : const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(text,
             style: TextStyle(
                 color: highlight ? AppColors.primary : Colors.black87,
                 fontSize: 12,
-                fontWeight:
-                    highlight ? FontWeight.w500 : FontWeight.normal)),
+                fontWeight: highlight ? FontWeight.w500 : FontWeight.normal)),
       ),
     );
   }
@@ -1593,7 +1566,9 @@ class _OrderCard extends StatelessWidget {
         ),
         child: Text(text,
             style: const TextStyle(
-                color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -1617,8 +1592,7 @@ class _OrderItemTile extends StatelessWidget {
 
   Future<void> _pickImage(BuildContext context) async {
     try {
-      final picked =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final dir = await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/order_images');
@@ -1632,9 +1606,7 @@ class _OrderItemTile extends StatelessWidget {
       // v1.9.102：存相对 Documents 路径——自签重装容器变化后图片不丢
       final rel = 'order_images/$fileName';
       // 用商品标题作为 key，详情页也会读取同一张图
-      await context
-          .read<ProductImageProvider>()
-          .setOverride(item.title, rel);
+      await context.read<ProductImageProvider>().setOverride(item.title, rel);
       if (!context.mounted) return;
       context.read<CartProvider>().updateOrderItem(item, imageUrl: rel);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1671,8 +1643,7 @@ class _OrderItemTile extends StatelessWidget {
 
   // ============ 售后卡片布局（照搬真实淘宝退款/售后列表） ============
   Widget _buildRefundLayout(BuildContext context, String imageUrl) {
-    final amount =
-        item.refundAmount > 0 ? item.refundAmount : item.price;
+    final amount = item.refundAmount > 0 ? item.refundAmount : item.price;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1729,8 +1700,8 @@ class _OrderItemTile extends StatelessWidget {
                       '$_specPrefix:${item.configuration}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.min
-                          .copyWith(color: AppColors.subText),
+                      style:
+                          AppTextStyles.min.copyWith(color: AppColors.subText),
                     ),
                   ],
                 ],
@@ -1802,8 +1773,7 @@ class _OrderItemTile extends StatelessWidget {
     if (item.showRefundDiscount && item.refundDiscount > 0) {
       spans.add(const TextSpan(text: '，优惠 ', style: grey));
       spans.add(TextSpan(
-          text: '¥${item.refundDiscount.toStringAsFixed(2)}',
-          style: orange));
+          text: '¥${item.refundDiscount.toStringAsFixed(2)}', style: orange));
     }
     return spans;
   }
@@ -1954,8 +1924,7 @@ class _OrderItemTile extends StatelessWidget {
   /// 标题右侧实付单价（v1.9.102）：与详情页 _unitPriceOf 同逻辑——
   /// price≈整单实付时先剥运费再 ÷数量；抓包新数据 price 本就是单价直接用
   double get _unitPrice {
-    if (shop.actualTotal > 0 &&
-        (item.price - shop.actualTotal).abs() < 1.0) {
+    if (shop.actualTotal > 0 && (item.price - shop.actualTotal).abs() < 1.0) {
       final shipFee = item.showShippingFee ? item.shippingFee : 0.0;
       return (item.price - shipFee) / item.quantity;
     }
@@ -1971,7 +1940,6 @@ class _OrderItemTile extends StatelessWidget {
     }
     return item.price;
   }
-
 }
 
 // ============ 卡片底部状态框架（v1.9.102：从商品区下移，贴近按钮区） ============
@@ -2042,8 +2010,7 @@ class _OrderStatusFrame extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.schedule,
-                    color: Color(0xFF999999), size: 14),
+                const Icon(Icons.schedule, color: Color(0xFF999999), size: 14),
                 const SizedBox(width: 4),
                 const Text('待发货',
                     style: TextStyle(
@@ -2136,8 +2103,7 @@ class _OrderStatusFrame extends StatelessWidget {
       case 2:
         final wan = (12 + h % 87) / 10; // 1.2 ~ 9.8 万
         return [
-          TextSpan(
-              text: '评价将帮助${wan.toStringAsFixed(1)}万人…', style: dark)
+          TextSpan(text: '评价将帮助${wan.toStringAsFixed(1)}万人…', style: dark)
         ];
       case 3:
         return [const TextSpan(text: '回购多次，怎么样？', style: dark)];
@@ -2211,11 +2177,8 @@ class _OrderStatusFrame extends StatelessWidget {
     // v1.9.110：运输中/派送中（预计xx送达）整行橙色，对齐真实淘宝
     if (_isTransitLine) {
       const orange = TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFFff5000));
-      const orangeTail =
-          TextStyle(fontSize: 12, color: Color(0xFFff5000));
+          fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFff5000));
+      const orangeTail = TextStyle(fontSize: 12, color: Color(0xFFff5000));
       if (idx <= 0) return [TextSpan(text: line, style: orange)];
       return [
         TextSpan(text: line.substring(0, idx), style: orange),
@@ -2290,7 +2253,6 @@ class _OrderStatusFrame extends StatelessWidget {
     }
     return Icons.local_shipping;
   }
-
 }
 
 // ============ 编辑菜单 BottomSheet ============
@@ -2372,14 +2334,13 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
-              border: Border(
-                  bottom: BorderSide(color: Color(0xFFf0f0f0))),
+              border: Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
             ),
             child: Row(
               children: [
                 const Text('订单编辑',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const Spacer(),
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
@@ -2461,8 +2422,7 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
 
   /// 修改退款金额（售后订单）：退款卡片的"退款: ¥金额"与退款条金额即时更新
   void _editRefundAmount(CartProvider provider) {
-    final current =
-        _item.refundAmount > 0 ? _item.refundAmount : _item.price;
+    final current = _item.refundAmount > 0 ? _item.refundAmount : _item.price;
     Navigator.of(context).pop();
     DialogHelpers.showTextInput(
       widget.parentContext,
@@ -2541,10 +2501,11 @@ class _OrderEditSheetState extends State<_OrderEditSheet> {
       DialogHelpers.showCountdownPicker(
         widget.parentContext,
         title: '修改倒计时',
-        initial: _item.countDown.isEmpty ? _defaultCountdown() : _item.countDown,
+        initial:
+            _item.countDown.isEmpty ? _defaultCountdown() : _item.countDown,
       ).then((v) {
         if (v != null && v.isNotEmpty) {
-          provider.updateOrderItem(_item, countDown: v);
+          provider.setCountdown(_item, v);
           _toast('倒计时已修改：$v');
         }
       });
@@ -2723,8 +2684,7 @@ class _AiAssistantSheetState extends State<_AiAssistantSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut);
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
       }
     });
   }
@@ -2762,8 +2722,8 @@ class _AiAssistantSheetState extends State<_AiAssistantSheet> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text('订单 AI 助手',
-                      style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, size: 20),
@@ -2786,11 +2746,10 @@ class _AiAssistantSheetState extends State<_AiAssistantSheet> {
                       isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     constraints: BoxConstraints(
-                        maxWidth:
-                            MediaQuery.of(context).size.width * 0.75),
+                        maxWidth: MediaQuery.of(context).size.width * 0.75),
                     decoration: BoxDecoration(
                       color: isMe ? AppColors.primary : Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -2861,15 +2820,14 @@ class _AiAssistantSheetState extends State<_AiAssistantSheet> {
                 GestureDetector(
                   onTap: () => _send(),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 9),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text('发送',
-                        style:
-                            TextStyle(color: Colors.white, fontSize: 13)),
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
                   ),
                 ),
               ],
@@ -2894,9 +2852,15 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
   final Set<String> _sel = {};
 
   static const _timeChips = [
-    '1个月前', '3个月前', '6个月前',
-    '2026年', '2025年', '2024年',
-    '2023年', '2022年', '展开 ∨',
+    '1个月前',
+    '3个月前',
+    '6个月前',
+    '2026年',
+    '2025年',
+    '2024年',
+    '2023年',
+    '2022年',
+    '展开 ∨',
   ];
 
   static const _categories = <(IconData, String)>[
@@ -2958,17 +2922,13 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
             if (icon != null) ...[
               Icon(icon,
                   size: 20,
-                  color: sel
-                      ? const Color(0xFFFF5000)
-                      : Colors.black87),
+                  color: sel ? const Color(0xFFFF5000) : Colors.black87),
               const SizedBox(width: 4),
             ],
             Text(label,
                 style: TextStyle(
                     fontSize: 13,
-                    color: sel
-                        ? const Color(0xFFFF5000)
-                        : Colors.black87)),
+                    color: sel ? const Color(0xFFFF5000) : Colors.black87)),
           ],
         ),
       ),
@@ -3010,8 +2970,8 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 22, color: Colors.black87),
+                  icon:
+                      const Icon(Icons.close, size: 22, color: Colors.black87),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -3037,16 +2997,14 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                           ),
                           child: const Text('起始时间',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF999999))),
+                                  fontSize: 13, color: Color(0xFF999999))),
                         ),
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8),
                         child: Text('-',
                             style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF999999))),
+                                fontSize: 13, color: Color(0xFF999999))),
                       ),
                       Expanded(
                         child: Container(
@@ -3058,8 +3016,7 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                           ),
                           child: const Text('终止时间',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF999999))),
+                                  fontSize: 13, color: Color(0xFF999999))),
                         ),
                       ),
                     ],
@@ -3076,8 +3033,7 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                     crossAxisSpacing: 10,
                     childAspectRatio: 2.6,
                     children: [
-                      for (final c in _categories)
-                        _chip(c.$2, icon: c.$1),
+                      for (final c in _categories) _chip(c.$2, icon: c.$1),
                     ],
                   ),
                 ),
@@ -3094,8 +3050,7 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                       Spacer(),
                       Text('试试按地址关键字搜索订单 ›',
                           style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF999999))),
+                              fontSize: 12, color: Color(0xFF999999))),
                     ],
                   ),
                 ),
@@ -3103,11 +3058,9 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     children: [
-                      _addrBox('山东省 淄博市 张店区',
-                          '中央公园(人民西路) 华润中央公园9号楼803'),
+                      _addrBox('山东省 淄博市 张店区', '中央公园(人民西路) 华润中央公园9号楼803'),
                       const SizedBox(height: 8),
-                      _addrBox(
-                          '山东省 淄博市 张店区', '中房大厦C座1001'),
+                      _addrBox('山东省 淄博市 张店区', '中房大厦C座1001'),
                       const SizedBox(height: 8),
                       Container(
                         width: double.infinity,
@@ -3119,8 +3072,7 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                         ),
                         child: const Text('展开更多地址 ∨',
                             style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF999999))),
+                                fontSize: 12, color: Color(0xFF999999))),
                       ),
                     ],
                   ),
@@ -3140,13 +3092,11 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                       TextSpan(
                           text: '没有找到适合的筛选条件？',
                           style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF999999))),
+                              fontSize: 12, color: Color(0xFF999999))),
                       TextSpan(
                           text: '试试订单搜索',
                           style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFFF5000))),
+                              fontSize: 12, color: Color(0xFFFF5000))),
                     ])),
                   ),
                 ),
@@ -3166,8 +3116,8 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(
                         color: Color(0xFFFFB400),
-                        borderRadius: BorderRadius.horizontal(
-                            left: Radius.circular(22)),
+                        borderRadius:
+                            BorderRadius.horizontal(left: Radius.circular(22)),
                       ),
                       child: const Text('重置',
                           style: TextStyle(
@@ -3185,8 +3135,8 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(
                         color: Color(0xFFFF5000),
-                        borderRadius: BorderRadius.horizontal(
-                            right: Radius.circular(22)),
+                        borderRadius:
+                            BorderRadius.horizontal(right: Radius.circular(22)),
                       ),
                       child: const Text('确认',
                           style: TextStyle(
@@ -3216,12 +3166,10 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(region,
-              style: const TextStyle(
-                  fontSize: 11, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF999999))),
           const SizedBox(height: 2),
           Text(detail,
-              style: const TextStyle(
-                  fontSize: 13, color: Colors.black87)),
+              style: const TextStyle(fontSize: 13, color: Colors.black87)),
         ],
       ),
     );
@@ -3266,8 +3214,7 @@ class _ShortcutsSheet extends StatelessWidget {
               width: double.infinity,
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(14)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
               ),
               padding: const EdgeInsets.fromLTRB(8, 22, 8, 20),
               child: Column(
@@ -3290,8 +3237,7 @@ class _ShortcutsSheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 alignment: Alignment.center,
                 child: const Text('取消',
-                    style: TextStyle(
-                        fontSize: 16, color: Colors.black87)),
+                    style: TextStyle(fontSize: 16, color: Colors.black87)),
               ),
             ),
           ],
@@ -3317,8 +3263,7 @@ class _ShortcutsSheet extends StatelessWidget {
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(items[i].$1,
-                          color: Colors.black87, size: 28),
+                      Icon(items[i].$1, color: Colors.black87, size: 28),
                       if (badgeOnFirst && i == 0)
                         Positioned(
                           right: -12,
@@ -3339,8 +3284,8 @@ class _ShortcutsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(items[i].$2,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black87)),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.black87)),
                 ],
               ),
             ),
@@ -3390,8 +3335,8 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
     _focus.addListener(() {
       if (_focus.hasFocus && _results) {
         setState(() => _results = false);
-        _ctrl.selection = TextSelection(
-            baseOffset: 0, extentOffset: _ctrl.text.length);
+        _ctrl.selection =
+            TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
       }
     });
     // 进入页面自动弹键盘（对齐真实淘宝）
@@ -3592,8 +3537,8 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             },
             child: const Padding(
               padding: EdgeInsets.all(8),
-              child: Icon(Icons.arrow_back_ios,
-                  color: Colors.black87, size: 20),
+              child:
+                  Icon(Icons.arrow_back_ios, color: Colors.black87, size: 20),
             ),
           ),
           Expanded(
@@ -3601,8 +3546,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
               height: 38,
               decoration: BoxDecoration(
                 color: Colors.white,
-                border:
-                    Border.all(color: const Color(0xFFFF5000), width: 1),
+                border: Border.all(color: const Color(0xFFFF5000), width: 1),
                 borderRadius: BorderRadius.circular(19),
               ),
               child: Row(
@@ -3633,12 +3577,12 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                       onChanged: (_) => setState(() {}),
                       onSubmitted: (_) => _submit(),
                       textInputAction: TextInputAction.search,
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.black87),
+                      style:
+                          const TextStyle(fontSize: 14, color: Colors.black87),
                       decoration: const InputDecoration(
                         hintText: '商品名/订单号/快递号',
-                        hintStyle: TextStyle(
-                            color: Color(0xFFBBBBBB), fontSize: 13),
+                        hintStyle:
+                            TextStyle(color: Color(0xFFBBBBBB), fontSize: 13),
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
@@ -3694,8 +3638,8 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             const Padding(
                 padding: EdgeInsets.all(14),
                 child: Text('搜索范围',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600))),
+                    style:
+                        TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
             for (final s in _scopes)
               ListTile(
                 dense: true,
@@ -3741,8 +3685,8 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                 GestureDetector(
                   onTap: () => _submit(k),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 7),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
                         color: const Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(15)),
@@ -3835,17 +3779,13 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-                  color: active
-                      ? const Color(0xFFFF5000)
-                      : Colors.black87)),
+                  color: active ? const Color(0xFFFF5000) : Colors.black87)),
           const SizedBox(height: 3),
           Container(
               width: 20,
               height: 2.5,
               decoration: BoxDecoration(
-                  color: active
-                      ? const Color(0xFFFF5000)
-                      : Colors.transparent,
+                  color: active ? const Color(0xFFFF5000) : Colors.transparent,
                   borderRadius: BorderRadius.circular(2))),
         ],
       ),
@@ -3869,8 +3809,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             padding: EdgeInsets.symmetric(vertical: 30),
             child: Center(
                 child: Text('暂无常买商品',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFFBBBBBB)))))
+                    style: TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)))))
       ];
     }
     return [
@@ -3899,8 +3838,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Text(
-                            '¥${_fmtP((e['it'] as OrderItem).price)}',
+                        Text('¥${_fmtP((e['it'] as OrderItem).price)}',
                             style: const TextStyle(
                                 color: Color(0xFFFF5000),
                                 fontSize: 15,
@@ -3908,8 +3846,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                         const SizedBox(width: 8),
                         Text('买过${e['n']}次',
                             style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF999999))),
+                                fontSize: 11, color: Color(0xFF999999))),
                       ],
                     ),
                   ],
@@ -3930,8 +3867,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             padding: EdgeInsets.symmetric(vertical: 30),
             child: Center(
                 child: Text('暂无常买店铺',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFFBBBBBB)))))
+                    style: TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)))))
       ];
     }
     return [
@@ -3972,14 +3908,12 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                       children: [
                         const Text('88VIP好评率99%',
                             style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFFFF5000))),
+                                fontSize: 11, color: Color(0xFFFF5000))),
                         const SizedBox(width: 8),
                         Text(
                             '买过${s.items.fold(0, (sum, it) => sum + it.quantity)}次',
                             style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF999999))),
+                                fontSize: 11, color: Color(0xFF999999))),
                       ],
                     ),
                   ],
@@ -3987,18 +3921,15 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
               ),
               GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) =>
-                        ShopHomeScreen(shopName: s.shopName))),
+                    builder: (_) => ShopHomeScreen(shopName: s.shopName))),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                   decoration: BoxDecoration(
-                      border:
-                          Border.all(color: const Color(0xFFDDDDDD)),
+                      border: Border.all(color: const Color(0xFFDDDDDD)),
                       borderRadius: BorderRadius.circular(14)),
                   child: const Text('进店',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.black87)),
+                      style: TextStyle(fontSize: 12, color: Colors.black87)),
                 ),
               ),
             ],
@@ -4027,8 +3958,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
       }
     }
     for (final s in _orderShops()) {
-      if (s.shopName.toLowerCase().contains(ql) &&
-          !kws.contains(s.shopName)) {
+      if (s.shopName.toLowerCase().contains(ql) && !kws.contains(s.shopName)) {
         kws.add(s.shopName);
       }
     }
@@ -4053,8 +3983,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: AppImage(
-                        url: it.imageUrl, width: 44, height: 44),
+                    child: AppImage(url: it.imageUrl, width: 44, height: 44),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -4063,8 +3992,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                       children: [
                         _hl(it.title, q,
                             style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF1A1A1A))),
+                                fontSize: 14, color: Color(0xFF1A1A1A))),
                         const SizedBox(height: 3),
                         Row(
                           children: [
@@ -4083,8 +4011,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF999999))),
+                                      fontSize: 11, color: Color(0xFF999999))),
                             ),
                           ],
                         ),
@@ -4111,8 +4038,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                   Expanded(
                       child: _hl(k, q,
                           style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF1A1A1A)))),
+                              fontSize: 14, color: Color(0xFF1A1A1A)))),
                 ],
               ),
             ),
@@ -4123,8 +4049,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
 
   // ============ 结果页（全部/购物N/闪购/飞猪 + 时间排序） ============
   Widget _buildResultTabs() {
-    final n = _matchGroups(_keyword)
-        .fold(0, (sum, g) => sum + g.items.length);
+    final n = _matchGroups(_keyword).fold(0, (sum, g) => sum + g.items.length);
     final labels = ['全部', '购物${n > 0 ? ' $n' : ''}', '闪购', '飞猪'];
     return Container(
       color: Colors.white,
@@ -4137,8 +4062,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             onTap: () => setState(() => _timeDesc = !_timeDesc),
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 10, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Row(
                 children: [
                   Text('时间',
@@ -4147,8 +4071,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
                           color: _timeDesc
                               ? Colors.black87
                               : const Color(0xFFFF5000))),
-                  const Icon(Icons.swap_vert,
-                      size: 15, color: Colors.black87),
+                  const Icon(Icons.swap_vert, size: 15, color: Colors.black87),
                 ],
               ),
             ),
@@ -4163,26 +4086,21 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
     return GestureDetector(
       onTap: () => setState(() => _resultTab = idx),
       child: Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           children: [
             Text(label,
                 style: TextStyle(
                     fontSize: 14,
-                    fontWeight:
-                        active ? FontWeight.w600 : FontWeight.normal,
-                    color: active
-                        ? const Color(0xFFFF5000)
-                        : Colors.black87)),
+                    fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                    color: active ? const Color(0xFFFF5000) : Colors.black87)),
             const SizedBox(height: 3),
             Container(
                 width: 18,
                 height: 2.5,
                 decoration: BoxDecoration(
-                    color: active
-                        ? const Color(0xFFFF5000)
-                        : Colors.transparent,
+                    color:
+                        active ? const Color(0xFFFF5000) : Colors.transparent,
                     borderRadius: BorderRadius.circular(2))),
           ],
         ),
@@ -4244,12 +4162,10 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.inbox_outlined,
-              size: 72, color: Color(0xFFC4C4C4)),
+          const Icon(Icons.inbox_outlined, size: 72, color: Color(0xFFC4C4C4)),
           const SizedBox(height: 12),
           Text(msg,
-              style: const TextStyle(
-                  fontSize: 13, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF999999))),
           const SizedBox(height: 6),
           const Text('换个商品关键词或店铺名试试',
               style: TextStyle(fontSize: 11, color: Color(0xFFBBBBBB))),
