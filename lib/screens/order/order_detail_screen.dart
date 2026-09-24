@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -48,20 +49,78 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final Set<String> _expandedTitles = {};
   bool _platformCouponExpanded = false; // 平台优惠明细展开（v1.9.93）
   bool _payDiscountExpanded = false; // 支付优惠明细展开（v1.9.142）
+  Timer? _countdownTimer; // 倒计时自动倒数 Timer（v1.9.151）
+  String _countdownDisplay = ''; // 实时倒计时展示文本（v1.9.151）
 
   @override
   void initState() {
     super.initState();
     _item = widget.item;
     _shop = widget.shop;
+    _countdownDisplay =
+        _item.countDown.isEmpty ? '还剩3天21小时自动确认' : _item.countDown;
+    _startCountdownTimer();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 启动倒计时自动倒数 Timer（有截止时间才启动，每秒递减）
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    if (_item.countDownDeadline.isEmpty) return;
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      _tickCountdown();
+    });
+  }
+
+  /// 每秒递减倒计时；归零自动跳到「交易成功」（自动确认收货）
+  void _tickCountdown() {
+    final deadline = DateTime.tryParse(_item.countDownDeadline);
+    if (deadline == null) {
+      _countdownTimer?.cancel();
+      _countdownTimer = null;
+      return;
+    }
+    final remain = deadline.difference(DateTime.now());
+    if (remain.isNegative) {
+      // 倒计时归零 → 自动确认收货，订单跳到交易成功
+      _countdownTimer?.cancel();
+      _countdownTimer = null;
+      if (mounted) {
+        final provider = context.read<CartProvider>();
+        provider.updateOrderStatus(_shop, _item, '交易成功');
+        // 清空 deadline，避免下次进入重复触发；倒计时文案保留作历史记录
+        provider.updateOrderItem(_item, countDownDeadline: '');
+      }
+      return;
+    }
+    final d = remain.inDays;
+    final h = remain.inHours % 24;
+    final m = remain.inMinutes % 60;
+    final s = remain.inSeconds % 60;
+    setState(() {
+      _countdownDisplay = _formatCountdown(d, h, m, s);
+    });
+  }
+
+  /// 实时倒计时文案：还剩 X天X小时X分X秒 自动确认（逐级省略为 0 的前缀）
+  String _formatCountdown(int d, int h, int m, int s) {
+    if (d > 0) return '还剩$d天$h小时$m分$s秒自动确认';
+    if (h > 0) return '还剩$h小时$m分$s秒自动确认';
+    if (m > 0) return '还剩$m分$s秒自动确认';
+    return '还剩$s秒自动确认';
   }
 
   bool get _isPendingShip => _item.statusTitle.contains('待发货');
 
   /// 待评价订单（已交易成功待买家评价）：详情页标题/物流条对齐真实淘宝交易成功单
   bool get _isWaitRate =>
-      _item.statusTitle.contains('待评价') ||
-      _shop.orderSubStatus.contains('待评价');
+      _item.statusTitle.contains('待评价') || _shop.orderSubStatus.contains('待评价');
 
   /// 订单编号（订单信息行）：5127 开头 19 位
   String get _orderNo => _item.orderNo;
@@ -101,9 +160,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Center(
                     child: Text(
-                      _item.countDown.isEmpty
+                      _countdownDisplay.isEmpty
                           ? '还剩3天21小时自动确认'
-                          : _item.countDown,
+                          : _countdownDisplay,
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF333333)),
                     ),
@@ -193,8 +252,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           GestureDetector(
             onTap: () => _showMoreActions(),
             onDoubleTap: () => _showEditMenu(),
-            child: const Icon(Icons.more_horiz,
-                color: Colors.black87, size: 24),
+            child:
+                const Icon(Icons.more_horiz, color: Colors.black87, size: 24),
           ),
         ],
       ),
@@ -229,69 +288,69 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           // 物流状态行（单击 → 物流详情页，对齐真实淘宝；双击换选项）
           // v1.9.134：待发货/待付款隐藏此行
           if (showLogisticsRow)
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => LogisticsScreen(
-                      item: _item, shopName: _shop.shopName)),
-            ),
-            onDoubleTap: () => _showOptionPicker(
-              title: '修改物流状态',
-              options: logisticsOptions,
-              currentValue: _item.logistics,
-              onSave: (v) => provider.updateOrderItem(_item, logistics: v),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // v1.9.141：图标 alpha 增强为实心纯橙 #FF5000（解决发虚），
-                // 尺寸加大：卡车 18x16→24x21，签收箱 16x16→21x21
-                Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: Image.asset(
-                      stage.$1.contains('签收')
-                          ? 'assets/images/icons/logistics_signed.png'
-                          : 'assets/images/icons/logistics_truck.png',
-                      width: stage.$1.contains('签收') ? 21 : 24,
-                      height: 21),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text.rich(
-                    TextSpan(children: [
-                      // v1.9.138：对齐真实淘宝——阶段词橙色 w600，
-                      // 后面内容是常规体深灰不是粗体（137 加粗加错了）
-                      TextSpan(
-                          text: '${stage.$1}  ',
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) =>
+                        LogisticsScreen(item: _item, shopName: _shop.shopName)),
+              ),
+              onDoubleTap: () => _showOptionPicker(
+                title: '修改物流状态',
+                options: logisticsOptions,
+                currentValue: _item.logistics,
+                onSave: (v) => provider.updateOrderItem(_item, logistics: v),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // v1.9.141：图标 alpha 增强为实心纯橙 #FF5000（解决发虚），
+                  // 尺寸加大：卡车 18x16→24x21，签收箱 16x16→21x21
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Image.asset(
+                        stage.$1.contains('签收')
+                            ? 'assets/images/icons/logistics_signed.png'
+                            : 'assets/images/icons/logistics_truck.png',
+                        width: stage.$1.contains('签收') ? 21 : 24,
+                        height: 21),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        // v1.9.138：对齐真实淘宝——阶段词橙色 w600，
+                        // 后面内容是常规体深灰不是粗体（137 加粗加错了）
+                        TextSpan(
+                            text: '${stage.$1}  ',
+                            style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFFFF5000),
+                                fontWeight: FontWeight.w600)),
+                        TextSpan(
+                          text: _bannerLogisticsText,
                           style: const TextStyle(
                               fontSize: 14,
-                              color: Color(0xFFFF5000),
-                              fontWeight: FontWeight.w600)),
-                      TextSpan(
-                        text: _bannerLogisticsText,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF333333),
-                            fontWeight: FontWeight.w400),
-                      ),
-                    ]),
-                    // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                              color: Color(0xFF333333),
+                              fontWeight: FontWeight.w400),
+                        ),
+                      ]),
+                      // v1.9.111：物流行只显示一行，超出省略号（对齐真实淘宝）
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const Icon(Icons.chevron_right,
-                    size: 16, color: Color(0xFFcccccc)),
-              ],
+                  const Icon(Icons.chevron_right,
+                      size: 16, color: Color(0xFFcccccc)),
+                ],
+              ),
             ),
-          ),
           // 地址区（单击展开/收起完整信息，双击手动输入：第一行收件人，其余地址）
           if (showLogisticsRow) const SizedBox(height: 14),
           GestureDetector(
-            onTap: () =>
-                setState(() => _addressExpanded = !_addressExpanded),
-            onDoubleTap: () => _editText('修改地址（第一行收件人，第二行起地址）',
-                '${_item.receiver}\n${_item.address}', (v) {
+            onTap: () => setState(() => _addressExpanded = !_addressExpanded),
+            onDoubleTap: () => _editText(
+                '修改地址（第一行收件人，第二行起地址）', '${_item.receiver}\n${_item.address}',
+                (v) {
               final lines = v
                   .split('\n')
                   .map((l) => l.trim())
@@ -301,8 +360,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 provider.updateOrderItem(_item, receiver: lines.first);
               }
               if (lines.length > 1) {
-                provider.updateOrderItem(
-                    _item, address: lines.sublist(1).join('\n'));
+                provider.updateOrderItem(_item,
+                    address: lines.sublist(1).join('\n'));
               }
             }, maxLines: 3),
             child: Column(
@@ -338,8 +397,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           fontSize: 12, color: Color(0xFF666666)),
                     ),
                     const Text(' 86-186****5652',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF666666))),
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF666666))),
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -442,8 +501,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   _editText('修改发货承诺', _item.deliveryPromise, (v) {
                 provider.updateOrderItem(_item, deliveryPromise: v);
               }),
-              onLongPress: () => _editText(
-                  '修改承诺副标题（清空隐藏）', _item.deliveryPromiseSub, (v) {
+              onLongPress: () =>
+                  _editText('修改承诺副标题（清空隐藏）', _item.deliveryPromiseSub, (v) {
                 provider.updateOrderItem(_item, deliveryPromiseSub: v);
               }),
               child: Column(
@@ -471,8 +530,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ),
           ),
-          const Icon(Icons.chevron_right,
-              size: 16, color: Color(0xFF999999)),
+          const Icon(Icons.chevron_right, size: 16, color: Color(0xFF999999)),
         ],
       ),
     );
@@ -536,8 +594,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         children: [
           GestureDetector(
-            onDoubleTap: () =>
-                _editText('修改准时送达文字', _item.onTimeText, (v) {
+            onDoubleTap: () => _editText('修改准时送达文字', _item.onTimeText, (v) {
               provider.updateOrderItem(_item, onTimeText: v);
             }),
             child: Padding(
@@ -555,8 +612,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           const Divider(height: 1, thickness: 1, color: Color(0xFFf0f0f0)),
           GestureDetector(
-            onDoubleTap: () =>
-                _editText('修改第二行文字', _item.onTimeText2, (v) {
+            onDoubleTap: () => _editText('修改第二行文字', _item.onTimeText2, (v) {
               provider.updateOrderItem(_item, onTimeText2: v);
             }),
             child: Padding(
@@ -567,9 +623,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _item.onTimeText2.isEmpty
-                          ? '送货上门'
-                          : _item.onTimeText2,
+                      _item.onTimeText2.isEmpty ? '送货上门' : _item.onTimeText2,
                       style: textStyle,
                     ),
                   ),
@@ -607,8 +661,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   (String, IconData) _logisticsStage() {
     final l = _item.logistics;
     final t = _item.statusTitle;
-    final category = CartProvider.statusCategory(
-        t.isEmpty ? _shop.orderSubStatus : t);
+    final category =
+        CartProvider.statusCategory(t.isEmpty ? _shop.orderSubStatus : t);
     // 交易成功/待评价订单物流条固定为已签收（对齐真实淘宝交易成功单）
     // v1.9.86：不再只看待评价——退款等状态改成交易成功后同样是已签收
     if (_isWaitRate || category == '已完成') {
@@ -665,8 +719,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onDoubleTap: () => _editText('修改店铺名', _shop.shopName, (v) {
-                        context.read<CartProvider>().updateShop(_shop, shopName: v);
+                      onDoubleTap: () =>
+                          _editText('修改店铺名', _shop.shopName, (v) {
+                        context
+                            .read<CartProvider>()
+                            .updateShop(_shop, shopName: v);
                       }),
                       child: Row(
                         children: [
@@ -675,8 +732,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold)),
+                                    fontSize: 15, fontWeight: FontWeight.bold)),
                           ),
                           // v1.9.99：店名右侧 > 箭头已删（用户要求）
                         ],
@@ -698,8 +754,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           color: Color(0xFF333333),
                           fontSize: 12,
                           fontWeight: FontWeight.w500)),
-                  Icon(Icons.chevron_right,
-                      color: Color(0xFF999999), size: 16),
+                  Icon(Icons.chevron_right, color: Color(0xFF999999), size: 16),
                 ],
               ),
             ],
@@ -750,8 +805,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           children: [
             ...List.generate(
                 5,
-                (_) => const Icon(Icons.star,
-                    color: Color(0xFFFF5000), size: 12)),
+                (_) =>
+                    const Icon(Icons.star, color: Color(0xFFFF5000), size: 12)),
             const SizedBox(width: 3),
             Text('${_shop.fansCount}粉丝',
                 style: grey, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -798,8 +853,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       return AppImage(url: _item.shopAvatar, width: 30, height: 30);
     }
     // 店铺级手动覆盖（旧版按店铺名存，全店订单共享）
-    final override =
-        context.watch<ProductImageProvider>().imageFor('shop_avatar:${_shop.shopName}');
+    final override = context
+        .watch<ProductImageProvider>()
+        .imageFor('shop_avatar:${_shop.shopName}');
     if (override != null) {
       return AppImage(url: override, width: 30, height: 30);
     }
@@ -815,8 +871,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _pickShopAvatar() async {
     try {
-      final picked =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final dir = await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/shop_avatars');
@@ -832,10 +887,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       // 按订单存店铺头像快照），双击只影响当前这一个订单
       await context
           .read<ProductImageProvider>()
-          .setOverride('shop_avatar:order:$_orderNo',
-              'shop_avatars/$fileName');
+          .setOverride('shop_avatar:order:$_orderNo', 'shop_avatars/$fileName');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
+        const SnackBar(
+            content: Text('商家头像已替换'), duration: Duration(seconds: 1)),
       );
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -888,8 +943,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final out = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       if (i > 0) out.add(_lineDivider());
-      out.add(_buildProductCard(items[i],
-          withPriceSection: i == items.length - 1));
+      out.add(
+          _buildProductCard(items[i], withPriceSection: i == items.length - 1));
     }
     return out;
   }
@@ -915,219 +970,220 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              // v1.9.107：Align 给图片松约束，防止 stretch 把 90x90 拉高
-              Align(
-                alignment: Alignment.topCenter,
-                child: GestureDetector(
-                  onDoubleTap: () => _pickProductImage(it),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AppImage(
-                      url: imageUrl,
-                      width: 90,
-                      height: 90,
+                // v1.9.107：Align 给图片松约束，防止 stretch 把 90x90 拉高
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: GestureDetector(
+                    onDoubleTap: () => _pickProductImage(it),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AppImage(
+                        url: imageUrl,
+                        width: 90,
+                        height: 90,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                // v1.9.108：右侧拆「内容列 + 价格/数量列」——灰色单价/xN
-                // 移出标题行，规格/标签行紧贴标题（间距 2），Spacer 把
-                // "实付价"行压到与商品图底边对齐（对齐真实淘宝）
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                  Expanded(
-                  child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // v1.9.99：标题>16字默认折叠1行（∨按钮展开）
-                    Builder(builder: (context) {
-                      final collapsible = it.title.length > 16;
-                      final expanded =
-                          _expandedTitles.contains(it.title);
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onDoubleTap: () =>
-                                  _editText('修改商品标题', it.title, (v) {
-                                context
-                                    .read<CartProvider>()
-                                    .updateOrderItem(it, title: v);
-                              }),
-                              child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  // v1.9.108：右侧拆「内容列 + 价格/数量列」——灰色单价/xN
+                  // 移出标题行，规格/标签行紧贴标题（间距 2），Spacer 把
+                  // "实付价"行压到与商品图底边对齐（对齐真实淘宝）
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // v1.9.99：标题>16字默认折叠1行（∨按钮展开）
+                            Builder(builder: (context) {
+                              final collapsible = it.title.length > 16;
+                              final expanded =
+                                  _expandedTitles.contains(it.title);
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: Text(it.title,
-                                        maxLines: collapsible && !expanded
-                                            ? 1
-                                            : 3,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: AppTextStyles.small),
-                                  ),
-                                  if (collapsible)
-                                    GestureDetector(
-                                      onTap: () => setState(() {
-                                        expanded
-                                            ? _expandedTitles
-                                                .remove(it.title)
-                                            : _expandedTitles
-                                                .add(it.title);
+                                    child: GestureDetector(
+                                      onDoubleTap: () =>
+                                          _editText('修改商品标题', it.title, (v) {
+                                        context
+                                            .read<CartProvider>()
+                                            .updateOrderItem(it, title: v);
                                       }),
-                                      child: Icon(
-                                        expanded
-                                            ? Icons.keyboard_arrow_up
-                                            : Icons.keyboard_arrow_down,
-                                        size: 16,
-                                        color: const Color(0xFF999999),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Text(it.title,
+                                                maxLines:
+                                                    collapsible && !expanded
+                                                        ? 1
+                                                        : 3,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: AppTextStyles.small),
+                                          ),
+                                          if (collapsible)
+                                            GestureDetector(
+                                              onTap: () => setState(() {
+                                                expanded
+                                                    ? _expandedTitles
+                                                        .remove(it.title)
+                                                    : _expandedTitles
+                                                        .add(it.title);
+                                              }),
+                                              child: Icon(
+                                                expanded
+                                                    ? Icons.keyboard_arrow_up
+                                                    : Icons.keyboard_arrow_down,
+                                                size: 16,
+                                                color: const Color(0xFF999999),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
+                                  ),
                                 ],
+                              );
+                            }),
+                            // v1.9.107："默认规格"不显示（与列表页一致）
+                            if (it.configuration.isNotEmpty &&
+                                it.configuration != '默认规格') ...[
+                              const SizedBox(height: 2),
+                              GestureDetector(
+                                onDoubleTap: () =>
+                                    _editText('修改规格', it.configuration, (v) {
+                                  context
+                                      .read<CartProvider>()
+                                      .updateOrderItem(it, configuration: v);
+                                }),
+                                child: Text(it.configuration,
+                                    style: AppTextStyles.minSub),
                               ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                    // v1.9.107："默认规格"不显示（与列表页一致）
-                    if (it.configuration.isNotEmpty &&
-                        it.configuration != '默认规格') ...[
-                      const SizedBox(height: 2),
-                      GestureDetector(
-                        onDoubleTap: () => _editText('修改规格', it.configuration, (v) {
-                          context.read<CartProvider>().updateOrderItem(it, configuration: v);
-                        }),
-                        child: Text(it.configuration,
-                            style: AppTextStyles.minSub),
-                      ),
-                    ],
-                    const SizedBox(height: 2),
-                    // v1.9.109：绿标只显示一行（对齐真实淘宝）——按宽度容纳
-                    // 尽可能多的完整标签，放不下的截断，› 固定在行尾跟行
-                    if (it.displayTags.isNotEmpty)
-                      LayoutBuilder(builder: (context, cons) {
-                        const tagStyle = TextStyle(
-                            color: Color(0xFF00A870), fontSize: 10);
-                        const spacing = 6.0;
-                        const chevW = 13.0;
-                        final shown = <String>[];
-                        var used = 0.0;
-                        for (final t in it.displayTags) {
-                          final tp = TextPainter(
-                              text: TextSpan(text: t, style: tagStyle),
-                              textDirection: TextDirection.ltr,
-                              maxLines: 1)
-                            ..layout();
-                          final w =
-                              tp.width + (shown.isEmpty ? 0 : spacing);
-                          // 至少保留一个标签；其余放不下就截断
-                          if (shown.isNotEmpty &&
-                              used + w + chevW > cons.maxWidth) {
-                            break;
-                          }
-                          shown.add(t);
-                          used += w;
-                        }
-                        return Row(
-                          children: [
-                            for (var i = 0; i < shown.length; i++) ...[
-                              if (i > 0) const SizedBox(width: spacing),
-                              Text(shown[i], style: tagStyle),
                             ],
-                            const Icon(Icons.chevron_right,
-                                size: 13, color: Color(0xFF00A870)),
+                            const SizedBox(height: 2),
+                            // v1.9.109：绿标只显示一行（对齐真实淘宝）——按宽度容纳
+                            // 尽可能多的完整标签，放不下的截断，› 固定在行尾跟行
+                            if (it.displayTags.isNotEmpty)
+                              LayoutBuilder(builder: (context, cons) {
+                                const tagStyle = TextStyle(
+                                    color: Color(0xFF00A870), fontSize: 10);
+                                const spacing = 6.0;
+                                const chevW = 13.0;
+                                final shown = <String>[];
+                                var used = 0.0;
+                                for (final t in it.displayTags) {
+                                  final tp = TextPainter(
+                                      text: TextSpan(text: t, style: tagStyle),
+                                      textDirection: TextDirection.ltr,
+                                      maxLines: 1)
+                                    ..layout();
+                                  final w =
+                                      tp.width + (shown.isEmpty ? 0 : spacing);
+                                  // 至少保留一个标签；其余放不下就截断
+                                  if (shown.isNotEmpty &&
+                                      used + w + chevW > cons.maxWidth) {
+                                    break;
+                                  }
+                                  shown.add(t);
+                                  used += w;
+                                }
+                                return Row(
+                                  children: [
+                                    for (var i = 0; i < shown.length; i++) ...[
+                                      if (i > 0) const SizedBox(width: spacing),
+                                      Text(shown[i], style: tagStyle),
+                                    ],
+                                    const Icon(Icons.chevron_right,
+                                        size: 13, color: Color(0xFF00A870)),
+                                  ],
+                                );
+                              }),
+                            // v1.9.107：Spacer 把实付价行压到商品图底边
+                            const Spacer(),
+                            Row(
+                              children: [
+                                Text('实付价 ', style: AppTextStyles.minSub),
+                                // v1.9.112：实付价金额调小调细（对齐真实淘宝 ¥85 样式，
+                                // 与下方实付款大小区分开）
+                                const Text('¥',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black)),
+                                // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
+                                // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
+                                // v1.9.97：双击金额=直接改该商品实付价（多商品订单各改各的）
+                                GestureDetector(
+                                  onDoubleTap: () =>
+                                      _editNumber('修改实付价（不含运费）', it.price, (v) {
+                                    context
+                                        .read<CartProvider>()
+                                        .updateOrderItem(it, price: v);
+                                  }),
+                                  child: Text(
+                                      _unitPriceOf(it).toStringAsFixed(2),
+                                      style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black)),
+                                ),
+                                // v1.9.146：店铺/平台/支付优惠全部隐藏时，
+                                // 价格明细入口一并隐藏（没有可展开的优惠就没意义了）
+                                if (_item.showShopDiscount ||
+                                    _item.showPlatformCoupon ||
+                                    _item.showPayDiscount) ...[
+                                  const SizedBox(width: 6),
+                                  // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
+                                  const Text('价格明细',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w400,
+                                          color: Color(0xFF999999))),
+                                  const Icon(Icons.chevron_right,
+                                      size: 12, color: Color(0xFF999999)),
+                                ],
+                                const Spacer(),
+                              ],
+                            ),
                           ],
-                        );
-                      }),
-                    // v1.9.107：Spacer 把实付价行压到商品图底边
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Text('实付价 ',
-                            style: AppTextStyles.minSub),
-                        // v1.9.112：实付价金额调小调细（对齐真实淘宝 ¥85 样式，
-                        // 与下方实付款大小区分开）
-                        const Text('¥',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black)),
-                        // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
-                        // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
-                        // v1.9.97：双击金额=直接改该商品实付价（多商品订单各改各的）
-                        GestureDetector(
-                          onDoubleTap: () => _editNumber(
-                              '修改实付价（不含运费）', it.price, (v) {
-                            context
-                                .read<CartProvider>()
-                                .updateOrderItem(it, price: v);
-                          }),
-                          child: Text(_unitPriceOf(it).toStringAsFixed(2),
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black)),
                         ),
-                        // v1.9.146：店铺/平台/支付优惠全部隐藏时，
-                        // 价格明细入口一并隐藏（没有可展开的优惠就没意义了）
-                        if (_item.showShopDiscount ||
-                            _item.showPlatformCoupon ||
-                            _item.showPayDiscount) ...[
-                          const SizedBox(width: 6),
-                          // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
-                          const Text('价格明细',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w400,
-                                  color: Color(0xFF999999))),
-                          const Icon(Icons.chevron_right,
-                              size: 12, color: Color(0xFF999999)),
-                        ],
-                        const Spacer(),
-                      ],
-                    ),
-                  ],
-                ),
-                ),
-                const SizedBox(width: 8),
-                // v1.9.108：右侧灰色单价（优惠前）+ 数量 xN 独立列，
-                // 顶部对齐、不参与内容流，规格/标签才能紧贴标题
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                          '¥${unitOriginal.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF666666))),
-                      const SizedBox(height: 10),
-                      // 数量双击可改（x1、x2…）
-                      GestureDetector(
-                        onDoubleTap: () => _editNumber(
-                            '修改数量', it.quantity.toDouble(), (v) {
-                          context
-                              .read<CartProvider>()
-                              .updateOrderItem(it,
-                                  quantity: v.round() < 1 ? 1 : v.round());
-                        }),
-                        child: Text('x${it.quantity}',
-                            style: AppTextStyles.minSub),
+                      ),
+                      const SizedBox(width: 8),
+                      // v1.9.108：右侧灰色单价（优惠前）+ 数量 xN 独立列，
+                      // 顶部对齐、不参与内容流，规格/标签才能紧贴标题
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                                '¥${unitOriginal.toStringAsFixed(2).replaceAll(RegExp(r'\.00$'), '')}',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF666666))),
+                            const SizedBox(height: 10),
+                            // 数量双击可改（x1、x2…）
+                            GestureDetector(
+                              onDoubleTap: () => _editNumber(
+                                  '修改数量', it.quantity.toDouble(), (v) {
+                                context.read<CartProvider>().updateOrderItem(it,
+                                    quantity: v.round() < 1 ? 1 : v.round());
+                              }),
+                              child: Text('x${it.quantity}',
+                                  style: AppTextStyles.minSub),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                ],
-                ),
-              ),
-            ],
+              ],
             ),
           ),
           const SizedBox(height: 14),
@@ -1137,12 +1193,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               // v1.9.97：更换款式（对齐真实淘宝，橙色带框；点击=改规格）
               // v1.9.98：默认隐藏，⋯菜单「显示更换款式」开关打开才显示
               if (it.showStyleBtn && it.configuration.isNotEmpty) ...[
-                _orangeOutlineBtn('更换款式', onTap: () => _editText(
-                    '更换款式', it.configuration, (v) {
-                  context
-                      .read<CartProvider>()
-                      .updateOrderItem(it, configuration: v);
-                })),
+                _orangeOutlineBtn('更换款式',
+                    onTap: () => _editText('更换款式', it.configuration, (v) {
+                          context
+                              .read<CartProvider>()
+                              .updateOrderItem(it, configuration: v);
+                        })),
                 const SizedBox(width: 8),
               ],
               _outlineBtn('加入购物车', onTap: () => _reAddToCart(it)),
@@ -1163,8 +1219,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _pickProductImage(OrderItem it) async {
     try {
-      final picked =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final dir = await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/product_images');
@@ -1177,9 +1232,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       // v1.9.102：存相对 Documents 路径——自签重装容器变化后图片不丢
       final rel = 'product_images/$fileName';
-      await context
-          .read<ProductImageProvider>()
-          .setOverride(it.title, rel);
+      await context.read<ProductImageProvider>().setOverride(it.title, rel);
       context.read<CartProvider>().updateOrderItem(it, imageUrl: rel);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('商品图已替换'), duration: Duration(seconds: 1)),
@@ -1223,16 +1276,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// 单击=编辑赠品件数（输入 0 隐藏），双击=换赠品图，长按=编辑赠品名
   Widget _giftRow(OrderItem it) {
     return GestureDetector(
-      onTap: () =>
-          _editNumber('修改赠品件数（0=隐藏赠品栏）', it.giftCount.toDouble(),
-              (v) {
-        context
-            .read<CartProvider>()
-            .updateOrderItem(it, giftCount: v.round());
+      onTap: () => _editNumber('修改赠品件数（0=隐藏赠品栏）', it.giftCount.toDouble(), (v) {
+        context.read<CartProvider>().updateOrderItem(it, giftCount: v.round());
       }),
       onDoubleTap: () => _pickGiftImage(it),
-      onLongPress: () =>
-          _editText('修改赠品名称', it.giftTitle, (v) {
+      onLongPress: () => _editText('修改赠品名称', it.giftTitle, (v) {
         context.read<CartProvider>().updateOrderItem(it, giftTitle: v);
       }),
       behavior: HitTestBehavior.opaque,
@@ -1247,8 +1295,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     color: Colors.black87)),
             const Spacer(),
             Text('${it.giftCount}件',
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF666666))),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF666666))),
             const SizedBox(width: 8),
             // v1.9.102：多张赠品缩略图（抓包 gifts 数组全量），
             // 最多展示 3 张；无图时灰色占位——之前只显示 1 张导致"赠品显示不全"
@@ -1272,8 +1319,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: const Icon(Icons.card_giftcard,
                     size: 16, color: Color(0xFFbbbbbb)),
               ),
-            const Icon(Icons.chevron_right,
-                color: Color(0xFFcccccc), size: 18),
+            const Icon(Icons.chevron_right, color: Color(0xFFcccccc), size: 18),
           ],
         ),
       ),
@@ -1296,8 +1342,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// 换赠品缩略图（双击赠品行触发）
   Future<void> _pickGiftImage(OrderItem it) async {
     try {
-      final picked =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final dir = await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/gift_images');
@@ -1324,8 +1369,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   // v1.9.97：服务标签对齐真实淘宝——绿色字体、不带框
   Widget _greenTag(String text) {
     return Text(text,
-        style: const TextStyle(
-            color: Color(0xFF00A870), fontSize: 10));
+        style: const TextStyle(color: Color(0xFF00A870), fontSize: 10));
   }
 
   // ============ 价格明细（与商品卡同一栏目） ============
@@ -1339,8 +1383,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
     final totalQty = _orderItems.fold<int>(0, (s, e) => s + e.quantity);
     // 实付款：抓包导入的订单带整单实付总额（单价×数量有分位差），优先用
-    final total =
-        _shop.actualTotal > 0 ? _shop.actualTotal : _item.price;
+    final total = _shop.actualTotal > 0 ? _shop.actualTotal : _item.price;
     // 优惠子项（v1.9.93）：抓包/手动编辑的明细优先，空则按总额确定性自动拆分；
     // 有明细时该组总额 = 子项之和（抓包导入的订单 shopDiscount/platformCoupon 为 0）
     final shopSubs = _discountSubs('shop');
@@ -1348,11 +1391,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final paySubs = _discountSubs('pay');
     final shopTotal =
         shopSubs.isNotEmpty ? _subsSum(shopSubs) : _item.shopDiscount;
-    final platformTotal = platformSubs.isNotEmpty
-        ? _subsSum(platformSubs)
-        : _item.platformCoupon;
-    final payTotal =
-        paySubs.isNotEmpty ? _subsSum(paySubs) : _item.payDiscount;
+    final platformTotal =
+        platformSubs.isNotEmpty ? _subsSum(platformSubs) : _item.platformCoupon;
+    final payTotal = paySubs.isNotEmpty ? _subsSum(paySubs) : _item.payDiscount;
     // 共减 = 店铺优惠 + 平台优惠 + 支付优惠（优先用持久化的共减字段）
     final co = _item.coDiscount > 0
         ? _item.coDiscount
@@ -1360,8 +1401,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             (_item.showPlatformCoupon ? platformTotal : 0) +
             (_item.showPayDiscount ? payTotal : 0);
     return [
-      _priceRow('商品总价', '共$totalQty件',
-          '¥${productTotal.toStringAsFixed(2)}'),
+      _priceRow('商品总价', '共$totalQty件', '¥${productTotal.toStringAsFixed(2)}'),
       // 运费行：可在编辑菜单开启/修改，默认不显示（金额为 0 也不显示）
       if (_item.showShippingFee)
         _priceRow('运费', '', '¥${_item.shippingFee.toStringAsFixed(2)}',
@@ -1381,8 +1421,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           total: shopTotal,
           subs: shopSubs,
           expanded: _shopDiscountExpanded,
-          onToggle: () => setState(
-              () => _shopDiscountExpanded = !_shopDiscountExpanded),
+          onToggle: () =>
+              setState(() => _shopDiscountExpanded = !_shopDiscountExpanded),
           onEditLabel: () => _pickDiscountLabel('shop'),
         ),
       if (_item.showPlatformCoupon)
@@ -1408,8 +1448,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           total: payTotal,
           subs: paySubs,
           expanded: _payDiscountExpanded,
-          onToggle: () => setState(
-              () => _payDiscountExpanded = !_payDiscountExpanded),
+          onToggle: () =>
+              setState(() => _payDiscountExpanded = !_payDiscountExpanded),
           onEditLabel: () => _pickDiscountLabel('pay'),
         ),
       Row(
@@ -1442,8 +1482,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   // v1.9.110：优惠解析改淡粉色内嵌框（#FEEFEB 无描边）+
                   // 橘→粉渐变文字（ShaderMask），对齐真实淘宝
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 4, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEEFEB),
                       borderRadius: BorderRadius.circular(3),
@@ -1506,8 +1546,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         child: Row(
           children: [
             Text('进口税',
-                style: AppTextStyles.small
-                    .copyWith(fontWeight: FontWeight.bold)),
+                style:
+                    AppTextStyles.small.copyWith(fontWeight: FontWeight.bold)),
             const Spacer(),
             Text(_item.taxContent,
                 style: const TextStyle(
@@ -1553,10 +1593,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           if (icon != null) _discountIcon(icon),
           // v1.9.109：价格区标签/数值改黑色粗体（对齐真实淘宝）
           Text(label,
-              style: AppTextStyles.small
-                  .copyWith(fontWeight: FontWeight.bold)),
-          if (sub.isNotEmpty)
-            Text('  $sub', style: AppTextStyles.minSub),
+              style: AppTextStyles.small.copyWith(fontWeight: FontWeight.bold)),
+          if (sub.isNotEmpty) Text('  $sub', style: AppTextStyles.minSub),
           const Spacer(),
           Text(value,
               style: TextStyle(
@@ -1634,12 +1672,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final subsidy = r2(total - coin - hb);
       if (subsidy > 0) {
         return [
-          {
-            'group': group,
-            'name': '官方限时补贴',
-            'sub': '秒杀直降',
-            'amount': subsidy
-          },
+          {'group': group, 'name': '官方限时补贴', 'sub': '秒杀直降', 'amount': subsidy},
           {
             'group': group,
             'name': '淘金币',
@@ -1719,8 +1752,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             ),
                             child: Text(sub,
                                 style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFFFF5000))),
+                                    fontSize: 11, color: Color(0xFFFF5000))),
                           )
                         : Text('  $sub',
                             style: const TextStyle(
@@ -1752,8 +1784,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: const Row(
                 children: [
                   Text('暂无子项，双击添加',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.black26)),
+                      style: TextStyle(fontSize: 12, color: Colors.black26)),
                 ],
               ),
             ),
@@ -1831,20 +1862,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         : isPay
             ? const ['支付立减', '银行卡立减', '支付宝立减', '微信立减金', '云闪付立减']
             : const ['满60元可减', '淘金币已抵', '88VIP专享', '跨店满减', '消费券', '红包已抵'];
-    final groupName = isShop ? '店铺优惠' : isPay ? '支付优惠' : '平台优惠';
+    final groupName = isShop
+        ? '店铺优惠'
+        : isPay
+            ? '支付优惠'
+            : '平台优惠';
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text('选择$groupName标签',
-            style: const TextStyle(fontSize: 15)),
+        title: Text('选择$groupName标签', style: const TextStyle(fontSize: 15)),
         children: [
           ...presets.map((p) => SimpleDialogOption(
                 onPressed: () {
                   context.read<CartProvider>().updateOrderItem(
                         _item,
                         shopDiscountLabel: isShop ? p : null,
-                        platformCouponLabel:
-                            (!isShop && !isPay) ? p : null,
+                        platformCouponLabel: (!isShop && !isPay) ? p : null,
                         payDiscountLabel: isPay ? p : null,
                       );
                   Navigator.pop(ctx);
@@ -1864,8 +1897,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 context.read<CartProvider>().updateOrderItem(
                       _item,
                       shopDiscountLabel: isShop ? v : null,
-                      platformCouponLabel:
-                          (!isShop && !isPay) ? v : null,
+                      platformCouponLabel: (!isShop && !isPay) ? v : null,
                       payDiscountLabel: isPay ? v : null,
                     );
               });
@@ -1880,8 +1912,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               context.read<CartProvider>().updateOrderItem(
                     _item,
                     shopDiscountLabel: isShop ? '' : null,
-                    platformCouponLabel:
-                        (!isShop && !isPay) ? '' : null,
+                    platformCouponLabel: (!isShop && !isPay) ? '' : null,
                     payDiscountLabel: isPay ? '' : null,
                   );
               Navigator.pop(ctx);
@@ -1928,10 +1959,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
     final rows = _discountSubs(group)
         .map((e) => <String, TextEditingController>{
-              'name':
-                  TextEditingController(text: (e['name'] ?? '').toString()),
-              'sub':
-                  TextEditingController(text: (e['sub'] ?? '').toString()),
+              'name': TextEditingController(text: (e['name'] ?? '').toString()),
+              'sub': TextEditingController(text: (e['sub'] ?? '').toString()),
               'amount': TextEditingController(
                   text: ((e['amount'] as num?)?.toDouble() ?? 0)
                       .toStringAsFixed(2)),
@@ -2004,8 +2033,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           IconButton(
                             icon: const Icon(Icons.remove_circle_outline,
                                 size: 18, color: Colors.black38),
-                            onPressed: () =>
-                                setState2(() => rows.removeAt(i)),
+                            onPressed: () => setState2(() => rows.removeAt(i)),
                           ),
                         ],
                       ),
@@ -2016,12 +2044,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       onPressed: () => setState2(() => rows.add({
                             'name': TextEditingController(),
                             'sub': TextEditingController(),
-                            'amount':
-                                TextEditingController(text: '0.00'),
+                            'amount': TextEditingController(text: '0.00'),
                           })),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('添加一项',
-                          style: TextStyle(fontSize: 12)),
+                      label: const Text('添加一项', style: TextStyle(fontSize: 12)),
                     ),
                   ),
                 ],
@@ -2045,9 +2071,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     for (final r in rows) {
       final name = (r['name'] as TextEditingController).text.trim();
       final sub = (r['sub'] as TextEditingController).text.trim();
-      final amount = double.tryParse(
-              (r['amount'] as TextEditingController).text.trim()) ??
-          0;
+      final amount =
+          double.tryParse((r['amount'] as TextEditingController).text.trim()) ??
+              0;
       if (name.isEmpty && amount <= 0) continue;
       subs.add({
         'group': group,
@@ -2211,7 +2237,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
-  /// 倒计时：滚动式选择器（天+小时双滚轮）
+  /// 倒计时：滚动式选择器（天+小时+分钟三滚轮，v1.9.151 起支持分钟级快速验证）
   void _editCountdown() {
     DialogHelpers.showCountdownPicker(
       context,
@@ -2219,7 +2245,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       initial: _item.countDown.isEmpty ? '还剩3天21小时自动确认' : _item.countDown,
     ).then((v) {
       if (v != null && v.isNotEmpty) {
-        context.read<CartProvider>().updateOrderItem(_item, countDown: v);
+        context.read<CartProvider>().setCountdown(_item, v);
+        if (!mounted) return;
+        setState(() {
+          _countdownDisplay = v;
+        });
+        _startCountdownTimer();
       }
     });
   }
@@ -2258,8 +2289,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     color: Color(0xFF999999), size: 14),
               ),
             ],
-            const Icon(Icons.chevron_right,
-                color: Color(0xFFcccccc), size: 16),
+            const Icon(Icons.chevron_right, color: Color(0xFFcccccc), size: 16),
           ],
         ),
       ),
@@ -2405,9 +2435,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _recPicks = pool.recommendGoods(6 + Random().nextInt(3));
     }
     final picks = _recPicks ??
-        (([...MockData.guessLikeGoods]..shuffle(Random()))
-            .take(6)
-            .toList());
+        (([...MockData.guessLikeGoods]..shuffle(Random())).take(6).toList());
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -2440,8 +2468,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _recommendGridCard(SearchResultItem g) {
     // 图片支持自定义替换（以商品标题为 key，全局同步，无"自定义"角标）
-    final override =
-        context.watch<ProductImageProvider>().imageFor(g.title);
+    final override = context.watch<ProductImageProvider>().imageFor(g.title);
     final imageUrl = override ?? g.imageUrl;
     return GestureDetector(
       onDoubleTap: () => pickProductImageFromGallery(context, g.title),
@@ -2536,8 +2563,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _outlineBtn('追加评价', onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) =>
-                          RateOrderScreen(shop: _shop, item: _item),
+                      builder: (_) => RateOrderScreen(shop: _shop, item: _item),
                     ),
                   );
                 }),
@@ -2545,7 +2571,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
                 _primaryBtn('再买一单',
-                    color: const Color(0xFFff5000), onTap: () => _reAddToCart(_item)),
+                    color: const Color(0xFFff5000),
+                    onTap: () => _reAddToCart(_item)),
               ] else if (isSignedPending) ...[
                 // v1.9.135：左一按钮三状态随机分配（按订单号哈希稳定随机）——
                 // 催物流 / 延长收货 / 催促配送，字体样式与框架底色完全一致（_outlineBtn 灰底）
@@ -2569,8 +2596,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 const SizedBox(width: 8),
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
-                _primaryBtn('确认收货', color: const Color(0xFFff5000),
-                    onTap: () {
+                _primaryBtn('确认收货', color: const Color(0xFFff5000), onTap: () {
                   context.read<CartProvider>().markSigned(_shop, _item);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('已确认收货'),
@@ -2685,8 +2711,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void _gotoLogistics() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            LogisticsScreen(item: _item, shopName: _shop.shopName),
+        builder: (_) => LogisticsScreen(item: _item, shopName: _shop.shopName),
       ),
     );
   }
@@ -2694,8 +2719,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// 修改地址（底部按钮与地址区双击共用）
   void _editAddress() {
     final provider = context.read<CartProvider>();
-    _editText('修改地址（第一行收件人，第二行起地址）',
-        '${_item.receiver}\n${_item.address}', (v) {
+    _editText('修改地址（第一行收件人，第二行起地址）', '${_item.receiver}\n${_item.address}',
+        (v) {
       final lines = v
           .split('\n')
           .map((l) => l.trim())
@@ -2798,7 +2823,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // 底部主按钮：橙底白字圆角矩形（对齐真实淘宝切图）
-  Widget _primaryBtn(String text, {required Color color, VoidCallback? onTap}) {    return GestureDetector(
+  Widget _primaryBtn(String text, {required Color color, VoidCallback? onTap}) {
+    return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
@@ -2827,13 +2853,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         SizedBox(
           width: 60,
           child: Text(label,
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
         ),
         Expanded(
           child: Text(value,
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF333333))),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF333333))),
         ),
       ],
     );
@@ -2874,8 +2898,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   void _copy(String text, String tip) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(tip), duration: const Duration(seconds: 1)));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tip), duration: const Duration(seconds: 1)));
   }
 
   // ============ 支付方式（image#10 二选一） ============
@@ -2909,8 +2933,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('天猫积分',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2919,8 +2943,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       Switch(
                         value: _item.showTmallPoints,
                         onChanged: (v) => setState(() {
-                          provider.updateOrderItem(
-                              _item, showTmallPoints: v);
+                          provider.updateOrderItem(_item, showTmallPoints: v);
                         }),
                         activeColor: const Color(0xFFff5000),
                       ),
@@ -2982,11 +3005,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (result == null) return;
       provider.updateOrderItem(
         _item,
-        detailTags: result.toList()..sort((a, b) {
-          final ia = allTags.indexOf(a);
-          final ib = allTags.indexOf(b);
-          return ia.compareTo(ib);
-        }),
+        detailTags: result.toList()
+          ..sort((a, b) {
+            final ia = allTags.indexOf(a);
+            final ib = allTags.indexOf(b);
+            return ia.compareTo(ib);
+          }),
       );
     });
   }
@@ -3069,8 +3093,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: const BoxDecoration(
-                    border: Border(
-                        bottom: BorderSide(color: Color(0xFFf0f0f0))),
+                    border:
+                        Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
                   ),
                   child: Row(
                     children: [
@@ -3080,8 +3104,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const Spacer(),
                       GestureDetector(
                         onTap: () => Navigator.of(ctx).pop(),
-                        child: const Icon(Icons.close,
-                            color: Color(0xFF999999)),
+                        child:
+                            const Icon(Icons.close, color: Color(0xFF999999)),
                       ),
                     ],
                   ),
@@ -3119,8 +3143,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             '物流异常 · 请联系快递员',
                           ],
                           currentValue: _item.logistics,
-                          onSave: (v) => provider.updateOrderItem(
-                              _item, logistics: v),
+                          onSave: (v) =>
+                              provider.updateOrderItem(_item, logistics: v),
                         );
                       }),
                       const Divider(height: 1),
@@ -3144,8 +3168,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         // 重新显示时若时间为空，自动按付款/创建时间 +24h 兜底
                         if (!v && _item.shipTime.trim().isEmpty) {
                           provider.updateOrderItem(_item,
-                              showShipTime: true,
-                              shipTime: _defaultShipTime());
+                              showShipTime: true, shipTime: _defaultShipTime());
                         } else {
                           provider.updateOrderItem(_item, showShipTime: !v);
                         }
@@ -3153,7 +3176,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       }),
                       _switchTile(Icons.visibility_off, '隐藏"承诺发货"行',
                           value: !_item.showDeliveryPromise, onChanged: (v) {
-                        provider.updateOrderItem(_item, showDeliveryPromise: !v);
+                        provider.updateOrderItem(_item,
+                            showDeliveryPromise: !v);
                         setSheetState(() {});
                       }),
                       _switchTile(Icons.visibility_off, '隐藏"准时送达"行',
@@ -3220,11 +3244,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       _editTile(Icons.account_balance_wallet, '修改交易号', () {
                         _editText('修改交易号', _tradeNo, (v) {
                           if (_item.paymentMethod.contains('微信')) {
-                            provider.updateOrderItem(
-                                _item, wechatTradeNo: v);
+                            provider.updateOrderItem(_item, wechatTradeNo: v);
                           } else {
-                            provider.updateOrderItem(
-                                _item, alipayTradeNo: v);
+                            provider.updateOrderItem(_item, alipayTradeNo: v);
                           }
                         });
                       }),
@@ -3252,7 +3274,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         }
                       }),
                       _editTile(Icons.payments, '修改实付款', () {
-                        _editNumber('修改实付款（整单总额，含运费）',
+                        _editNumber(
+                            '修改实付款（整单总额，含运费）',
                             _shop.actualTotal > 0
                                 ? _shop.actualTotal
                                 : _item.price, (v) {
@@ -3279,8 +3302,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       }),
                       _switchTile(Icons.visibility_off, '隐藏店铺优惠',
                           value: !_item.showShopDiscount, onChanged: (v) {
-                        provider.updateOrderItem(
-                            _item, showShopDiscount: !v);
+                        provider.updateOrderItem(_item, showShopDiscount: !v);
                         setSheetState(() {});
                       }),
                       _editTile(Icons.money_off, '修改店铺优惠', () {
@@ -3290,8 +3312,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       }),
                       _switchTile(Icons.visibility_off, '隐藏平台优惠',
                           value: !_item.showPlatformCoupon, onChanged: (v) {
-                        provider.updateOrderItem(
-                            _item, showPlatformCoupon: !v);
+                        provider.updateOrderItem(_item, showPlatformCoupon: !v);
                         setSheetState(() {});
                       }),
                       _editTile(Icons.local_offer, '修改平台优惠', () {
@@ -3302,8 +3323,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       // v1.9.142：支付优惠（默认不显示，开关打开后出现）
                       _switchTile(Icons.visibility_off, '隐藏支付优惠',
                           value: !_item.showPayDiscount, onChanged: (v) {
-                        provider.updateOrderItem(
-                            _item, showPayDiscount: !v);
+                        provider.updateOrderItem(_item, showPayDiscount: !v);
                         setSheetState(() {});
                       }),
                       _editTile(Icons.payment, '修改支付优惠', () {
@@ -3331,8 +3351,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       }),
                       // v1.9.87：赠品栏开关——没有赠品数据的订单也能手动调出来
                       _editTile(
-                          Icons.redeem,
-                          _item.giftCount > 0 ? '隐藏赠品栏' : '显示赠品栏', () {
+                          Icons.redeem, _item.giftCount > 0 ? '隐藏赠品栏' : '显示赠品栏',
+                          () {
                         if (_item.giftCount > 0) {
                           provider.updateOrderItem(_item, giftCount: 0);
                         } else {
@@ -3353,8 +3373,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         _editProductFields(provider);
                       }),
                       ListTile(
-                        leading: const Icon(Icons.delete,
-                            color: Color(0xFFff0036)),
+                        leading:
+                            const Icon(Icons.delete, color: Color(0xFFff0036)),
                         title: const Text('删除',
                             style: TextStyle(color: Color(0xFFff0036))),
                         onTap: () {
@@ -3411,8 +3431,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         title: Text(title),
         content: TextField(
           controller: controller,
-          keyboardType:
-              const TextInputType.numberWithOptions(decimal: true),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: const InputDecoration(hintText: '请输入金额'),
         ),
         actions: [
@@ -3473,8 +3492,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onPressed: () {
               final price =
                   double.tryParse(priceCtrl.text.trim()) ?? _item.price;
-              final qty =
-                  int.tryParse(qtyCtrl.text.trim()) ?? _item.quantity;
+              final qty = int.tryParse(qtyCtrl.text.trim()) ?? _item.quantity;
               provider.updateOrderItem(
                 _item,
                 title: titleCtrl.text.trim(),
