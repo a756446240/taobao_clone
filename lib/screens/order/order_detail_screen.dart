@@ -103,16 +103,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final h = remain.inHours % 24;
     final m = remain.inMinutes % 60;
     final s = remain.inSeconds % 60;
-    setState(() {
-      _countdownDisplay = _formatCountdown(d, h, m, s);
-    });
+    // 显示只到天+小时（v1.9.152 对齐真实淘宝）；文本没变不重建，
+    // 但 Timer 每秒照跑（归零检测/自动跳交易成功不受影响）
+    final text = _formatCountdown(d, h, m, s);
+    if (text != _countdownDisplay) {
+      setState(() {
+        _countdownDisplay = text;
+      });
+    }
   }
 
-  /// 实时倒计时文案：还剩 X天X小时X分X秒 自动确认（逐级省略为 0 的前缀）
+  /// 倒计时文案：只显示「还剩X天Y小时自动确认」（v1.9.152 去掉分秒，
+  /// 对齐真实淘宝截图「还剩4天22小时自动确认」）；内部照常倒数，
+  /// 仅天=0且小时=0 的极短时长（分钟级快速验证）才降级显示分钟
   String _formatCountdown(int d, int h, int m, int s) {
-    if (d > 0) return '还剩$d天$h小时$m分$s秒自动确认';
-    if (h > 0) return '还剩$h小时$m分$s秒自动确认';
-    if (m > 0) return '还剩$m分$s秒自动确认';
+    if (d > 0) return '还剩$d天$h小时自动确认';
+    if (h > 0) return '还剩$h小时自动确认';
+    if (m > 0) return '还剩$m分钟自动确认';
     return '还剩$s秒自动确认';
   }
 
