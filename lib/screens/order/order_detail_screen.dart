@@ -2303,7 +2303,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 订单保障（v1.9.153：胶囊跟订单标签走，默认 2 个占满一行） ============
+  // ============ 订单保障（v1.9.154：胶囊固定宽度可横滑，屏内 2 个+露出半个，跟标签走） ============
   Widget _buildGuaranteeCard() {
     final pills = _guaranteePills();
     return Container(
@@ -2321,38 +2321,61 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       fontWeight: FontWeight.bold,
                       color: Colors.black87)),
               const Spacer(),
-              Text('凭据：今日下单交易快照', style: AppTextStyles.minSub),
+              Text(_snapshotText(), style: AppTextStyles.minSub),
               const Icon(Icons.chevron_right,
                   color: Color(0xFFcccccc), size: 16),
             ],
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              for (var i = 0; i < pills.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(child: pills[i]),
-              ],
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // 每个胶囊固定宽度：屏内正好 2 个完整 + 第 3 个露出一半，可左右滑
+              final pillW = (constraints.maxWidth - 8) / 2.5;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < pills.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      SizedBox(width: pillW, child: pills[i]),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  /// 保障胶囊列表：按订单服务标签（抓包 detailTags）生成——
-  /// 有「退货运费险/退货包运费」→ 退货包运费胶囊（88VIP 角标）；
-  /// 有「价保」类标签 → 大促价保胶囊（申请价保 + 截止时间，按付款时间往后延，
-  /// 大促价保 7 天 / 15天价保 15 天 / 30天价保 30 天）；
-  /// 有「退货宝」→ 退货宝胶囊；
-  /// 一个都不沾 → 默认 2 个（退货包运费 + 退货宝）占满一行。
+  /// 凭据文案：当天下单显示「今日下单」，否则「M月d日下单」
+  String _snapshotText() {
+    final base = _parseTime(_item.createTime) ?? _parseTime(_item.payTime);
+    if (base == null) return '凭据：今日下单交易快照';
+    final now = DateTime.now();
+    final sameDay =
+        base.year == now.year && base.month == now.month && base.day == now.day;
+    return sameDay ? '凭据：今日下单交易快照' : '凭据：${base.month}月${base.day}日下单交易快照';
+  }
+
+  /// 保障胶囊列表：按订单服务标签（抓包 detailTags）生成，顺序对齐真实淘宝——
+  /// 退货包运费（默认 88VIP 在最前）→ 大促价保 → 退货宝 → 极速退款 →
+  /// 7天无理由退货 → 海外直邮 → 正品保障；
+  /// 「不支持7天无理由」不出 7天无理由胶囊；一个标签都不沾 → 默认 2 个
+  /// （88VIP退货包运费 + 退货宝）。
   List<Widget> _guaranteePills() {
-    final tags = _item.displayTags;
+    // 只用真实标签（detailTags / returnText），不吃 displayTags 的兜底默认标签
+    final tags = _item.detailTags.isNotEmpty
+        ? List<String>.from(_item.detailTags)
+        : (_item.returnText.trim().isNotEmpty
+            ? [_item.returnText.trim()]
+            : <String>[]);
     bool hasAny(List<String> keys) =>
         tags.any((t) => keys.any((k) => t.contains(k)));
     final out = <Widget>[];
 
-    // 退货包运费（88VIP 退货运费险）
+    // 1) 退货包运费（88VIP 退货运费险）
     if (hasAny(const ['退货运费险', '退货包运费'])) {
       final vip = tags.any((t) => t.contains('88VIP'));
       out.add(_guaranteePill(
@@ -2363,7 +2386,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ));
     }
 
-    // 价保（大促价保/15天价保/30天价保）
+    // 2) 价保（大促价保/15天价保/30天价保）→ 申请价保 + 截止时间
     final priceTag = tags.firstWhere((t) => t.contains('价保'), orElse: () => '');
     if (priceTag.isNotEmpty) {
       final days = priceTag.contains('30')
@@ -2379,7 +2402,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ));
     }
 
-    // 退货宝
+    // 3) 退货宝
     if (hasAny(const ['退货宝'])) {
       out.add(_guaranteePill(
         title: '退货宝',
@@ -2388,7 +2411,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ));
     }
 
-    // 默认 2 个占满一行
+    // 4) 极速退款
+    if (hasAny(const ['极速退款'])) {
+      out.add(_guaranteePill(
+        title: '极速退款',
+        subtitle: '满足条件享极速退款',
+        subtitleColor: const Color(0xFF999999),
+      ));
+    }
+
+    // 5) 7天无理由退货（「不支持7天无理由」不算）
+    if (tags.any((t) => t.contains('7天无理由') && !t.contains('不支持'))) {
+      out.add(_guaranteePill(
+        title: '7天无理由退货',
+        subtitle: '物流签收后7天内可享',
+        subtitleColor: const Color(0xFF999999),
+      ));
+    }
+
+    // 6) 海外直邮（无副标题）
+    if (hasAny(const ['海外直邮'])) {
+      out.add(_guaranteePill(
+        title: '海外直邮',
+        subtitle: '',
+      ));
+    }
+
+    // 7) 正品保障（假一赔四/假一赔十）
+    if (hasAny(const ['假一赔', '正品保障'])) {
+      out.add(_guaranteePill(
+        title: '正品保障',
+        subtitle: '100%正品假一赔十',
+        subtitleColor: const Color(0xFF999999),
+      ));
+    }
+
+    // 默认 2 个：88VIP 退货包运费在最前 + 退货宝
     if (out.isEmpty) {
       out.add(_guaranteePill(
         title: '退货包运费',
