@@ -2329,7 +2329,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
-              // 每个胶囊固定宽度：屏内正好 2 个完整 + 第 3 个露出一半，可左右滑
+              // v1.9.155：≤2 个胶囊时均分占满一行（真淘宝 2 胶囊就是撑满的）；
+              // ≥3 个时固定宽度横滑，屏内 2 个完整 + 第 3 个露出半个
+              if (pills.length <= 2) {
+                return Row(
+                  children: [
+                    for (var i = 0; i < pills.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(child: pills[i]),
+                    ],
+                  ],
+                );
+              }
               final pillW = (constraints.maxWidth - 8) / 2.5;
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -2359,11 +2370,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return sameDay ? '凭据：今日下单交易快照' : '凭据：${base.month}月${base.day}日下单交易快照';
   }
 
-  /// 保障胶囊列表：按订单服务标签（抓包 detailTags）生成，顺序对齐真实淘宝——
-  /// 退货包运费（默认 88VIP 在最前）→ 大促价保 → 退货宝 → 极速退款 →
-  /// 7天无理由退货 → 海外直邮 → 正品保障；
-  /// 「不支持7天无理由」不出 7天无理由胶囊；一个标签都不沾 → 默认 2 个
-  /// （88VIP退货包运费 + 退货宝）。
+  /// 保障胶囊列表：默认 88VIP 退货包运费永远在最前（v1.9.155 用户明确），
+  /// 之后按订单服务标签（抓包 detailTags）追加——
+  /// 大促价保 → 退货宝 → 极速退款 → 7天无理由退货 → 海外直邮 → 正品保障；
+  /// 「不支持7天无理由」不出 7天无理由胶囊；一个标签都不沾 → 补退货宝凑默认 2 个。
   List<Widget> _guaranteePills() {
     // 只用真实标签（detailTags / returnText），不吃 displayTags 的兜底默认标签
     final tags = _item.detailTags.isNotEmpty
@@ -2375,16 +2385,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         tags.any((t) => keys.any((k) => t.contains(k)));
     final out = <Widget>[];
 
-    // 1) 退货包运费（88VIP 退货运费险）
-    if (hasAny(const ['退货运费险', '退货包运费'])) {
-      final vip = tags.any((t) => t.contains('88VIP'));
-      out.add(_guaranteePill(
-        title: '退货包运费',
-        subtitle: '上门取件可用',
-        subtitleColor: const Color(0xFF999999),
-        badge: vip ? '88VIP' : null,
-      ));
-    }
+    // 1) 默认 88VIP 退货包运费永远在最前
+    out.add(_guaranteePill(
+      title: '退货包运费',
+      subtitle: '上门取件可用',
+      subtitleColor: const Color(0xFF999999),
+      badge: '88VIP',
+    ));
 
     // 2) 价保（大促价保/15天价保/30天价保）→ 申请价保 + 截止时间
     final priceTag = tags.firstWhere((t) => t.contains('价保'), orElse: () => '');
@@ -2446,14 +2453,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ));
     }
 
-    // 默认 2 个：88VIP 退货包运费在最前 + 退货宝
-    if (out.isEmpty) {
-      out.add(_guaranteePill(
-        title: '退货包运费',
-        subtitle: '上门取件可用',
-        subtitleColor: const Color(0xFF999999),
-        badge: '88VIP',
-      ));
+    // 一个标签胶囊都没出 → 补退货宝凑默认 2 个（88VIP退货包运费已在最前）
+    if (out.length == 1) {
       out.add(_guaranteePill(
         title: '退货宝',
         subtitle: '服务已生效',
@@ -2473,6 +2474,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// 保障小胶囊（88VIP 角标 + 标题 + ›，下方一行小字说明）
+  /// v1.9.155：整体放大对齐真淘宝（内边距/字号加大，框架更高）
   Widget _guaranteePill({
     required String title,
     required String subtitle,
@@ -2481,20 +2483,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     String? trailing,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             children: [
               if (badge != null) ...[
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                      const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(2),
@@ -2502,17 +2505,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: Text(badge,
                       style: const TextStyle(
                           color: Color(0xFFFFD89E),
-                          fontSize: 8,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(width: 3),
+                const SizedBox(width: 4),
               ],
               Flexible(
                 child: Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1A1A1A))),
               ),
@@ -2522,19 +2525,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFFff5000))),
                 ),
               const Icon(Icons.chevron_right,
-                  color: Color(0xFF999999), size: 13),
+                  color: Color(0xFF999999), size: 14),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10, color: subtitleColor)),
+              style: TextStyle(fontSize: 11, color: subtitleColor)),
         ],
       ),
     );
