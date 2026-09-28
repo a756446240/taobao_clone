@@ -2303,8 +2303,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  // ============ 订单保障（对齐真实淘宝：灰色胶囊行，退货包运费/大促价保/退货宝） ============
+  // ============ 订单保障（v1.9.153：胶囊跟订单标签走，默认 2 个占满一行） ============
   Widget _buildGuaranteeCard() {
+    final pills = _guaranteePills();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -2328,36 +2329,89 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: _guaranteePill(
-                  title: '退货包运费',
-                  subtitle: '上门取件可用',
-                  subtitleColor: const Color(0xFF999999),
-                  badge: '88VIP',
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _guaranteePill(
-                  title: '大促价保',
-                  trailing: '申请价保',
-                  subtitle: '至9/7 23:59',
-                  subtitleColor: const Color(0xFFff5000),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _guaranteePill(
-                  title: '退货宝',
-                  subtitle: '服务已生效',
-                  subtitleColor: const Color(0xFFff5000),
-                ),
-              ),
+              for (var i = 0; i < pills.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: pills[i]),
+              ],
             ],
           ),
         ],
       ),
     );
+  }
+
+  /// 保障胶囊列表：按订单服务标签（抓包 detailTags）生成——
+  /// 有「退货运费险/退货包运费」→ 退货包运费胶囊（88VIP 角标）；
+  /// 有「价保」类标签 → 大促价保胶囊（申请价保 + 截止时间，按付款时间往后延，
+  /// 大促价保 7 天 / 15天价保 15 天 / 30天价保 30 天）；
+  /// 有「退货宝」→ 退货宝胶囊；
+  /// 一个都不沾 → 默认 2 个（退货包运费 + 退货宝）占满一行。
+  List<Widget> _guaranteePills() {
+    final tags = _item.displayTags;
+    bool hasAny(List<String> keys) =>
+        tags.any((t) => keys.any((k) => t.contains(k)));
+    final out = <Widget>[];
+
+    // 退货包运费（88VIP 退货运费险）
+    if (hasAny(const ['退货运费险', '退货包运费'])) {
+      final vip = tags.any((t) => t.contains('88VIP'));
+      out.add(_guaranteePill(
+        title: '退货包运费',
+        subtitle: '上门取件可用',
+        subtitleColor: const Color(0xFF999999),
+        badge: vip ? '88VIP' : null,
+      ));
+    }
+
+    // 价保（大促价保/15天价保/30天价保）
+    final priceTag = tags.firstWhere((t) => t.contains('价保'), orElse: () => '');
+    if (priceTag.isNotEmpty) {
+      final days = priceTag.contains('30')
+          ? 30
+          : priceTag.contains('15')
+              ? 15
+              : 7; // 大促价保默认付款时间 +7 天
+      out.add(_guaranteePill(
+        title: '大促价保',
+        trailing: '申请价保',
+        subtitle: _priceProtectDeadline(days),
+        subtitleColor: const Color(0xFFff5000),
+      ));
+    }
+
+    // 退货宝
+    if (hasAny(const ['退货宝'])) {
+      out.add(_guaranteePill(
+        title: '退货宝',
+        subtitle: '服务已生效',
+        subtitleColor: const Color(0xFFff5000),
+      ));
+    }
+
+    // 默认 2 个占满一行
+    if (out.isEmpty) {
+      out.add(_guaranteePill(
+        title: '退货包运费',
+        subtitle: '上门取件可用',
+        subtitleColor: const Color(0xFF999999),
+        badge: '88VIP',
+      ));
+      out.add(_guaranteePill(
+        title: '退货宝',
+        subtitle: '服务已生效',
+        subtitleColor: const Color(0xFFff5000),
+      ));
+    }
+    return out;
+  }
+
+  /// 价保截止时间：付款时间（无则创建时间）+ N 天，格式「至M/d 23:59」
+  String _priceProtectDeadline(int days) {
+    final base = _parseTime(_item.payTime) ??
+        _parseTime(_item.createTime) ??
+        DateTime.now();
+    final end = base.add(Duration(days: days));
+    return '至${end.month}/${end.day} 23:59';
   }
 
   /// 保障小胶囊（88VIP 角标 + 标题 + ›，下方一行小字说明）
