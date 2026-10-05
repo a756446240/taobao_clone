@@ -71,8 +71,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       _item.refundStatus = '退款结束';
     }
     if (_item.refundStatus.isEmpty) {
-      _item.refundStatus =
-          st.contains('待商家退款') ? '待商家退款' : '退款成功';
+      _item.refundStatus = st.contains('待商家退款') ? '待商家退款' : '退款成功';
     }
     // 标题未自定义过时跟随状态（修正旧数据里标题与状态不一致）
     if (_item.refundTitle.isEmpty ||
@@ -82,8 +81,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       _item.refundTitle = _item.refundStatus;
     }
     if (_item.refundMethod.isEmpty) {
-      _item.refundMethod =
-          _item.paymentMethod.contains('微信') ? '微信支付' : '支付宝';
+      _item.refundMethod = _item.paymentMethod.contains('微信') ? '微信支付' : '支付宝';
     }
     if (_item.refundAmount <= 0) {
       _item.refundAmount = double.parse(_item.price.toStringAsFixed(2));
@@ -148,8 +146,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     _timer?.cancel();
     if (_isPending) {
       // 已寄回分支倒计时精确到秒（对齐真实淘宝"21时42分12秒后..."）
-      _timer = Timer.periodic(
-          Duration(seconds: _isShippedBack ? 1 : 30), (_) {
+      _timer = Timer.periodic(Duration(seconds: _isShippedBack ? 1 : 30), (_) {
         if (mounted) setState(() {});
       });
     }
@@ -195,8 +192,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   /// 副标题是否为主动保障样式（橙色加粗标签 + 橙色正文，对齐真实淘宝）
-  bool get _subtitleIsGuarantee =>
-      _item.refundSubtitle.isEmpty && !_isPending;
+  bool get _subtitleIsGuarantee => _item.refundSubtitle.isEmpty && !_isPending;
 
   @override
   Widget build(BuildContext context) {
@@ -301,8 +297,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       if (i < current) {
         // 已完成：灰色 ✓ + 步骤名
         children.add(Text('✓${parts[i]}',
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFF999999))));
+            style: const TextStyle(fontSize: 12, color: Color(0xFF999999))));
       } else if (i == current) {
         // 当前步骤：加黑
         children.add(Text('${i + 1}${parts[i]}',
@@ -313,8 +308,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       } else {
         // 未到达：浅灰
         children.add(Text('${i + 1}${parts[i]}',
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFFCCCCCC))));
+            style: const TextStyle(fontSize: 12, color: Color(0xFFCCCCCC))));
       }
     }
     return GestureDetector(
@@ -380,8 +374,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               onDoubleTap: _editSubtitle,
               child: Text(_subtitle,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF999999))),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF999999))),
             ),
             const SizedBox(height: 10),
             // B2：灰色说明框（对齐真实淘宝"如果商家收到货..."）
@@ -396,9 +390,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 '如果商家收到货并验货无误，将操作退款给您如果商家拒绝退款，需要您修改退货申请如果商家超时未处理，将自动退款给您。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontSize: 12,
-                    height: 1.6,
-                    color: Color(0xFF999999)),
+                    fontSize: 12, height: 1.6, color: Color(0xFF999999)),
               ),
             ),
           ] else if (_isPending) ...[
@@ -436,7 +428,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   // ============ 寄回商品卡（退款进行中·未寄回；取件码/时间/退货宝均可双击编辑） ============
-  String get _pickupCode => _item.pickupCode.isEmpty ? '0180' : _item.pickupCode;
+  String get _pickupCode =>
+      _item.pickupCode.isEmpty ? '0180' : _item.pickupCode;
   String get _pickupTime => _item.pickupTimeText.isEmpty
       ? '明天 17:00-19:00 上门取件'
       : _item.pickupTimeText;
@@ -472,8 +465,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF1A1A1A))),
                       const SizedBox(height: 3),
-                      const Text(
-                          '山东省淄博市张店区科苑街道中房大厦C座1001，黑山灰，18653385652',
+                      const Text('山东省淄博市张店区科苑街道中房大厦C座1001，黑山灰，18653385652',
                           style: TextStyle(
                               fontSize: 12, color: Color(0xFF999999))),
                     ],
@@ -488,8 +480,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           // 快递员已接单（对齐真实淘宝 v1.9.100）
           const Row(
             children: [
-              Icon(Icons.person_outline,
-                  size: 16, color: Color(0xFFFF5000)),
+              Icon(Icons.person_outline, size: 16, color: Color(0xFFFF5000)),
               SizedBox(width: 6),
               Text('快递员已接单',
                   style: TextStyle(
@@ -527,8 +518,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             child: GestureDetector(
               onDoubleTap: _editPickupInsuranceAmount,
               child: Text(_pickupInsurance,
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFFFF5000))),
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFFFF5000))),
             ),
           ),
           const SizedBox(height: 14),
@@ -572,9 +563,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         child: Text(text,
             style: TextStyle(
                 fontSize: 12,
-                color: highlight
-                    ? const Color(0xFFFF5000)
-                    : Colors.black87)),
+                color: highlight ? const Color(0xFFFF5000) : Colors.black87)),
       ),
     );
   }
@@ -658,10 +647,9 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           ),
           // 支付宝渠道：优惠/银行卡 子行（对齐真实淘宝 v1.9.100）
           if (_item.refundMethod.contains('支付宝')) ...[
-            _buildRefundSubRow('优惠',
-                '¥${discountPart.toStringAsFixed(2)}'),
-            _buildRefundSubRow('银行卡（平安银行4853）',
-                '¥${bankPart.toStringAsFixed(2)}'),
+            _buildRefundSubRow('优惠', '¥${discountPart.toStringAsFixed(2)}'),
+            _buildRefundSubRow(
+                '银行卡（平安银行4853）', '¥${bankPart.toStringAsFixed(2)}'),
           ],
           if (_item.refundDiscount > 0 && _item.showRefundDiscount)
             _buildRefundDetailRow(
@@ -684,7 +672,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               label: '运费保障',
               value: '',
               iconColor: const Color(0xFFFF5000),
-              sublabel: '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+              sublabel:
+                  '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
               onDoubleTap: _editFreightInsuranceAmount,
             ),
         ],
@@ -699,18 +688,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       child: Row(
         children: [
           Text('L',
-              style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade400)),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF999999))),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
           ),
           Text(value,
-              style: const TextStyle(
-                  fontSize: 12, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
         ],
       ),
     );
@@ -743,8 +728,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                   Text(label,
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                              bold ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
                           color: const Color(0xFF333333))),
                   if (sublabel != null) ...[
                     const SizedBox(height: 2),
@@ -810,8 +794,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right,
-                size: 16, color: Color(0xFFCCCCCC)),
+            const Icon(Icons.chevron_right, size: 16, color: Color(0xFFCCCCCC)),
           ],
         ),
       ),
@@ -830,29 +813,29 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         onDoubleTap: _editFreightInsuranceAmount,
         behavior: HitTestBehavior.opaque,
         child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.monetization_on_outlined,
-              color: Color(0xFFFF5000), size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('运费保障',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 3),
-                Text(
-                    '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF999999))),
-              ],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.monetization_on_outlined,
+                color: Color(0xFFFF5000), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('运费保障',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 3),
+                  Text(
+                      '您已享受全额保障${_item.freightInsuranceAmount.toStringAsFixed(2)}元',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF999999))),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -911,14 +894,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                       final no = ctrl.text.trim();
                       if (no.isEmpty) return;
                       setDlg(() => busy = true);
-                      final detected =
-                          await ExpressOnline.detectCompany(no);
-                      final traces = await ExpressOnline.fetchTraces(
-                          detected.$1, no);
+                      final detected = await ExpressOnline.detectCompany(no);
+                      final traces =
+                          await ExpressOnline.fetchTraces(detected.$1, no);
                       if (!mounted) return;
-                      final company = detected.$2.isNotEmpty
-                          ? detected.$2
-                          : '快递';
+                      final company =
+                          detected.$2.isNotEmpty ? detected.$2 : '快递';
                       String main;
                       String sub = '';
                       var gotReal = false;
@@ -931,10 +912,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                       } else {
                         main = '退货物流：运输中 $company 运单号:$no';
                       }
-                      context.read<CartProvider>().updateOrderItem(
-                          _item,
-                          refundLogistics:
-                              sub.isEmpty ? main : '$main\n$sub');
+                      context.read<CartProvider>().updateOrderItem(_item,
+                          refundLogistics: sub.isEmpty ? main : '$main\n$sub');
                       Navigator.of(ctx).pop();
                       setState(() {});
                       _toast(gotReal
@@ -956,12 +935,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         .read<ProductImageProvider>()
         .imageFor('shop_avatar:order:${_item.orderNo}');
     if (orderOverride != null) {
-      return AppImage(url: orderOverride, width: 22, height: 22,
-          fit: BoxFit.cover);
+      return AppImage(
+          url: orderOverride, width: 22, height: 22, fit: BoxFit.cover);
     }
     if (_item.shopAvatar.isNotEmpty) {
-      return AppImage(url: _item.shopAvatar, width: 22, height: 22,
-          fit: BoxFit.cover);
+      return AppImage(
+          url: _item.shopAvatar, width: 22, height: 22, fit: BoxFit.cover);
     }
     final override = context
         .read<ProductImageProvider>()
@@ -970,8 +949,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       return AppImage(url: override, width: 22, height: 22, fit: BoxFit.cover);
     }
     if (_shop.shopAvatar.isNotEmpty) {
-      return AppImage(url: _shop.shopAvatar, width: 22, height: 22,
-          fit: BoxFit.cover);
+      return AppImage(
+          url: _shop.shopAvatar, width: 22, height: 22, fit: BoxFit.cover);
     }
     return Image.asset('assets/images/shop_default.png',
         width: 22, height: 22, fit: BoxFit.cover);
@@ -1023,7 +1002,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onDoubleTap: () => pickProductImageFromGallery(context, _item.title),
+            onDoubleTap: () =>
+                pickProductImageFromGallery(context, _item.title),
             child: Container(
               width: 70,
               height: 70,
@@ -1076,19 +1056,19 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               GestureDetector(
                 onTap: _showNegotiationSheet,
                 child: const Text('查看',
-                    style:
-                        TextStyle(fontSize: 12, color: Color(0xFF999999))),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF999999))),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          // 退款完结行
+          // 退款完结行（双击时间可改）
           _historyItem(
             _isPending ? '商家处理' : '退款完结',
             _isPending ? '等待商家处理中' : '退款已原路退回至${_item.refundMethod}',
             _isPending ? '' : _item.refundDoneTime,
             _isDone,
             pending: _isPending,
+            onTimeDoubleTap: _editRefundDoneTime,
           ),
           const SizedBox(height: 12),
           // 可折叠的"查看全部售后信息"
@@ -1103,8 +1083,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               children: [
                 Text(
                   _item.refundInfoCollapsed ? '查看全部售后信息' : '收起售后信息',
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF666666)),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF666666)),
                 ),
                 Icon(
                   _item.refundInfoCollapsed
@@ -1124,10 +1104,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             _infoRow('退款原因',
                 _item.refundReason.isEmpty ? '点击选择' : _item.refundReason,
                 onTap: _pickRefundReason, isLink: _item.refundReason.isEmpty),
-            _infoRow('申请金额',
-                '共${_item.refundAmount.toStringAsFixed(2)}元'),
-            _infoRow('退款完结', _item.refundDoneTime),
-            _infoRow('申请时间', _item.refundApplyTime),
+            _infoRow('申请金额', '共${_item.refundAmount.toStringAsFixed(2)}元'),
+            _infoRow('退款完结', _item.refundDoneTime,
+                onDoubleTap: _editRefundDoneTime),
+            _infoRow('申请时间', _item.refundApplyTime,
+                onDoubleTap: _editRefundApplyTime),
             _infoRowWithCopy('退款编号', _item.refundNumber),
           ],
         ],
@@ -1136,67 +1117,86 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   /// 完整协商历史弹层（基于真实退款字段构建时间线）
+  /// v1.9.156：双击「买家申请退款/退款完结」的时间可修改，弹层内即时刷新
   void _showNegotiationSheet() {
-    final steps = <(String, String, String, int)>[
-      // (标题, 描述, 时间, 状态) 状态: 0=已发生 1=当前 2=未发生
-      (
-        '买家申请退款',
-        '退款原因：${_item.refundReason.isEmpty ? '未填写' : _item.refundReason} · 申请金额 ¥${_item.refundAmount.toStringAsFixed(2)}',
-        _item.refundApplyTime,
-        0,
-      ),
-      if (_isPending)
-        ('商家处理中', '等待商家处理，逾期未处理将自动同意', '', 1)
-      else ...[
-        ('商家同意退款', '商家同意了本次退款申请', '', 0),
-        ('退款完结', '退款已原路退回至${_item.refundMethod}', _item.refundDoneTime, 1),
-      ],
-    ];
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Center(
-                child: Text('协商历史',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final steps = <(String, String, String, int)>[
+            // (标题, 描述, 时间, 状态) 状态: 0=已发生 1=当前 2=未发生
+            (
+              '买家申请退款',
+              '退款原因：${_item.refundReason.isEmpty ? '未填写' : _item.refundReason} · 申请金额 ¥${_item.refundAmount.toStringAsFixed(2)}',
+              _item.refundApplyTime,
+              0,
+            ),
+            if (_isPending)
+              ('商家处理中', '等待商家处理，逾期未处理将自动同意', '', 1)
+            else ...[
+              ('商家同意退款', '商家同意了本次退款申请', '', 0),
+              (
+                '退款完结',
+                '退款已原路退回至${_item.refundMethod}',
+                _item.refundDoneTime,
+                1
               ),
-              const SizedBox(height: 14),
-              for (var i = 0; i < steps.length; i++) ...[
-                _negoStep(steps[i], isFirst: i == steps.length - 1),
-                if (i != steps.length - 1)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    width: 2,
-                    height: 26,
-                    color: const Color(0xFFE5E5E5),
-                  ),
-              ],
-              const SizedBox(height: 10),
-              Text('退款编号：${_item.refundNumber}',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF999999))),
             ],
-          ),
-        ),
+          ];
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text('协商历史',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 14),
+                  for (var i = 0; i < steps.length; i++) ...[
+                    _negoStep(
+                      steps[i],
+                      isFirst: i == steps.length - 1,
+                      onTimeDoubleTap: steps[i].$1 == '买家申请退款'
+                          ? () =>
+                              _editRefundApplyTime(() => setSheetState(() {}))
+                          : (steps[i].$1 == '退款完结'
+                              ? () => _editRefundDoneTime(
+                                  () => setSheetState(() {}))
+                              : null),
+                    ),
+                    if (i != steps.length - 1)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        width: 2,
+                        height: 26,
+                        color: const Color(0xFFE5E5E5),
+                      ),
+                  ],
+                  const SizedBox(height: 10),
+                  Text('退款编号：${_item.refundNumber}',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF999999))),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _negoStep((String, String, String, int) s, {bool isFirst = false}) {
-    final color = s.$4 == 1
-        ? const Color(0xFFFF5000)
-        : const Color(0xFF2A9655);
+  Widget _negoStep((String, String, String, int) s,
+      {bool isFirst = false, VoidCallback? onTimeDoubleTap}) {
+    final color = s.$4 == 1 ? const Color(0xFFFF5000) : const Color(0xFF2A9655);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1223,9 +1223,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               ],
               if (s.$3.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(s.$3,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFFBBBBBB))),
+                GestureDetector(
+                  onDoubleTap: onTimeDoubleTap,
+                  child: Text(s.$3,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFFBBBBBB))),
+                ),
               ],
             ],
           ),
@@ -1235,7 +1238,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   Widget _historyItem(String title, String desc, String time, bool done,
-      {bool pending = false}) {
+      {bool pending = false, VoidCallback? onTimeDoubleTap}) {
     final color = done
         ? const Color(0xFF2A9655)
         : (pending ? const Color(0xFFFF5000) : const Color(0xFF666666));
@@ -1264,9 +1267,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               ],
               if (time.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(time,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF999999))),
+                GestureDetector(
+                  onDoubleTap: onTimeDoubleTap,
+                  child: Text(time,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF999999))),
+                ),
               ],
             ],
           ),
@@ -1276,22 +1282,23 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   Widget _infoRow(String label, String value,
-      {VoidCallback? onTap, bool isLink = false}) {
+      {VoidCallback? onTap, bool isLink = false, VoidCallback? onDoubleTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
           Text(label,
-              style:
-                  const TextStyle(fontSize: 13, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF999999))),
           const Spacer(),
           GestureDetector(
             onTap: onTap,
+            onDoubleTap: onDoubleTap,
             child: Text(
               value,
               style: TextStyle(
                 fontSize: 13,
-                color: isLink ? const Color(0xFFFF5000) : const Color(0xFF1A1A1A),
+                color:
+                    isLink ? const Color(0xFFFF5000) : const Color(0xFF1A1A1A),
                 decoration: isLink ? TextDecoration.underline : null,
               ),
             ),
@@ -1307,12 +1314,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       child: Row(
         children: [
           Text(label,
-              style:
-                  const TextStyle(fontSize: 13, color: Color(0xFF999999))),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF999999))),
           const Spacer(),
           Text(value,
-              style: const TextStyle(
-                  fontSize: 13, color: Color(0xFF1A1A1A))),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF1A1A1A))),
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () {
@@ -1356,8 +1361,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 child: const Row(
                   children: [
                     Text('换一换',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF999999))),
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF999999))),
                     Icon(Icons.refresh, size: 14, color: Color(0xFF999999)),
                   ],
                 ),
@@ -1380,8 +1385,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   Widget _recommendItem(SearchResultItem g) {
-    final override =
-        context.watch<ProductImageProvider>().imageFor(g.title);
+    final override = context.watch<ProductImageProvider>().imageFor(g.title);
     final imageUrl = override ?? g.imageUrl;
     return GestureDetector(
       onDoubleTap: () => pickProductImageFromGallery(context, g.title),
@@ -1442,8 +1446,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                   });
                   context.read<CartProvider>().updateOrderItem(_item);
                 },
-                child: const Icon(Icons.close,
-                    size: 16, color: Color(0xFF999999)),
+                child:
+                    const Icon(Icons.close, size: 16, color: Color(0xFF999999)),
               ),
             ],
           ),
@@ -1474,8 +1478,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                   context.read<CartProvider>().updateOrderItem(_item);
                   _toast('反馈已提交，我们会尽快改进');
                 },
-                child: const Text('提交反馈',
-                    style: TextStyle(fontSize: 13)),
+                child: const Text('提交反馈', style: TextStyle(fontSize: 13)),
               ),
             ),
           ],
@@ -1496,16 +1499,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           color: selected ? const Color(0xFFFFF3EC) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-              color: selected
-                  ? const Color(0xFFFF5000)
-                  : const Color(0xFFE5E5E5)),
+              color:
+                  selected ? const Color(0xFFFF5000) : const Color(0xFFE5E5E5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (selected) ...[
-              const Icon(Icons.check,
-                  size: 13, color: Color(0xFFFF5000)),
+              const Icon(Icons.check, size: 13, color: Color(0xFFFF5000)),
               const SizedBox(width: 3),
             ],
             Text(label,
@@ -1529,7 +1530,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade300, width: 0.5)),
+        border:
+            Border(top: BorderSide(color: Colors.grey.shade300, width: 0.5)),
       ),
       child: SafeArea(
         top: false,
@@ -1537,8 +1539,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _bottomIcon(Icons.tag_faces, '卖家',
-                  onTap: _gotoServiceChat),
+              _bottomIcon(Icons.tag_faces, '卖家', onTap: _gotoServiceChat),
               const Spacer(),
               if (_isAwaitingPickup) ...[
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
@@ -1549,8 +1550,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 const SizedBox(width: 8),
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
                 const SizedBox(width: 8),
-                _smallBtn('催处理',
-                    onTap: () => _toast('已提醒商家尽快处理退款')),
+                _smallBtn('催处理', onTap: () => _toast('已提醒商家尽快处理退款')),
               ] else if (_isReturnDone) ...[
                 _smallBtn('寄件详情', onTap: _showShipDetailSheet),
                 const SizedBox(width: 8),
@@ -1576,8 +1576,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             Icon(ic, size: 20, color: const Color(0xFF666666)),
             const SizedBox(height: 2),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 10, color: Color(0xFF666666))),
+                style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
           ],
         ),
       ),
@@ -1652,19 +1651,19 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             children: [
               const Center(
                 child: Text('寄件详情',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(height: 14),
               _shipRow('物流信息', _item.refundLogistics),
               _shipRow('寄件人', '张* 138****8888'),
               _shipRow('寄件地址', '江苏省南京市江宁区诚信大道 88 号'),
               _shipRow('收件人', '${_shop.shopName}（退货仓）'),
-              _shipRow('申请时间', _item.refundApplyTime),
+              _shipRow('申请时间', _item.refundApplyTime,
+                  onDoubleTap: _editRefundApplyTime),
               const SizedBox(height: 6),
               const Text('退货请在商家同意后 7 天内寄出，逾期退款通道将关闭。',
-                  style: TextStyle(
-                      color: Color(0xFF999999), fontSize: 11)),
+                  style: TextStyle(color: Color(0xFF999999), fontSize: 11)),
             ],
           ),
         ),
@@ -1672,7 +1671,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _shipRow(String k, String v) {
+  Widget _shipRow(String k, String v, {VoidCallback? onDoubleTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -1681,11 +1680,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           SizedBox(
             width: 72,
             child: Text(k,
-                style: const TextStyle(
-                    color: Color(0xFF999999), fontSize: 13)),
+                style: const TextStyle(color: Color(0xFF999999), fontSize: 13)),
           ),
           Expanded(
-              child: Text(v, style: const TextStyle(fontSize: 13))),
+              child: GestureDetector(
+            onDoubleTap: onDoubleTap,
+            child: Text(v, style: const TextStyle(fontSize: 13)),
+          )),
         ],
       ),
     );
@@ -1707,15 +1708,12 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('申请平台介入',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               const Text(
                   '商家超过处理时效或您与商家协商不一致时，可申请淘宝客服介入。介入后平台将在 48 小时内根据双方凭证做出判定。',
                   style: TextStyle(
-                      color: Color(0xFF666666),
-                      fontSize: 12,
-                      height: 1.6)),
+                      color: Color(0xFF666666), fontSize: 12, height: 1.6)),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
@@ -1754,19 +1752,18 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             children: [
               const Center(
                 child: Text('钱款去向',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
               const SizedBox(height: 14),
-              _shipRow('退款金额',
-                  '¥${_item.refundAmount.toStringAsFixed(2)}'),
+              _shipRow('退款金额', '¥${_item.refundAmount.toStringAsFixed(2)}'),
               _shipRow('退回方式', _item.refundMethod),
-              _shipRow('到账时间', _item.refundDoneTime),
+              _shipRow('到账时间', _item.refundDoneTime,
+                  onDoubleTap: _editRefundDoneTime),
               _shipRow('退款编号', _item.refundNumber),
               const SizedBox(height: 6),
               const Text('退款已原路退回，银行处理可能存在 1-3 个工作日延迟。',
-                  style: TextStyle(
-                      color: Color(0xFF999999), fontSize: 11)),
+                  style: TextStyle(color: Color(0xFF999999), fontSize: 11)),
             ],
           ),
         ),
@@ -1797,19 +1794,17 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             children: [
               const SizedBox(height: 14),
               const Text('帮助中心',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: faqs.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1),
+                  separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (_, i) => ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    title: Text(faqs[i].$1,
-                        style: const TextStyle(fontSize: 13)),
+                    title:
+                        Text(faqs[i].$1, style: const TextStyle(fontSize: 13)),
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -1864,13 +1859,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(c);
-              context.read<CartProvider>().updateOrderItem(
-                  _item, refundStatus: '退款结束');
+              context
+                  .read<CartProvider>()
+                  .updateOrderItem(_item, refundStatus: '退款结束');
               setState(() {});
               _toast('退货已关闭');
             },
-            child: const Text('关闭退货',
-                style: TextStyle(color: Color(0xFFA32D2D))),
+            child:
+                const Text('关闭退货', style: TextStyle(color: Color(0xFFA32D2D))),
           ),
         ],
       ),
@@ -1879,8 +1875,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// 编辑步骤条文字（逗号分隔；未发货退款 2 段，退货退款 3 段）
   void _editSteps() {
-    final def =
-        _isNoShipRefund ? '商家处理,退款结束' : '商家处理,寄回商品,退款结束';
+    final def = _isNoShipRefund ? '商家处理,退款结束' : '商家处理,寄回商品,退款结束';
     DialogHelpers.showTextInput(context,
             title: '修改步骤条（逗号分隔）',
             initial: _item.refundSteps.isEmpty ? def : _item.refundSteps)
@@ -1894,8 +1889,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editPickupCode() {
-    DialogHelpers.showTextInput(context,
-            title: '修改取件码', initial: _pickupCode)
+    DialogHelpers.showTextInput(context, title: '修改取件码', initial: _pickupCode)
         .then((v) {
       if (v != null && v.isNotEmpty) {
         context.read<CartProvider>().updateOrderItem(_item, pickupCode: v);
@@ -1910,11 +1904,38 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             title: '修改上门取件时间', initial: _pickupTime)
         .then((v) {
       if (v != null) {
-        context
-            .read<CartProvider>()
-            .updateOrderItem(_item, pickupTimeText: v);
+        context.read<CartProvider>().updateOrderItem(_item, pickupTimeText: v);
         setState(() {});
         _toast('取件时间已修改');
+      }
+    });
+  }
+
+  /// v1.9.156：双击修改退款申请时间（协商历史/售后信息/寄件详情同步刷新）
+  /// refresh：从协商历史弹层内编辑时刷新弹层内容
+  void _editRefundApplyTime([VoidCallback? refresh]) {
+    DialogHelpers.showDateTimePicker(context,
+            title: '修改申请时间', initial: _item.refundApplyTime)
+        .then((v) {
+      if (v != null && v.isNotEmpty) {
+        context.read<CartProvider>().updateOrderItem(_item, refundApplyTime: v);
+        setState(() {});
+        refresh?.call();
+        _toast('申请时间已修改');
+      }
+    });
+  }
+
+  /// v1.9.156：双击修改退款完结时间
+  void _editRefundDoneTime([VoidCallback? refresh]) {
+    DialogHelpers.showDateTimePicker(context,
+            title: '修改退款完结时间', initial: _item.refundDoneTime)
+        .then((v) {
+      if (v != null && v.isNotEmpty) {
+        context.read<CartProvider>().updateOrderItem(_item, refundDoneTime: v);
+        setState(() {});
+        refresh?.call();
+        _toast('完结时间已修改');
       }
     });
   }
@@ -1937,8 +1958,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   void _editPickupInsuranceAmount() {
     final m = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(_pickupInsurance);
     final cur = m?.group(1) ?? '6.02';
-    DialogHelpers.showTextInput(context,
-            title: '修改退货宝抵扣金额', initial: cur)
+    DialogHelpers.showTextInput(context, title: '修改退货宝抵扣金额', initial: cur)
         .then((v) {
       final n = double.tryParse(v ?? '');
       if (n == null || n <= 0) return;
@@ -1985,14 +2005,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   void _editRefundAmount() {
     DialogHelpers.showTextInput(context,
-            title: '修改退款金额',
-            initial: _item.refundAmount.toStringAsFixed(2))
+            title: '修改退款金额', initial: _item.refundAmount.toStringAsFixed(2))
         .then((v) {
       final n = double.tryParse(v ?? '');
       if (n != null && n > 0) {
-        context
-            .read<CartProvider>()
-            .updateOrderItem(_item, refundAmount: n);
+        context.read<CartProvider>().updateOrderItem(_item, refundAmount: n);
         setState(() {});
         _toast('退款金额已修改为 ¥${n.toStringAsFixed(2)}');
       }
@@ -2019,9 +2036,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
             title: '修改退款物流（留空=不显示）', initial: _item.refundLogistics)
         .then((v) {
       if (v != null) {
-        context
-            .read<CartProvider>()
-            .updateOrderItem(_item, refundLogistics: v);
+        context.read<CartProvider>().updateOrderItem(_item, refundLogistics: v);
         setState(() {});
         _toast(v.isEmpty ? '退款物流已隐藏' : '退款物流已修改：$v');
       }
@@ -2057,8 +2072,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               context.read<CartProvider>().removeItem(_item);
               Navigator.of(context).pop();
             },
-            child:
-                const Text('删除', style: TextStyle(color: Color(0xFFA32D2D))),
+            child: const Text('删除', style: TextStyle(color: Color(0xFFA32D2D))),
           ),
         ],
       ),
@@ -2085,8 +2099,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(
-                  border:
-                      Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
+                  border: Border(bottom: BorderSide(color: Color(0xFFf0f0f0))),
                 ),
                 child: Row(
                   children: [
@@ -2096,8 +2109,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                     const Spacer(),
                     GestureDetector(
                       onTap: () => Navigator.of(ctx).pop(),
-                      child:
-                          const Icon(Icons.close, color: Color(0xFF999999)),
+                      child: const Icon(Icons.close, color: Color(0xFF999999)),
                     ),
                   ],
                 ),
@@ -2111,8 +2123,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         _editRefundMethod),
                     _menuTile(ctx, Icons.title, '修改大标题', _editTitle),
                     _menuTile(ctx, Icons.notes, '修改副标题', _editSubtitle),
-                    _menuTile(
-                        ctx, Icons.payments, '修改退款金额', _editRefundAmount),
+                    _menuTile(ctx, Icons.payments, '修改退款金额', _editRefundAmount),
                     _menuTile(ctx, Icons.local_shipping, '修改退款物流',
                         _editRefundLogistics),
                     _menuTile(ctx, Icons.format_list_bulleted, '选择退款原因',
@@ -2134,30 +2145,25 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         _item.hasFreightInsurance = !_item.hasFreightInsurance;
                       });
                       context.read<CartProvider>().updateOrderItem(_item);
-                      _toast(_item.hasFreightInsurance
-                          ? '运费保障已显示'
-                          : '运费保障已隐藏');
+                      _toast(_item.hasFreightInsurance ? '运费保障已显示' : '运费保障已隐藏');
                     }),
                     _menuTile(ctx, Icons.help, '切换"您是否遇到问题"区', () {
                       setState(() {
                         _item.showHelpSection = !_item.showHelpSection;
                       });
                       context.read<CartProvider>().updateOrderItem(_item);
-                      _toast(_item.showHelpSection
-                          ? '帮助区已显示'
-                          : '帮助区已隐藏');
+                      _toast(_item.showHelpSection ? '帮助区已显示' : '帮助区已隐藏');
                     }),
                     _menuTile(ctx, Icons.local_post_office, '切换"寄件详情"按钮', () {
                       setState(() {
                         _item.showShipDetailBtn = !_item.showShipDetailBtn;
                       });
                       context.read<CartProvider>().updateOrderItem(_item);
-                      _toast(_item.showShipDetailBtn
-                          ? '寄件详情已显示'
-                          : '寄件详情已隐藏');
+                      _toast(_item.showShipDetailBtn ? '寄件详情已显示' : '寄件详情已隐藏');
                     }),
                     _menuTile(ctx, Icons.linear_scale, '修改步骤条文字', _editSteps),
-                    _menuTile(ctx, Icons.pin_outlined, '修改取件码', _editPickupCode),
+                    _menuTile(
+                        ctx, Icons.pin_outlined, '修改取件码', _editPickupCode),
                     _menuTile(ctx, Icons.schedule, '修改上门取件时间', _editPickupTime),
                     _menuTile(ctx, Icons.savings_outlined, '修改退货宝抵扣文案',
                         _editPickupInsurance),
@@ -2166,9 +2172,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                         _item.showPickupCard = !_item.showPickupCard;
                       });
                       context.read<CartProvider>().updateOrderItem(_item);
-                      _toast(_item.showPickupCard
-                          ? '寄回商品卡已显示'
-                          : '寄回商品卡已隐藏');
+                      _toast(_item.showPickupCard ? '寄回商品卡已显示' : '寄回商品卡已隐藏');
                     }),
                     ListTile(
                       leading: const Icon(Icons.delete_outline,
@@ -2209,9 +2213,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       context,
       title: '修改退款状态（可改回待发货等状态）',
       options: CartProvider.orderStatusOptions,
-      currentValue: _item.statusTitle.isNotEmpty
-          ? _item.statusTitle
-          : _item.refundStatus,
+      currentValue:
+          _item.statusTitle.isNotEmpty ? _item.statusTitle : _item.refundStatus,
     ).then((v) {
       if (v == null) return;
       final provider = context.read<CartProvider>();
@@ -2234,8 +2237,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF666666)),
       title: Text(label),
-      trailing:
-          const Icon(Icons.chevron_right, color: Color(0xFFcccccc)),
+      trailing: const Icon(Icons.chevron_right, color: Color(0xFFcccccc)),
       onTap: () {
         Navigator.of(sheetCtx).pop();
         onTap();
