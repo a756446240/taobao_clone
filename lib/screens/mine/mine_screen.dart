@@ -74,8 +74,7 @@ class _MineScreenState extends State<MineScreen> {
       if (!_circleCtrl.hasClients) return;
       final max = _circleCtrl.position.maxScrollExtent;
       if (max <= 0) return;
-      setState(() =>
-          _circleRatio = (_circleCtrl.offset / max).clamp(0.0, 1.0));
+      setState(() => _circleRatio = (_circleCtrl.offset / max).clamp(0.0, 1.0));
     });
   }
 
@@ -123,8 +122,7 @@ class _MineScreenState extends State<MineScreen> {
   // ============ 相册选图 ============
   Future<String?> _pickImageToLocal(String subDir) async {
     try {
-      final picked =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return null;
       final dir = await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/$subDir');
@@ -221,15 +219,14 @@ class _MineScreenState extends State<MineScreen> {
                 profile.nickname,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
             GestureDetector(
               onTap: _gotoAddress,
               behavior: HitTestBehavior.opaque,
-              child: _stickyBtn(
-                  icon: Icons.location_on_outlined, label: '地址'),
+              child: _stickyBtn(icon: Icons.location_on_outlined, label: '地址'),
             ),
             const SizedBox(width: 16),
             GestureDetector(
@@ -242,8 +239,7 @@ class _MineScreenState extends State<MineScreen> {
             GestureDetector(
               onTap: _openSettings,
               behavior: HitTestBehavior.opaque,
-              child: _stickyBtn(
-                  icon: Icons.settings_outlined, label: '设置'),
+              child: _stickyBtn(icon: Icons.settings_outlined, label: '设置'),
             ),
           ],
         ),
@@ -352,7 +348,9 @@ class _MineScreenState extends State<MineScreen> {
                                   size: 12, color: Color(0xFF1A1A1A)),
                               const SizedBox(width: 2),
                               Text(
-                                profile.slogan.isEmpty ? '关注店铺' : profile.slogan,
+                                profile.slogan.isEmpty
+                                    ? '关注店铺'
+                                    : profile.slogan,
                                 style: const TextStyle(
                                     color: Color(0xFF1A1A1A), fontSize: 12),
                               ),
@@ -489,7 +487,8 @@ class _MineScreenState extends State<MineScreen> {
       children: [
         Icon(icon, size: 20, color: Colors.black87),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black87)),
+        Text(label,
+            style: const TextStyle(fontSize: 10, color: Colors.black87)),
       ],
     );
   }
@@ -671,9 +670,7 @@ class _MineScreenState extends State<MineScreen> {
                           height: 1.1)),
                   Text('红包',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          height: 1.1)),
+                          color: Colors.white, fontSize: 9, height: 1.1)),
                 ],
               ),
             ),
@@ -701,11 +698,10 @@ class _MineScreenState extends State<MineScreen> {
               child: Text(subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Color(0xFF999999), fontSize: 11)),
+                  style:
+                      const TextStyle(color: Color(0xFF999999), fontSize: 11)),
             ),
-            const Icon(Icons.chevron_right,
-                size: 12, color: Color(0xFF999999)),
+            const Icon(Icons.chevron_right, size: 12, color: Color(0xFF999999)),
           ],
         ),
       ],
@@ -764,8 +760,8 @@ class _MineScreenState extends State<MineScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('借钱',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFFB9AC9B))),
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFFB9AC9B))),
                     SizedBox(width: 2),
                     Icon(Icons.help_outline,
                         size: 11, color: Color(0xFFB9AC9B)),
@@ -801,9 +797,7 @@ class _MineScreenState extends State<MineScreen> {
               const Text('全\n部\n权\n益',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 10,
-                      height: 1.0,
-                      color: Color(0xFFB9AC9B))),
+                      fontSize: 10, height: 1.0, color: Color(0xFFB9AC9B))),
               const Icon(Icons.chevron_right,
                   size: 12, color: Color(0xFFB9AC9B)),
             ],
@@ -841,8 +835,7 @@ class _MineScreenState extends State<MineScreen> {
                 color: const Color(0xFFE8DFA8),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Icon(Icons.eco,
-                  size: 13, color: Color(0xFF8A7B1E)),
+              child: const Icon(Icons.eco, size: 13, color: Color(0xFF8A7B1E)),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -861,11 +854,9 @@ class _MineScreenState extends State<MineScreen> {
               ),
             ),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                border:
-                    Border.all(color: const Color(0xFFB3A24A), width: 0.8),
+                border: Border.all(color: const Color(0xFFB3A24A), width: 0.8),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: const Text('去查收',
@@ -1064,7 +1055,8 @@ class _MineScreenState extends State<MineScreen> {
   /// 单击"设置" → 设置页（双击仍是编辑资料）
   void _openSettings() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen(version: '1.9.148')),
+      MaterialPageRoute(
+          builder: (_) => const SettingsScreen(version: '1.9.156')),
     );
   }
 
@@ -1119,36 +1111,33 @@ class _MineScreenState extends State<MineScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
         ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                  child: Text('领券中心', style: AppTextStyles.middleBold)),
-              const Text('惊喜优惠券  限量抢 >', style: AppTextStyles.smallSub),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              // v1.9.116：首卡 88VIP 专享金色券，其余红底券（对齐真实淘宝）
-              _vipCoupon('¥635', '88VIP专享'),
-              const SizedBox(width: 8),
-              _bigCoupon('¥6', '秋装加补券',
-                  bg: const Color(0xFFFFECEF),
-                  fg: const Color(0xFFFF2450)),
-              const SizedBox(width: 8),
-              _bigCoupon('¥5', '智家加补券',
-                  bg: const Color(0xFFFFECEF),
-                  fg: const Color(0xFFFF2450)),
-              const SizedBox(width: 8),
-              _bigCoupon('¥50', '珠宝加补券',
-                  bg: const Color(0xFFFFECEF),
-                  fg: const Color(0xFFFF2450)),
-            ],
-          ),
-        ],
-      ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                    child: Text('领券中心', style: AppTextStyles.middleBold)),
+                const Text('惊喜优惠券  限量抢 >', style: AppTextStyles.smallSub),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                // v1.9.116：首卡 88VIP 专享金色券，其余红底券（对齐真实淘宝）
+                _vipCoupon('¥635', '88VIP专享'),
+                const SizedBox(width: 8),
+                _bigCoupon('¥6', '秋装加补券',
+                    bg: const Color(0xFFFFECEF), fg: const Color(0xFFFF2450)),
+                const SizedBox(width: 8),
+                _bigCoupon('¥5', '智家加补券',
+                    bg: const Color(0xFFFFECEF), fg: const Color(0xFFFF2450)),
+                const SizedBox(width: 8),
+                _bigCoupon('¥50', '珠宝加补券',
+                    bg: const Color(0xFFFFECEF), fg: const Color(0xFFFF2450)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1186,15 +1175,13 @@ class _MineScreenState extends State<MineScreen> {
                     fontSize: 11)),
             const SizedBox(height: 4),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFF3A2C12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text('去领取',
-                  style: TextStyle(
-                      color: Color(0xFFF6E7C8), fontSize: 10)),
+                  style: TextStyle(color: Color(0xFFF6E7C8), fontSize: 10)),
             ),
           ],
         ),
@@ -1215,12 +1202,10 @@ class _MineScreenState extends State<MineScreen> {
           children: [
             Text(value,
                 style: TextStyle(
-                    color: fg,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
+                    color: fg, fontSize: 20, fontWeight: FontWeight.bold)),
             Text(label,
-                style: TextStyle(
-                    color: fg.withValues(alpha: 0.65), fontSize: 11)),
+                style:
+                    TextStyle(color: fg.withValues(alpha: 0.65), fontSize: 11)),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
@@ -1428,9 +1413,7 @@ class _MineScreenState extends State<MineScreen> {
       _recPicks = pool.recommendGoods(6 + Random().nextInt(3));
     }
     final picks = _recPicks ??
-        (([...MockData.guessLikeGoods]..shuffle(Random()))
-            .take(6)
-            .toList());
+        (([...MockData.guessLikeGoods]..shuffle(Random())).take(6).toList());
     // 双列瀑布流（左右列各自撑内容高度，卡片底部不留白）
     final left = <Widget>[];
     final right = <Widget>[];
@@ -1449,8 +1432,7 @@ class _MineScreenState extends State<MineScreen> {
                   children: [
                     for (final w in left)
                       Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: w),
+                          padding: const EdgeInsets.only(bottom: 10), child: w),
                   ],
                 ),
               ),
@@ -1460,8 +1442,7 @@ class _MineScreenState extends State<MineScreen> {
                   children: [
                     for (final w in right)
                       Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: w),
+                          padding: const EdgeInsets.only(bottom: 10), child: w),
                   ],
                 ),
               ),
@@ -1476,8 +1457,7 @@ class _MineScreenState extends State<MineScreen> {
             }),
             child: Container(
               margin: const EdgeInsets.only(top: 2, bottom: 12),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: const Color(0xFFdddddd)),
@@ -1486,12 +1466,10 @@ class _MineScreenState extends State<MineScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.refresh,
-                      size: 15, color: Color(0xFF666666)),
+                  Icon(Icons.refresh, size: 15, color: Color(0xFF666666)),
                   SizedBox(width: 4),
                   Text('换一批',
-                      style: TextStyle(
-                          fontSize: 13, color: Color(0xFF666666))),
+                      style: TextStyle(fontSize: 13, color: Color(0xFF666666))),
                 ],
               ),
             ),
@@ -1570,8 +1548,8 @@ class _MineScreenState extends State<MineScreen> {
     final sorted = [...titled];
     switch (_favFilter) {
       case 0: // 有降价：降价宝贝排前面
-        sorted.sort((a, b) =>
-            (_hashOf(a.title) % 3).compareTo(_hashOf(b.title) % 3));
+        sorted.sort(
+            (a, b) => (_hashOf(a.title) % 3).compareTo(_hashOf(b.title) % 3));
         break;
       case 1: // 宝贝分类：按品牌归类
         sorted.sort((a, b) => MaterialPoolProvider.brandOf(a.title)
@@ -1628,15 +1606,13 @@ class _MineScreenState extends State<MineScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   color: selected ? AppColors.primary : Colors.black87,
-                  fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                 )),
             if (arrow)
               Icon(Icons.keyboard_arrow_down,
                   size: 14,
-                  color: selected
-                      ? AppColors.primary
-                      : const Color(0xFF999999)),
+                  color:
+                      selected ? AppColors.primary : const Color(0xFF999999)),
           ],
         ),
       ),
@@ -1651,8 +1627,7 @@ class _MineScreenState extends State<MineScreen> {
     final priceText = MaterialPoolProvider.displayPriceOf(e);
     final collectors = 1 + h % 200;
     final coinBack = (h % 300) / 100 + 0.5;
-    final shop =
-        '${MaterialPoolProvider.brandOf(e.title)}海外旗舰店';
+    final shop = '${MaterialPoolProvider.brandOf(e.title)}海外旗舰店';
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1687,8 +1662,7 @@ class _MineScreenState extends State<MineScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                    '淘金币抵${coinBack.toStringAsFixed(2)}元  $collectors人收藏',
+                Text('淘金币抵${coinBack.toStringAsFixed(2)}元  $collectors人收藏',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1745,8 +1719,8 @@ class _MineScreenState extends State<MineScreen> {
         border: Border.all(color: const Color(0xFFdddddd)),
         borderRadius: BorderRadius.circular(14),
       ),
-      child:
-          Text(text, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+      child: Text(text,
+          style: const TextStyle(fontSize: 11, color: Colors.black87)),
     );
   }
 
@@ -1799,8 +1773,7 @@ class _MineScreenState extends State<MineScreen> {
             child: Column(
               children: [
                 for (final w in left)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 10), child: w),
+                  Padding(padding: const EdgeInsets.only(bottom: 10), child: w),
               ],
             ),
           ),
@@ -1809,8 +1782,7 @@ class _MineScreenState extends State<MineScreen> {
             child: Column(
               children: [
                 for (final w in right)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 10), child: w),
+                  Padding(padding: const EdgeInsets.only(bottom: 10), child: w),
               ],
             ),
           ),
@@ -1820,68 +1792,73 @@ class _MineScreenState extends State<MineScreen> {
   }
 
   Widget _reviewCard(
-      ({String image, String text, String product, String user, String likes})
-          r) {
+      ({
+        String image,
+        String text,
+        String product,
+        String user,
+        String likes
+      }) r) {
     return GestureDetector(
       onTap: () => _previewImage(r.image),
       child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppImage(url: r.image, width: double.infinity),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(r.text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(fontSize: 13, color: Colors.black87)),
-                if (r.product.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(r.product,
-                      maxLines: 1,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppImage(url: r.image, width: double.infinity),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.text,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF999999))),
-                ],
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 9,
-                      backgroundColor: Color(0xFFffd180),
-                      child: Icon(Icons.person,
-                          size: 12, color: Colors.white),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(r.user,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF999999))),
-                    ),
-                    const Icon(Icons.favorite_border,
-                        size: 14, color: Color(0xFF999999)),
-                    if (r.likes.isNotEmpty)
-                      Text(' ${r.likes}',
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF999999))),
+                      style:
+                          const TextStyle(fontSize: 13, color: Colors.black87)),
+                  if (r.product.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(r.product,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF999999))),
                   ],
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 9,
+                        backgroundColor: Color(0xFFffd180),
+                        child:
+                            Icon(Icons.person, size: 12, color: Colors.white),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(r.user,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF999999))),
+                      ),
+                      const Icon(Icons.favorite_border,
+                          size: 14, color: Color(0xFF999999)),
+                      if (r.likes.isNotEmpty)
+                        Text(' ${r.likes}',
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF999999))),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
