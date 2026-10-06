@@ -1711,32 +1711,46 @@ class _OrderItemTile extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         // 退款条：灰底圆角整宽（状态跟随退款详情页改动实时同步 + 变体文案 + 金额橘色）
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    text: '$_refundBarStatus ',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A)),
-                    children: _refundBarSpans(amount),
+        // v1.9.158：双击分两部分修改——黑粗体部分 + 灰色部分（留空恢复自动）
+        GestureDetector(
+          onDoubleTap: () => _editRefundBarTexts(context, amount),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text:
+                          '${item.refundBarBoldText.isNotEmpty ? item.refundBarBoldText : _refundBarStatus} ',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A)),
+                      children: item.refundBarGreyText.isNotEmpty
+                          ? [
+                              TextSpan(
+                                  text: item.refundBarGreyText,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.normal,
+                                      color: Color(0xFF999999)))
+                            ]
+                          : _refundBarSpans(amount),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const Icon(Icons.chevron_right,
-                  color: Color(0xFF999999), size: 16),
-            ],
+                const Icon(Icons.chevron_right,
+                    color: Color(0xFF999999), size: 16),
+              ],
+            ),
           ),
         ),
       ],
@@ -1782,6 +1796,62 @@ class _OrderItemTile extends StatelessWidget {
   String get _specPrefix {
     final sum = item.title.codeUnits.fold<int>(0, (a, b) => a + b);
     return sum.isEven ? '颜色分类' : '商品规格';
+  }
+
+  /// 双击退款条：分两部分修改——黑粗体部分 + 灰色部分（各自留空=恢复自动生成）
+  void _editRefundBarTexts(BuildContext context, double amount) {
+    final boldCtrl = TextEditingController(
+        text: item.refundBarBoldText.isNotEmpty
+            ? item.refundBarBoldText
+            : _refundBarStatus);
+    final greyAuto = _refundBarSpans(amount).map((s) => s.text ?? '').join();
+    final greyCtrl = TextEditingController(
+        text: item.refundBarGreyText.isNotEmpty
+            ? item.refundBarGreyText
+            : greyAuto.trim());
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('修改退款条文案', style: TextStyle(fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: boldCtrl,
+              decoration: const InputDecoration(
+                labelText: '黑体粗字部分（清空=跟随退款状态）',
+                labelStyle: TextStyle(fontSize: 12),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: greyCtrl,
+              decoration: const InputDecoration(
+                labelText: '灰色字部分（清空=自动生成）',
+                labelStyle: TextStyle(fontSize: 12),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: const Text('取消')),
+          TextButton(
+            onPressed: () {
+              context.read<CartProvider>().updateOrderItem(
+                    item,
+                    refundBarBoldText: boldCtrl.text.trim(),
+                    refundBarGreyText: greyCtrl.text.trim(),
+                  );
+              Navigator.pop(c);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ============ 普通订单布局 ============
