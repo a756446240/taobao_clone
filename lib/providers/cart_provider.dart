@@ -1019,6 +1019,7 @@ class CartProvider extends ChangeNotifier {
     double? refundAmount,
     String? refundMethod,
     String? refundLogistics,
+    String? refundReason,
     String? refundApplyTime,
     String? refundDoneTime,
     int? refundBarStyle,
@@ -1128,6 +1129,7 @@ class CartProvider extends ChangeNotifier {
     if (refundAmount != null) item.refundAmount = refundAmount;
     if (refundMethod != null) item.refundMethod = refundMethod;
     if (refundLogistics != null) item.refundLogistics = refundLogistics;
+    if (refundReason != null) item.refundReason = refundReason;
     if (refundApplyTime != null) item.refundApplyTime = refundApplyTime;
     if (refundDoneTime != null) item.refundDoneTime = refundDoneTime;
     if (refundBarStyle != null) item.refundBarStyle = refundBarStyle;
