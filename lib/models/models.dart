@@ -261,6 +261,8 @@ class OrderItem {
   int refundBarStyle; // 售后卡片退款条样式：0极速退款/1退款金额/2支付渠道/3平台支持退款（-1=待随机生成）
   double refundDiscount; // 退款优惠金额（随机生成，0=无）
   bool showRefundDiscount; // 是否在退款条显示优惠
+  String refundBarBoldText; // 退款条黑粗体部分自定义文案（空=跟随退款状态自动）
+  String refundBarGreyText; // 退款条灰色部分自定义文案（空=按 refundBarStyle 自动生成）
 
   // ===== 退款详情扩展字段（3.5 整改新增） =====
   String refundNumber; // 退款编号（4 开头 17 位，留空=自动生成）
@@ -366,6 +368,8 @@ class OrderItem {
     this.refundApplyTime = '',
     this.refundDoneTime = '',
     this.refundBarStyle = -1,
+    this.refundBarBoldText = '',
+    this.refundBarGreyText = '',
     this.refundDiscount = 0,
     this.showRefundDiscount = true,
     this.refundNumber = '',
