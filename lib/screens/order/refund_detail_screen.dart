@@ -2048,10 +2048,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     showRefundReasonPicker(context, currentReason: _item.refundReason)
         .then((v) {
       if (v != null) {
-        setState(() {
-          _item.refundReason = v;
-        });
-        context.read<CartProvider>().updateOrderItem(_item);
+        context.read<CartProvider>().updateOrderItem(_item, refundReason: v);
+        setState(() {});
         _toast('退款原因已选择：$v');
       }
     });
