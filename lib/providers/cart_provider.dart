@@ -1023,6 +1023,8 @@ class CartProvider extends ChangeNotifier {
     String? refundApplyTime,
     String? refundDoneTime,
     int? refundBarStyle,
+    String? refundBarBoldText,
+    String? refundBarGreyText,
     double? refundDiscount,
     bool? showRefundDiscount,
     String? refundSteps,
@@ -1133,6 +1135,8 @@ class CartProvider extends ChangeNotifier {
     if (refundApplyTime != null) item.refundApplyTime = refundApplyTime;
     if (refundDoneTime != null) item.refundDoneTime = refundDoneTime;
     if (refundBarStyle != null) item.refundBarStyle = refundBarStyle;
+    if (refundBarBoldText != null) item.refundBarBoldText = refundBarBoldText;
+    if (refundBarGreyText != null) item.refundBarGreyText = refundBarGreyText;
     if (refundDiscount != null) item.refundDiscount = refundDiscount;
     if (showRefundDiscount != null) {
       item.showRefundDiscount = showRefundDiscount;
