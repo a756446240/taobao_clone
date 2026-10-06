@@ -571,14 +571,13 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   // ============ 未发货秒退横幅 ============
   Widget _buildInstantRefundBanner() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
+      margin: const EdgeInsets.only(top: 8),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
           colors: [Color(0xFFFFF4E8), Color(0xFFFFE8D1)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
-        borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
@@ -625,9 +624,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         .clamp(0, double.infinity)
         .toDouble();
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
@@ -762,9 +760,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   Widget _buildLogisticsCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       child: GestureDetector(
         // 双击：更换/输入快递单号并联网实时更新（v1.9.100）
@@ -804,9 +801,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   // ============ 运费保障卡（情况B2 已寄回，对齐真实淘宝 v1.9.100） ============
   Widget _buildFreightInsuranceCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       // 双击改保障金额（v1.9.101）
       child: GestureDetector(
@@ -959,9 +955,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   // ============ 店铺行 ============
   Widget _buildShopRow() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
@@ -994,9 +989,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         context.watch<ProductImageProvider>().imageFor(_item.title);
     final imageUrl = override ?? _item.imageUrl;
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: EdgeInsets.zero,
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1037,9 +1031,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   // ============ 协商历史 + 退款信息（可折叠） ============
   Widget _buildRefundInfoCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(color: Colors.white),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1338,10 +1331,9 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     allGoods.shuffle(Random());
     final goods = allGoods.take(6).toList();
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: Colors.white),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1421,10 +1413,9 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   // ============ "您是否遇到以下问题？"反馈区 ============
   Widget _buildHelpSection() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: Colors.white),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
