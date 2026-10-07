@@ -1098,8 +1098,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
                 _item.refundReason.isEmpty ? '点击选择' : _item.refundReason,
                 onTap: _pickRefundReason, isLink: _item.refundReason.isEmpty),
             _infoRow('申请金额', '共${_item.refundAmount.toStringAsFixed(2)}元'),
-            _infoRow('退款完结', _item.refundDoneTime,
-                onDoubleTap: _editRefundDoneTime),
+            // v1.9.159：待寄回/处理中自动隐藏「退款完结」行，退款结束/成功自动出现
+            if (!_isPending)
+              _infoRow('退款完结', _item.refundDoneTime,
+                  onDoubleTap: _editRefundDoneTime),
             _infoRow('申请时间', _item.refundApplyTime,
                 onDoubleTap: _editRefundApplyTime),
             _infoRowWithCopy('退款编号', _item.refundNumber),
@@ -1530,7 +1532,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _bottomIcon(Icons.tag_faces, '卖家', onTap: _gotoServiceChat),
+              _bottomIcon(null, '卖家', onTap: _gotoServiceChat),
               const Spacer(),
               if (_isAwaitingPickup) ...[
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
@@ -1556,7 +1558,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _bottomIcon(IconData ic, String label, {VoidCallback? onTap}) {
+  Widget _bottomIcon(IconData? ic, String label, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -1564,7 +1566,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(ic, size: 20, color: const Color(0xFF666666)),
+            // v1.9.159：卖家入口用旺旺图标（橙色圆脸），对齐真实淘宝
+            ic == null
+                ? CustomPaint(
+                    size: const Size(20, 20), painter: _WangwangPainter())
+                : Icon(ic, size: 20, color: const Color(0xFF666666)),
             const SizedBox(height: 2),
             Text(label,
                 style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
@@ -2233,4 +2239,49 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
       },
     );
   }
+}
+
+/// 旺旺图标（橙色圆脸 + 白色双眼 + 微笑），对齐真实淘宝「卖家」入口
+class _WangwangPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    // 橙色圆脸（微扁）
+    final face = Paint()..color = const Color(0xFFFF8A1E);
+    canvas.drawOval(
+        Rect.fromLTWH(w * 0.04, h * 0.08, w * 0.92, h * 0.84), face);
+    final white = Paint()..color = Colors.white;
+    // 双眼（左眼略大，对齐旺旺 logo 神态）
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(w * 0.33, h * 0.40),
+            width: w * 0.15,
+            height: h * 0.19),
+        white);
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(w * 0.67, h * 0.40),
+            width: w * 0.13,
+            height: h * 0.17),
+        white);
+    // 微笑弧线
+    final smile = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.08
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+        Rect.fromCenter(
+            center: Offset(w * 0.5, h * 0.50),
+            width: w * 0.52,
+            height: h * 0.46),
+        0.4,
+        pi - 0.8,
+        false,
+        smile);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
