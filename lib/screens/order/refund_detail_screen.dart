@@ -1542,7 +1542,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              _bottomIcon(null, '卖家', onTap: _gotoServiceChat),
+              _bottomIcon(null, '卖家',
+                  onTap: _gotoServiceChat, labelColor: const Color(0xFFFF6E19)),
               const Spacer(),
               if (_isAwaitingPickup) ...[
                 _smallBtn('平台介入', onTap: _showInterveneSheet),
@@ -1568,7 +1569,8 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
     );
   }
 
-  Widget _bottomIcon(IconData? ic, String label, {VoidCallback? onTap}) {
+  Widget _bottomIcon(IconData? ic, String label,
+      {VoidCallback? onTap, Color labelColor = const Color(0xFF666666)}) {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -1576,14 +1578,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // v1.9.160：卖家入口用真实旺旺图标（从真淘宝截图抠图+高清化）
+            // v1.9.162：卖家入口用真旺旺 logo（橙描边线稿，从高清特写抠图）
             ic == null
                 ? Image.asset('assets/icons/ic_wangwang.png',
-                    width: 20, height: 20, fit: BoxFit.contain)
-                : Icon(ic, size: 20, color: const Color(0xFF666666)),
+                    width: 22, height: 22, fit: BoxFit.contain)
+                : Icon(ic, size: 20, color: labelColor),
             const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(fontSize: 10, color: Color(0xFF666666))),
+            // v1.9.162：真实淘宝「卖家」文字是橙色
+            Text(label, style: TextStyle(fontSize: 10, color: labelColor)),
           ],
         ),
       ),
