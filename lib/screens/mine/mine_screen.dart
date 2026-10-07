@@ -1056,7 +1056,7 @@ class _MineScreenState extends State<MineScreen> {
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(
-          builder: (_) => const SettingsScreen(version: '1.9.161')),
+          builder: (_) => const SettingsScreen(version: '1.9.162')),
     );
   }
 
