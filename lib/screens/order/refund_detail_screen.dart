@@ -358,12 +358,14 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           else
             GestureDetector(
               onDoubleTap: _editTitle,
+              // v1.9.161：完成态大标题斜体粗字，对齐真实淘宝退款成功页
               child: Text(
                 _item.refundTitle,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A1A)),
+                    fontStyle: _isPending ? FontStyle.normal : FontStyle.italic,
+                    color: const Color(0xFF1A1A1A)),
               ),
             ),
           const SizedBox(height: 8),
@@ -631,8 +633,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         children: [
           // 退回渠道主行（双击=改退款方式，长按=改退款金额）
           _buildRefundDetailRow(
+            iconAsset: _item.refundMethod.contains('微信')
+                ? 'assets/icons/ic_refund_chat.png'
+                : null,
             icon: _item.refundMethod.contains('微信')
-                ? Icons.chat_bubble_outline
+                ? null
                 : Icons.account_balance_wallet,
             label: _item.refundMethod.contains('银行卡')
                 ? '退回${_item.refundMethod} 平安银行8738'
@@ -651,7 +656,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           ],
           if (_item.refundDiscount > 0 && _item.showRefundDiscount)
             _buildRefundDetailRow(
-              icon: Icons.card_giftcard,
+              iconAsset: 'assets/icons/ic_refund_gift.png',
               label: '返还优惠',
               value: '¥${_item.refundDiscount.toStringAsFixed(2)}',
               iconColor: const Color(0xFFFF8C00),
@@ -666,7 +671,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           // 运费保障：仅退货退款（发过货）显示，未发货退款无此行（双击改金额）
           if (_item.hasFreightInsurance && _item.shipTime.isNotEmpty)
             _buildRefundDetailRow(
-              icon: Icons.shield_outlined,
+              iconAsset: 'assets/icons/ic_refund_shield.png',
               label: '运费保障',
               value: '',
               iconColor: const Color(0xFFFF5000),
@@ -700,10 +705,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   Widget _buildRefundDetailRow({
-    required IconData icon,
+    IconData? icon,
+    String? iconAsset,
     required String label,
     required String value,
-    required Color iconColor,
+    Color iconColor = const Color(0xFF999999),
     String? sublabel,
     bool bold = false,
     VoidCallback? onDoubleTap,
@@ -717,7 +723,11 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: iconColor, size: 18),
+            // v1.9.161：真实淘宝抠图图标优先，Material 图标兜底
+            iconAsset != null
+                ? Image.asset(iconAsset,
+                    width: 18, height: 18, fit: BoxFit.contain)
+                : Icon(icon, color: iconColor, size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
