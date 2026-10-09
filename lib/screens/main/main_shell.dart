@@ -10,12 +10,38 @@ import '../weitao/weitao_screen.dart';
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
+  /// v1.9.164：跨页面切 Tab 通知器（快捷入口面板「回到首页/消息/购物车/
+  /// 我的淘宝」等用它切到对应 Tab；value=目标 tab 下标）
+  static final ValueNotifier<int> tabNotifier = ValueNotifier<int>(0);
+
   @override
   State<MainShell> createState() => _MainShellState();
 }
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    MainShell.tabNotifier.addListener(_onTabNotify);
+  }
+
+  @override
+  void dispose() {
+    MainShell.tabNotifier.removeListener(_onTabNotify);
+    super.dispose();
+  }
+
+  void _onTabNotify() {
+    final v = MainShell.tabNotifier.value.clamp(0, 4);
+    if (v != _currentIndex) {
+      setState(() {
+        _currentIndex = v;
+        _visited.add(v);
+      });
+    }
+  }
 
   /// 懒加载：只构建访问过的 tab，避免启动时构建全部页面导致白屏/崩溃
   final List<Widget?> _pages = List.filled(5, null);
@@ -110,9 +136,7 @@ class _MainShellState extends State<MainShell> {
                   errorBuilder: (_, __, ___) => Icon(
                     Icons.circle_outlined,
                     size: 24,
-                    color: active
-                        ? const Color(0xFFFF5000)
-                        : Colors.black87,
+                    color: active ? const Color(0xFFFF5000) : Colors.black87,
                   ),
                 ),
                 if (badge > 0)
@@ -125,15 +149,14 @@ class _MainShellState extends State<MainShell> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFF5000),
                         borderRadius: BorderRadius.circular(9),
-                        border:
-                            Border.all(color: Colors.white, width: 1),
+                        border: Border.all(color: Colors.white, width: 1),
                       ),
                       constraints: const BoxConstraints(minWidth: 17),
                       child: Text(
                         badge > 99 ? '99+' : '$badge',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 10),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 10),
                       ),
                     ),
                   ),
@@ -144,11 +167,9 @@ class _MainShellState extends State<MainShell> {
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: active
-                    ? const Color(0xFFFF5000)
-                    : const Color(0xFF1A1A1A),
-                fontWeight:
-                    active ? FontWeight.w500 : FontWeight.normal,
+                color:
+                    active ? const Color(0xFFFF5000) : const Color(0xFF1A1A1A),
+                fontWeight: active ? FontWeight.w500 : FontWeight.normal,
               ),
             ),
           ],
