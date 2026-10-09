@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'core/app_lock.dart';
 import 'providers/banner_pool_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/chat_history_provider.dart';
@@ -30,6 +31,8 @@ void main() {
     // v1.9.102：初始化文档目录根路径（图片相对路径持久化的解析基础），
     // 必须在任何 AppImage build 之前完成
     await DocPaths.init();
+    // v1.9.164：读取全局锁定开关（设置页可切换）
+    await AppLock.load();
     // Android 状态栏透明沉浸
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
