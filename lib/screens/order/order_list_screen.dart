@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/app_lock.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -28,6 +29,7 @@ import 'channel_orders.dart';
 import 'logistics_screen.dart';
 import 'order_detail_screen.dart';
 import 'rate_order_screen.dart';
+import 'shortcuts_sheet.dart';
 import 'order_manager_screen.dart';
 import 'refund_detail_screen.dart';
 
@@ -816,11 +818,12 @@ class _OrderListScreenState extends State<OrderListScreen>
 
   // ============ v1.9.115：三个点 → 快捷入口底部弹层（对齐真实淘宝） ============
   // ============ 消息/回到首页/我的淘宝/购物车/我的订单/足迹/收藏/客服/反馈/举报 ============
+  // v1.9.164：面板抽到 shortcuts_sheet.dart（订单/退款详情锁定态 ⋯ 复用）
   void _openShortcutsSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _ShortcutsSheet(),
+      builder: (_) => const ShortcutsSheet(),
     );
   }
 
@@ -878,6 +881,7 @@ class _OrderListScreenState extends State<OrderListScreen>
 
   // ============ 编辑菜单（3.4 商品编辑功能） ============
   void _showEditMenu(ShoppingCartShop shop, OrderItem item) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -962,6 +966,7 @@ class _OrderCard extends StatelessWidget {
 
   /// 点击店铺类型徽章：切换 天猫/淘宝/国际
   void _pickShopType(BuildContext context) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showOptionPicker(
       context,
       title: '切换店铺类型',
@@ -1459,6 +1464,7 @@ class _OrderCard extends StatelessWidget {
 
   /// 售后卡片「加入购物车」：把商品重新加回购物车
   void _reAddToCart(BuildContext context) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final item = items.first;
     context.read<CartProvider>().addToCart(
           shopName: shop.shopName,
@@ -1591,6 +1597,7 @@ class _OrderItemTile extends StatelessWidget {
   });
 
   Future<void> _pickImage(BuildContext context) async {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     try {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
@@ -1800,6 +1807,7 @@ class _OrderItemTile extends StatelessWidget {
 
   /// 双击退款条：分两部分修改——黑粗体部分 + 灰色部分（各自留空=恢复自动生成）
   void _editRefundBarTexts(BuildContext context, double amount) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final boldCtrl = TextEditingController(
         text: item.refundBarBoldText.isNotEmpty
             ? item.refundBarBoldText
@@ -2293,6 +2301,7 @@ class _OrderStatusFrame extends StatelessWidget {
 
   /// 双击灰色框架：编辑发货时间文案（持久化到 shipPromise）
   void _editShipPromise(BuildContext context) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(
       context,
       title: '修改发货时间',
@@ -3249,122 +3258,6 @@ class _OrderFilterSheetState extends State<_OrderFilterSheet> {
 /// v1.9.115：三个点 → 快捷入口底部弹层（对齐真实淘宝，纯视觉可关闭）
 /// 第一行：消息(带67角标)/回到首页/我的淘宝/购物车/我的订单
 /// 第二行：我的足迹/我的收藏/专属客服/意见反馈/举报；底部取消按钮
-class _ShortcutsSheet extends StatelessWidget {
-  const _ShortcutsSheet();
-
-  static const _row1 = <(IconData, String)>[
-    (Icons.chat_bubble_outline, '消息'),
-    (Icons.home_outlined, '回到首页'),
-    (Icons.sentiment_satisfied_alt, '我的淘宝'),
-    (Icons.shopping_cart_outlined, '购物车'),
-    (Icons.receipt_long, '我的订单'),
-  ];
-  static const _row2 = <(IconData, String)>[
-    (Icons.travel_explore, '我的足迹'),
-    (Icons.star_border, '我的收藏'),
-    (Icons.headset_mic_outlined, '专属客服'),
-    (Icons.edit_outlined, '意见反馈'),
-    (Icons.report_gmailerrorred_outlined, '举报'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 上半部分白底图标区
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              ),
-              padding: const EdgeInsets.fromLTRB(8, 22, 8, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildRow(context, _row1, badgeOnFirst: true),
-                  const SizedBox(height: 22),
-                  _buildRow(context, _row2),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 取消按钮
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                width: double.infinity,
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                alignment: Alignment.center,
-                child: const Text('取消',
-                    style: TextStyle(fontSize: 16, color: Colors.black87)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRow(BuildContext context, List<(IconData, String)> items,
-      {bool badgeOnFirst = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        for (var i = 0; i < items.length; i++)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(context).pop(),
-            child: SizedBox(
-              width: 62,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(items[i].$1, color: Colors.black87, size: 28),
-                      if (badgeOnFirst && i == 0)
-                        Positioned(
-                          right: -12,
-                          top: -6,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFF5000),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text('67',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 9)),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(items[i].$2,
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.black87)),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 // ============ v1.9.122：真实淘宝同款订单搜索页 ============
 // 入口：订单列表顶栏搜索框（双击「筛选」按钮在经典/新版间切换）。
 // 结构对齐真实淘宝：搜索栏（全部▾ + 输入框 + 筛选icon + 橙色搜索按钮）、
@@ -4305,6 +4198,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
   }
 
   void _editItem(ShoppingCartShop shop, OrderItem item) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
