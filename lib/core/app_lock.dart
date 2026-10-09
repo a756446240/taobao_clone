@@ -28,16 +28,9 @@ class AppLock {
     await p.setBool(_kKey, v);
   }
 
-  /// 锁定中 → 弹提示并返回 true（调用方 return 即可）；未锁定返回 false
+  /// 锁定中 → 返回 true（调用方 return 即可），静默拦截不弹提示；
+  /// 未锁定返回 false
   static bool blocked(BuildContext context) {
-    if (!enabled) return false;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(
-        content: Text('已锁定，请到「我的淘宝 - 设置」关闭锁定后再修改'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ));
-    return true;
+    return enabled;
   }
 }
