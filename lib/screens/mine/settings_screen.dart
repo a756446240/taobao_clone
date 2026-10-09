@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/app_lock.dart';
 import '../../core/theme/app_colors.dart';
 import 'account_pay_screens.dart';
 import 'address_screen.dart';
@@ -21,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _msgNotify = true;
   bool _soundVibrate = true;
   bool _wifiVideo = false;
+  bool _locked = AppLock.enabled; // v1.9.164：全局锁定开关
   String _cacheSize = '128.6MB';
 
   static const _kMsgNotify = 'settings_msg_notify';
@@ -79,8 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Text('取消')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('退出登录',
-                  style: TextStyle(color: Colors.red))),
+              child: const Text('退出登录', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -110,52 +111,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _group([
             _arrowRow('账号与安全',
-                onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            const AccountSecurityScreen()))),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const AccountSecurityScreen()))),
             _arrowRow('支付设置',
-                onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const PaySettingsScreen()))),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const PaySettingsScreen()))),
             _arrowRow('收货地址管理',
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const AddressScreen()))),
+                    MaterialPageRoute(builder: (_) => const AddressScreen()))),
           ]),
           _group([
             _switchRow('消息通知', '接收订单/物流/优惠推送', _msgNotify,
                 (v) => _saveSwitch(_kMsgNotify, v, (x) => _msgNotify = x)),
-            _switchRow('声音与震动', '新消息提示音和震动', _soundVibrate,
-                (v) => _saveSwitch(_kSoundVibrate, v, (x) => _soundVibrate = x)),
+            _switchRow(
+                '声音与震动',
+                '新消息提示音和震动',
+                _soundVibrate,
+                (v) =>
+                    _saveSwitch(_kSoundVibrate, v, (x) => _soundVibrate = x)),
             _switchRow('WiFi 下自动播放视频', '微淘/详情页视频自动播放', _wifiVideo,
                 (v) => _saveSwitch(_kWifiVideo, v, (x) => _wifiVideo = x)),
           ]),
+          // v1.9.164：锁定开关——开启后所有修改入口禁用，防止误触（查看不受限）
           _group([
-            _arrowRow('清除缓存',
-                trailing: _cacheSize, onTap: _clearCache),
+            _switchRow('锁定', '开启后锁定修改功能，防止误触', _locked, (v) async {
+              await AppLock.set(v);
+              if (!mounted) return;
+              setState(() => _locked = v);
+              _toast(v ? '已开启锁定' : '已关闭锁定');
+            }),
+          ]),
+          _group([
+            _arrowRow('清除缓存', trailing: _cacheSize, onTap: _clearCache),
             _arrowRow('隐私',
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const PrivacyScreen()))),
+                    MaterialPageRoute(builder: (_) => const PrivacyScreen()))),
             _arrowRow('通用',
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const GeneralScreen()))),
+                    MaterialPageRoute(builder: (_) => const GeneralScreen()))),
           ]),
           _group([
             _arrowRow('关于淘宝',
-                trailing: widget.version.isNotEmpty
-                    ? 'v${widget.version}'
-                    : null,
-                onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            AboutScreen(version: widget.version)))),
+                trailing:
+                    widget.version.isNotEmpty ? 'v${widget.version}' : null,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AboutScreen(version: widget.version)))),
             _arrowRow('意见反馈',
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const FeedbackScreen()))),
+                    MaterialPageRoute(builder: (_) => const FeedbackScreen()))),
           ]),
           const SizedBox(height: 16),
           Padding(
@@ -213,8 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            Expanded(
-                child: Text(title, style: const TextStyle(fontSize: 14))),
+            Expanded(child: Text(title, style: const TextStyle(fontSize: 14))),
             if (trailing != null)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
@@ -222,8 +224,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: const TextStyle(
                         color: Color(0xFF999999), fontSize: 12)),
               ),
-            const Icon(Icons.chevron_right,
-                color: Color(0xFFCCCCCC), size: 18),
+            const Icon(Icons.chevron_right, color: Color(0xFFCCCCCC), size: 18),
           ],
         ),
       ),
