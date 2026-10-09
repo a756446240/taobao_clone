@@ -3381,7 +3381,8 @@ class OrderSearchScreen extends StatefulWidget {
 class _OrderSearchScreenState extends State<OrderSearchScreen> {
   static const _kHistoryKey = 'order_search_history_v1';
   static const _kSeenKey = 'order_search_seen_v1';
-  static const _scopes = ['全部', '商品名', '订单号', '店铺名'];
+  // v1.9.163：新增「金额」搜索范围——输入实付金额直接找出对应订单
+  static const _scopes = ['全部', '商品名', '订单号', '店铺名', '金额'];
 
   final TextEditingController _ctrl = TextEditingController();
   final FocusNode _focus = FocusNode();
@@ -3459,13 +3460,59 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
             it.alipayTradeNo.toLowerCase().contains(q);
       case '店铺名':
         return shop.shopName.toLowerCase().contains(q);
+      case '金额':
+        // v1.9.163：只按金额匹配（单价/实付总额/明细总价/退款金额）
+        return _amountMatches(shop, it, q);
       case '全部':
       default:
+        // v1.9.163：查询串是数字金额时（如 96.95），同时按金额匹配订单
         return it.title.toLowerCase().contains(q) ||
             it.configuration.toLowerCase().contains(q) ||
             it.orderNo.toLowerCase().contains(q) ||
-            shop.shopName.toLowerCase().contains(q);
+            shop.shopName.toLowerCase().contains(q) ||
+            _amountMatches(shop, it, q);
     }
+  }
+
+  // ============ v1.9.163 金额搜索 ============
+  /// 金额规整成可前缀比较的字符串：96.95→"96.95"、166.60→"166.6"、9→"9"
+  String _normAmount(double v) {
+    var s = v.toStringAsFixed(2);
+    if (s.contains('.')) {
+      s = s.replaceAll(RegExp(r'0+$'), '');
+      if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
+
+  /// 查询串是否为金额（可带 ¥ 前缀/千位逗号），是则返回规整串，否则 null
+  String? _amountQuery(String q) {
+    var t = q.trim().replaceFirst(RegExp(r'^[¥￥$]'), '').replaceAll(',', '');
+    if (t.endsWith('.')) t = t.substring(0, t.length - 1);
+    if (t.isEmpty || !RegExp(r'^\d+(\.\d+)?$').hasMatch(t)) return null;
+    var s = t;
+    if (s.contains('.')) {
+      s = s.replaceAll(RegExp(r'0+$'), '');
+      if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
+
+  /// 金额命中：订单实付总额命中算整单命中（多商品订单按总价搜）；
+  /// 否则看商品级金额——实付单价、单价×数量、明细总价、退款金额。
+  /// 前缀匹配（"96"能带出 96.95），方便只记得部分金额时缩小范围。
+  bool _amountMatches(ShoppingCartShop shop, OrderItem it, String q) {
+    final aq = _amountQuery(q);
+    if (aq == null) return false;
+    bool hit(double v) => v > 0 && _normAmount(v).startsWith(aq);
+    final total = shop.actualTotal > 0
+        ? shop.actualTotal
+        : shop.items.fold<double>(0, (s, e) => s + e.price);
+    if (hit(total)) return true;
+    return hit(it.price) ||
+        hit(it.price * it.quantity) ||
+        hit(it.productTotal) ||
+        hit(it.refundAmount);
   }
 
   /// 关键词匹配的 店铺+命中商品 分组
@@ -4237,7 +4284,7 @@ class _OrderSearchScreenState extends State<OrderSearchScreen> {
           Text(msg,
               style: const TextStyle(fontSize: 13, color: Color(0xFF999999))),
           const SizedBox(height: 6),
-          const Text('换个商品关键词或店铺名试试',
+          const Text('换个商品关键词、店铺名或金额试试',
               style: TextStyle(fontSize: 11, color: Color(0xFFBBBBBB))),
         ],
       ),
