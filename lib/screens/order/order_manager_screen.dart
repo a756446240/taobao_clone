@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_lock.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
@@ -68,8 +69,7 @@ class OrderManagerScreen extends StatelessWidget {
         ],
       ),
       body: shops.isEmpty
-          ? const Center(
-              child: Text('暂无订单', style: AppTextStyles.middleSub))
+          ? const Center(child: Text('暂无订单', style: AppTextStyles.middleSub))
           : ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: shops.length,
@@ -91,32 +91,35 @@ class _ShopTile extends StatelessWidget {
 
     return Slidable(
       key: ValueKey(shop.hashCode),
-      endActionPane: ActionPane(
-        motion: const ScrollMotion(),
-        extentRatio: 0.22,
-        children: [
-          CustomSlidableAction(
-            onPressed: (_) {
-              provider.removeShop(shop);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('订单已删除'),
-                    duration: Duration(seconds: 1)),
-              );
-            },
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      // v1.9.164：锁定时禁用左滑删除（防误触）
+      endActionPane: AppLock.enabled
+          ? null
+          : ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: 0.22,
               children: [
-                Icon(Icons.delete_outline, size: 22),
-                SizedBox(height: 2),
-                Text('删除', style: TextStyle(fontSize: 12)),
+                CustomSlidableAction(
+                  onPressed: (_) {
+                    provider.removeShop(shop);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('订单已删除'),
+                          duration: Duration(seconds: 1)),
+                    );
+                  },
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete_outline, size: 22),
+                      SizedBox(height: 2),
+                      Text('删除', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         padding: const EdgeInsets.all(12),
