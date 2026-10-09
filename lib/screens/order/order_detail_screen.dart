@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_lock.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
@@ -22,6 +23,7 @@ import 'refund_detail_screen.dart';
 import 'rate_order_screen.dart';
 import 'logistics_screen.dart';
 import 'complaint_screen.dart';
+import 'shortcuts_sheet.dart';
 import '../message/chat_screen.dart';
 
 /// 订单详情页（严格对齐 v3.4 APK 待发货/待收货详情）
@@ -256,9 +258,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           // v1.9.127：单击 ⋯ 弹出操作菜单（编辑订单/克隆订单）；
           // 保留双击直开编辑菜单的老手势
+          // v1.9.164：锁定态 ⋯ 改开快捷入口面板（纯浏览，防止误触修改）
           GestureDetector(
-            onTap: () => _showMoreActions(),
-            onDoubleTap: () => _showEditMenu(),
+            onTap: () =>
+                AppLock.enabled ? _openShortcutsSheet() : _showMoreActions(),
+            onDoubleTap: () =>
+                AppLock.enabled ? _openShortcutsSheet() : _showEditMenu(),
             child:
                 const Icon(Icons.more_horiz, color: Colors.black87, size: 24),
           ),
@@ -790,6 +795,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   int get _shopNewReviews => 20 + _shop.shopName.hashCode.abs() % 80;
 
   void _pickShopLineStyle() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showOptionPicker(
       context,
       title: '店铺信息行样式',
@@ -877,6 +883,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _pickShopAvatar() async {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     try {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
@@ -1225,6 +1232,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _pickProductImage(OrderItem it) async {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     try {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
@@ -1253,6 +1261,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 把该订单商品重新加回购物车（再次购买）
   void _reAddToCart(OrderItem it) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     context.read<CartProvider>().addToCart(
           shopName: _shop.shopName,
           title: it.title,
@@ -1348,6 +1357,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 换赠品缩略图（双击赠品行触发）
   Future<void> _pickGiftImage(OrderItem it) async {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     try {
       final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
@@ -1953,6 +1963,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _editDiscountDetails(String group, String label) async {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     // 其他组的明细原样保留
     final others = <Map<String, dynamic>>[];
     final raw = _item.discountDetails.trim();
@@ -2232,6 +2243,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 订单状态：9 个固定选项，改动后自动归入对应栏目
   void _showStatusPicker() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showOptionPicker(
       context,
       title: '修改订单状态',
@@ -2246,6 +2258,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 倒计时：滚动式选择器（天+小时+分钟三滚轮，v1.9.151 起支持分钟级快速验证）
   void _editCountdown() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showCountdownPicker(
       context,
       title: '修改倒计时',
@@ -2593,7 +2606,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final override = context.watch<ProductImageProvider>().imageFor(g.title);
     final imageUrl = override ?? g.imageUrl;
     return GestureDetector(
-      onDoubleTap: () => pickProductImageFromGallery(context, g.title),
+      onDoubleTap: () {
+        if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
+        pickProductImageFromGallery(context, g.title);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFFAFAFA),
@@ -2683,6 +2699,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     color: const Color(0xFFff5000), onTap: _editAddress),
               ] else if (isTradeSuccess) ...[
                 _outlineBtn('追加评价', onTap: () {
+                  if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => RateOrderScreen(shop: _shop, item: _item),
@@ -2719,6 +2736,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _outlineBtn('查看物流', onTap: _gotoLogistics),
                 const SizedBox(width: 8),
                 _primaryBtn('确认收货', color: const Color(0xFFff5000), onTap: () {
+                  if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
                   context.read<CartProvider>().markSigned(_shop, _item);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('已确认收货'),
@@ -2791,41 +2809,78 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  /// 底部「更多」→ 更多操作弹层
-  void _showMoreSheet() {
+  /// v1.9.164：锁定态 ⋯ → 快捷入口面板（纯浏览，与订单列表三个点同一套）
+  void _openShortcutsSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.local_shipping_outlined, size: 22),
-              title: const Text('查看物流', style: TextStyle(fontSize: 14)),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _gotoLogistics();
-              },
+      backgroundColor: Colors.transparent,
+      builder: (_) => const ShortcutsSheet(),
+    );
+  }
+
+  /// 底部「更多」→ 更多操作小弹窗（v1.9.164 对齐真实淘宝截图：
+  /// 锚定在底栏上方左侧的小白卡，非全宽底部弹层）
+  void _showMoreSheet() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      builder: (ctx) => Align(
+        alignment: Alignment.bottomLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 10, bottom: 68),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            elevation: 10,
+            shadowColor: Colors.black26,
+            child: Container(
+              width: 124,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _popupItem(ctx, '延长收货', () {
+                    if (AppLock.blocked(context)) return; // 修改类，锁定拦截
+                    _demoToast('已延长收货时间');
+                  }),
+                  const Divider(
+                      height: 0.5, thickness: 0.5, color: Color(0xFFF0F0F0)),
+                  _popupItem(ctx, '加入购物车', () {
+                    Navigator.of(ctx).pop();
+                    _reAddToCart(_item); // 内部已带锁定拦截
+                  }),
+                  const Divider(
+                      height: 0.5, thickness: 0.5, color: Color(0xFFF0F0F0)),
+                  _popupItem(ctx, '申请开票', () => _demoToast('申请开票')),
+                  const Divider(
+                      height: 0.5, thickness: 0.5, color: Color(0xFFF0F0F0)),
+                  _popupItem(ctx, '投诉', () {
+                    Navigator.of(ctx).pop();
+                    _gotoComplaint();
+                  }),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  size: 22, color: Color(0xFFff0036)),
-              title: const Text('删除订单',
-                  style: TextStyle(fontSize: 14, color: Color(0xFFff0036))),
-              onTap: () {
-                context.read<CartProvider>().removeItem(_item);
-                Navigator.of(ctx).pop();
-                Navigator.of(context).pop();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// 更多弹窗单行项（高度约 42、文字居中）
+  Widget _popupItem(BuildContext ctx, String text, VoidCallback onTap) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 42,
+        alignment: Alignment.center,
+        child: Text(text,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF333333))),
       ),
     );
   }
@@ -2840,6 +2895,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// 修改地址（底部按钮与地址区双击共用）
   void _editAddress() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final provider = context.read<CartProvider>();
     _editText('修改地址（第一行收件人，第二行起地址）', '${_item.receiver}\n${_item.address}',
         (v) {
@@ -2987,6 +3043,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   void _editText(String title, String initial, ValueChanged<String> onSave,
       {int maxLines = 1}) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: title, initial: initial, maxLines: maxLines)
         .then((v) {
@@ -2996,6 +3053,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   void _editDateTime(
       String title, String initial, ValueChanged<String> onSave) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showDateTimePicker(context, title: title, initial: initial)
         .then((v) {
       if (v != null && v.isNotEmpty) onSave(v);
@@ -3008,6 +3066,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     required String currentValue,
     required ValueChanged<String> onSave,
   }) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showOptionPicker(
       context,
       title: title,
@@ -3026,6 +3085,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ============ 支付方式（image#10 二选一） ============
   void _showPaymentPicker(CartProvider provider) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     const options = ['支付宝支付', '微信支付'];
     DialogHelpers.showOptionPicker(
       context,
@@ -3040,6 +3100,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ============ 天猫积分编辑 ============
   void _editTmallPoints(CartProvider provider) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -3102,6 +3163,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ============ 编辑标签（订单保障） ============
   void _editTags() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final allTags = [
       '极速退款',
       '7天无理由',
@@ -3178,6 +3240,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   /// v1.9.127：克隆本单（整店卡片深拷贝+新订单号），跳到克隆单详情页继续编辑
   void _cloneOrder() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final provider = context.read<CartProvider>();
     final cloned = provider.cloneShop(_shop);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3546,6 +3609,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   void _editNumber(String title, double initial, ValueChanged<double> onSave) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final controller = TextEditingController(text: initial.toStringAsFixed(2));
     showDialog(
       context: context,
