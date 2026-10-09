@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_lock.dart';
 import '../../data/mock_data.dart';
 import '../../models/models.dart';
 import '../../providers/cart_provider.dart';
@@ -13,6 +14,7 @@ import '../../widgets/app_image.dart';
 import '../../widgets/dialog_helpers.dart';
 import '../../widgets/image_picker_helper.dart';
 import 'refund_reason_picker.dart';
+import 'shortcuts_sheet.dart';
 import '../message/chat_screen.dart';
 
 /// 退款详情页 v3.5 整改版
@@ -258,8 +260,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
           Expanded(
             child: Center(child: _stepBreadcrumb()),
           ),
+          // v1.9.164：锁定态 ⋯ 改开快捷入口面板（纯浏览）
           GestureDetector(
-            onDoubleTap: () => _showEditMenu(),
+            onTap: _moreDotTap,
+            onDoubleTap: _moreDotTap,
             child:
                 const Icon(Icons.more_horiz, color: Colors.black87, size: 24),
           ),
@@ -850,7 +854,26 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   /// 双击退货物流卡：更换快递单号并联网实时更新轨迹（v1.9.100）
   /// - 输入单号 → 快递100 识别公司 → apizero 拉实时轨迹 → 主文案+摘要一并更新
   /// - 「手动改文案」走旧的纯文本编辑（留空=隐藏物流卡，回到未寄回分支）
+  /// v1.9.164：⋯ 点击（锁定=快捷入口面板；未锁定=编辑菜单）
+  void _moreDotTap() {
+    if (AppLock.enabled) {
+      _openShortcutsSheet();
+    } else {
+      _showEditMenu();
+    }
+  }
+
+  /// v1.9.164：锁定态 ⋯ → 快捷入口面板（纯浏览，与订单列表同一套）
+  void _openShortcutsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const ShortcutsSheet(),
+    );
+  }
+
   void _editRefundLogisticsOnline() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final oldMain = _refundLogisticsMain;
     // 从旧文案里尽力提取已有单号作为默认值
     final m = RegExp(r'[A-Za-z0-9]{8,}').firstMatch(oldMain);
@@ -1006,8 +1029,10 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onDoubleTap: () =>
-                pickProductImageFromGallery(context, _item.title),
+            onDoubleTap: () {
+              if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
+              pickProductImageFromGallery(context, _item.title);
+            },
             child: Container(
               width: 70,
               height: 70,
@@ -1843,6 +1868,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editTitle() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改大标题', initial: _item.refundTitle)
         .then((v) {
@@ -1884,6 +1910,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// 编辑步骤条文字（逗号分隔；未发货退款 2 段，退货退款 3 段）
   void _editSteps() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final def = _isNoShipRefund ? '商家处理,退款结束' : '商家处理,寄回商品,退款结束';
     DialogHelpers.showTextInput(context,
             title: '修改步骤条（逗号分隔）',
@@ -1898,6 +1925,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editPickupCode() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context, title: '修改取件码', initial: _pickupCode)
         .then((v) {
       if (v != null && v.isNotEmpty) {
@@ -1909,6 +1937,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editPickupTime() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改上门取件时间', initial: _pickupTime)
         .then((v) {
@@ -1923,6 +1952,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   /// v1.9.156：双击修改退款申请时间（协商历史/售后信息/寄件详情同步刷新）
   /// refresh：从协商历史弹层内编辑时刷新弹层内容
   void _editRefundApplyTime([VoidCallback? refresh]) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showDateTimePicker(context,
             title: '修改申请时间', initial: _item.refundApplyTime)
         .then((v) {
@@ -1937,6 +1967,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// v1.9.156：双击修改退款完结时间
   void _editRefundDoneTime([VoidCallback? refresh]) {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showDateTimePicker(context,
             title: '修改退款完结时间', initial: _item.refundDoneTime)
         .then((v) {
@@ -1950,6 +1981,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editPickupInsurance() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改退货宝抵扣文案', initial: _pickupInsurance)
         .then((v) {
@@ -1965,6 +1997,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// 双击抵扣金额：只改 ¥ 数字（v1.9.101），文案其余部分保持不变
   void _editPickupInsuranceAmount() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     final m = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(_pickupInsurance);
     final cur = m?.group(1) ?? '6.02';
     DialogHelpers.showTextInput(context, title: '修改退货宝抵扣金额', initial: cur)
@@ -1986,6 +2019,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   /// 双击运费保障金额（v1.9.101）
   void _editFreightInsuranceAmount() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改运费保障金额',
             initial: _item.freightInsuranceAmount.toStringAsFixed(2))
@@ -2001,6 +2035,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editSubtitle() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改副标题（留空=自动生成）', initial: _item.refundSubtitle)
         .then((v) {
@@ -2013,6 +2048,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editRefundAmount() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改退款金额', initial: _item.refundAmount.toStringAsFixed(2))
         .then((v) {
@@ -2026,6 +2062,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editRefundMethod() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showOptionPicker(
       context,
       title: '选择退款方式',
@@ -2041,6 +2078,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editRefundLogistics() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改退款物流（留空=不显示）', initial: _item.refundLogistics)
         .then((v) {
@@ -2088,6 +2126,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
 
   // ============ 右上角编辑菜单 ============
   void _showEditMenu() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2202,6 +2241,7 @@ class _RefundDetailScreenState extends State<RefundDetailScreen> {
   }
 
   void _editRefundNumber() {
+    if (AppLock.blocked(context)) return; // v1.9.164 锁定防误触
     DialogHelpers.showTextInput(context,
             title: '修改退款编号（留空=重新生成）', initial: _item.refundNumber)
         .then((v) {
