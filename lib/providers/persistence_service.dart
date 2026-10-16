@@ -31,8 +31,29 @@ class PersistenceService {
   static const _kPresetVersion = 'imported_preset_version_v1';
   static const _kDeletedTradeNos = 'persisted_deleted_trade_nos_v1';
 
+  /// v1.9.166：订单回收站（删除订单时存整单快照，可一键恢复）
+  static const _kRecycleBin = 'persisted_recycle_bin_v1';
+
   /// v1.9.149：独立物流单库（与订单解耦，抓包物流单必进库）
   static const _kExpress = 'standalone_express_v1';
+
+  static Future<List<ShoppingCartShop>> loadRecycleBin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kRecycleBin);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list.map((e) => _shopFromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> saveRecycleBin(List<ShoppingCartShop> bin) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        _kRecycleBin, jsonEncode(bin.map(_shopToJson).toList()));
+  }
 
   static Future<List<ExpressRecord>> loadExpressRecords() async {
     final prefs = await SharedPreferences.getInstance();
