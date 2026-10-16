@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'express_library_screen.dart';
+import 'recycle_bin_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -783,12 +784,16 @@ class _OrderListScreenState extends State<OrderListScreen>
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           // v1.9.136：「我的快递」不再是纯视觉，点击进快递库
+                          // v1.9.166：「回收站」进订单回收站（可恢复误删订单）
                           onTap: () {
                             Navigator.of(dlgCtx).pop();
                             if (e.$2 == '我的快递') {
                               Navigator.of(context).push(MaterialPageRoute(
                                   builder: (_) =>
                                       const ExpressLibraryScreen()));
+                            } else if (e.$2 == '回收站') {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) => const RecycleBinScreen()));
                             }
                           },
                           child: SizedBox(
