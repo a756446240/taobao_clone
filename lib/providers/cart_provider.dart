@@ -100,6 +100,16 @@ class CartProvider extends ChangeNotifier {
   /// 淘宝同步导入时永久跳过（防止已删订单复活）。
   final Set<String> _deletedTradeNos = {};
 
+  /// v1.9.166：订单回收站——删除订单时存整单快照，可一键恢复。
+  /// 与黑名单（只存单号）互补：黑名单拦导入、回收站留数据供恢复。
+  final List<ShoppingCartShop> _recycleBin = [];
+
+  /// 回收站里的订单快照（新删除的在前）
+  List<ShoppingCartShop> get recycleBin => List.unmodifiable(_recycleBin);
+
+  /// 回收站数量
+  int get recycleBinCount => _recycleBin.length;
+
   /// 已删除黑名单中的订单号数量（同步导入页展示用）
   int get deletedTradeNosCount => _deletedTradeNos.length;
 
@@ -685,6 +695,10 @@ class CartProvider extends ChangeNotifier {
       final saved = await PersistenceService.loadShops();
       // 加载已删除订单号黑名单（同步导入防复活）
       _deletedTradeNos.addAll(await PersistenceService.loadDeletedTradeNos());
+      // v1.9.166：加载订单回收站快照
+      _recycleBin
+        ..clear()
+        ..addAll(await PersistenceService.loadRecycleBin());
       // v1.9.149：加载独立物流单库（与订单解耦的抓包物流单）
       _expressRecords
         ..clear()
@@ -1412,11 +1426,67 @@ class CartProvider extends ChangeNotifier {
   }
 
   /// 删除整单（订单管理页左滑删除）
+  /// v1.9.166：删除前先存整单快照进回收站，可一键恢复；
+  /// 单号仍进黑名单（同步导入防复活）。
   void removeShop(ShoppingCartShop shop) {
     _markDeleted(shop.items.map((e) => e.orderNo));
+    // 深拷贝一份快照进回收站，避免与 _shops 里的对象共享引用
+    _recycleBin.insert(0, _deepCopyShop(shop));
     _shops.remove(shop);
     _persist();
+    PersistenceService.saveRecycleBin(_recycleBin);
     notifyListeners();
+  }
+
+  /// 深拷贝店铺卡片（回收站快照用，避免引用共享）
+  ShoppingCartShop _deepCopyShop(ShoppingCartShop shop) {
+    return PersistenceService.shopFromJson(
+      jsonDecode(jsonEncode(PersistenceService.shopToJson(shop)))
+          as Map<String, dynamic>,
+    );
+  }
+
+  /// 从回收站恢复订单（v1.9.166）：
+  /// 快照加回订单列表 + 该单号从黑名单放行 + 从回收站移除。
+  /// 返回是否恢复成功。
+  bool restoreFromRecycleBin(String orderNo) {
+    final idx = _recycleBin
+        .indexWhere((s) => s.items.any((it) => it.orderNo == orderNo));
+    if (idx < 0) return false;
+    final snapshot = _deepCopyShop(_recycleBin[idx]);
+    // 放行黑名单（否则下次抓包导入仍会拦截）
+    _unmarkDeleted(snapshot.items.map((e) => e.orderNo));
+    _shops.insert(0, snapshot);
+    _recycleBin.removeAt(idx);
+    _persist();
+    PersistenceService.saveRecycleBin(_recycleBin);
+    notifyListeners();
+    return true;
+  }
+
+  /// 回收站彻底删除（不留数据，单号保留在黑名单）
+  void permanentlyDeleteFromRecycleBin(String orderNo) {
+    _recycleBin.removeWhere((s) => s.items.any((it) => it.orderNo == orderNo));
+    PersistenceService.saveRecycleBin(_recycleBin);
+    notifyListeners();
+  }
+
+  /// 清空回收站（单号保留在黑名单）
+  void clearRecycleBin() {
+    _recycleBin.clear();
+    PersistenceService.saveRecycleBin(_recycleBin);
+    notifyListeners();
+  }
+
+  /// 把订单号从已删除黑名单移除（恢复订单时放行）
+  void _unmarkDeleted(Iterable<String> orderNos) {
+    var changed = false;
+    for (final no in orderNos) {
+      if (no.isNotEmpty && _deletedTradeNos.remove(no)) changed = true;
+    }
+    if (changed) {
+      PersistenceService.saveDeletedTradeNos(_deletedTradeNos.toList());
+    }
   }
 
   /// 一键清空全部商品订单（仅淘宝商品订单 _shops，不影响闪购/飞猪）。
