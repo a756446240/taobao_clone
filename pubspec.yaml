@@ -37,11 +37,15 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.1
 
-# v1.9.167：固定 foundation 到 2.5.7。
-# 云端 GitHub Actions 每次 pub get 重新解析依赖，会漂移到 shared_preferences_foundation 2.6.1，
-# 其 messages.g.swift 在新版 Swift 编译器下报 "Unexpected ',' separator" 导致构建失败。
+# v1.9.167：固定会漂移的原生插件版本，避免云端 pub get 拉到带 Swift 6 语法的新版导致编译失败。
+# 云端 GitHub Actions 每次 pub get 重新解析（仓库不提交 lock），这些包会漂移到新版本：
+# - shared_preferences_foundation 2.6.1：messages.g.swift 报 "Unexpected ',' separator"
+# - video_player_avfoundation 2.12.3：用了 @isolated/@isolation 宏（Swift 6），编译报错
+# - image_picker_ios 0.8.13+13：同上风险，锁定到 10-16 成功构建的版本
 dependency_overrides:
   shared_preferences_foundation: 2.5.7
+  video_player_avfoundation: 2.12.1
+  image_picker_ios: 0.8.13+12
 
 flutter:
   uses-material-design: true
