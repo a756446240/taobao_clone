@@ -1121,14 +1121,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             const Spacer(),
                             Row(
                               children: [
-                                Text('实付价 ', style: AppTextStyles.minSub),
+                                const Text('实付价 ',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFff5000))),
                                 // v1.9.112：实付价金额调小调细（对齐真实淘宝 ¥85 样式，
                                 // 与下方实付款大小区分开）
                                 const Text('¥',
                                     style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.black)),
+                                        color: Color(0xFFff5000))),
                                 // v1.9.90：商品卡显示单价，对齐真实淘宝 ¥33×3 而非 ¥99×3。
                                 // v1.9.96：实付价不含运费（旧数据 price 含运费时自动剥掉）
                                 // v1.9.97：双击金额=直接改该商品实付价（多商品订单各改各的）
@@ -1144,7 +1148,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                       style: const TextStyle(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
-                                          color: Colors.black)),
+                                          color: Color(0xFFff5000))),
                                 ),
                                 // v1.9.146：店铺/平台/支付优惠全部隐藏时，
                                 // 价格明细入口一并隐藏（没有可展开的优惠就没意义了）
@@ -1153,13 +1157,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     _item.showPayDiscount) ...[
                                   const SizedBox(width: 6),
                                   // v1.9.107：价格明细改灰色细体（对齐真实淘宝）
+                                  // v1.9.167：价格明细随实付价一并改橙色
                                   const Text('价格明细',
                                       style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w400,
-                                          color: Color(0xFF999999))),
+                                          color: Color(0xFFff5000))),
                                   const Icon(Icons.chevron_right,
-                                      size: 12, color: Color(0xFF999999)),
+                                      size: 12, color: Color(0xFFff5000)),
                                 ],
                                 const Spacer(),
                               ],
