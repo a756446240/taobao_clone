@@ -15,7 +15,7 @@ dependencies:
   # 网络图片缓存
   cached_network_image: ^3.3.1
   # 本地存储（搜索历史、收藏）
-  shared_preferences: ^2.2.2
+  shared_preferences: 2.5.5
 
   cupertino_icons: ^1.0.6
   # 视频播放（微淘 AI 视频轮播）
@@ -36,6 +36,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+
+# v1.9.167：固定 foundation 到 2.5.7。
+# 云端 GitHub Actions 每次 pub get 重新解析依赖，会漂移到 shared_preferences_foundation 2.6.1，
+# 其 messages.g.swift 在新版 Swift 编译器下报 "Unexpected ',' separator" 导致构建失败。
+dependency_overrides:
+  shared_preferences_foundation: 2.5.7
 
 flutter:
   uses-material-design: true
