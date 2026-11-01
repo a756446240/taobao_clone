@@ -1686,7 +1686,7 @@ class _OrderItemTile extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 商品行右侧：退款金额（与订单金额一致）
+                      // 商品行右侧：退款金额（与退款条金额同橙）
                       Text.rich(
                         TextSpan(
                           text: '退款: ',
@@ -1696,7 +1696,7 @@ class _OrderItemTile extends StatelessWidget {
                             TextSpan(
                               text: '¥${amount.toStringAsFixed(2)}',
                               style: const TextStyle(
-                                  fontSize: 12, color: Colors.black87),
+                                  fontSize: 12, color: Color(0xFFFF5000)),
                             ),
                           ],
                         ),
