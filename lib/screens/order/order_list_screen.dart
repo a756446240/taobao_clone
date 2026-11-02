@@ -1745,14 +1745,7 @@ class _OrderItemTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF1A1A1A)),
                       children: item.refundBarGreyText.isNotEmpty
-                          ? [
-                              TextSpan(
-                                  text: item.refundBarGreyText,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.normal,
-                                      color: Color(0xFF999999)))
-                            ]
+                          ? _greyTextSpans(item.refundBarGreyText)
                           : _refundBarSpans(amount),
                     ),
                     maxLines: 1,
@@ -1775,6 +1768,27 @@ class _OrderItemTile extends StatelessWidget {
     if (orderStatus.contains('成功')) return '退款成功';
     if (orderStatus.contains('结束')) return '退款结束';
     return '待商家退款';
+  }
+
+  /// 编辑过的退款条灰色文案：金额（¥数字）渲染成橙色，其余保持灰色
+  /// 与未编辑的 _refundBarSpans 视觉对齐，避免"修改过的地方金额变灰"
+  List<TextSpan> _greyTextSpans(String text) {
+    const grey = TextStyle(fontSize: 12, color: Color(0xFF999999));
+    const orange = TextStyle(fontSize: 12, color: Color(0xFFFF5000));
+    final spans = <TextSpan>[];
+    final re = RegExp(r'¥[\d,]+(?:\.\d+)?');
+    int last = 0;
+    for (final m in re.allMatches(text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start), style: grey));
+      }
+      spans.add(TextSpan(text: m.group(0), style: orange));
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last), style: grey));
+    }
+    return spans;
   }
 
   /// 退款条变体文案：0极速退款成功/1退款金额/2支付渠道/3平台支持退款
